@@ -1,0 +1,15 @@
+{
+    "name": "prestaflow/php-library",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "PrestaFlow\\Library\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jonathan Danse",
+            "email": "j.danse@prestaedit.com"
+        }
+    ]
+}
