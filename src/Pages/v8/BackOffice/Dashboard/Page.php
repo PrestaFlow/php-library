@@ -1,0 +1,13 @@
+<?php
+
+namespace PrestaFlow\Library\Pages\v8\BackOffice\Dashboard;
+
+use PrestaFlow\Library\Pages\v8\BackOffice\BasePage;
+
+class Page extends BasePage
+{
+    public function __construct()
+    {
+        $this->pageTitle = 'Dashboard';
+    }
+}

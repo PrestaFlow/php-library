@@ -2,7 +2,9 @@
 
 namespace PrestaFlow\Library\Utils;
 
-class Versions
+use PrestaFlow\Library\Exceptions\InvalidVersionException;
+
+trait Versions
 {
     public string $patchVersion;
     public string $minorVersion;
@@ -11,30 +13,27 @@ class Versions
     public function setVersions(string $patchVersion)
     {
         $this->patchVersion = $patchVersion;
-        /*
-        if (this.patchVersion.length === 7 || this.patchVersion.length === 8) {
-            this.minorVersion = this.patchVersion.slice(0, 5);
-            if (this.minorVersion.includes('1.7')) {
-              this.majorVersion = '1.7';
-            } else if (this.minorVersion.includes('1.6')) {
-              this.majorVersion = '1.6';
-            } else {
-              this.majorVersion = this.minorVersion.slice(0, 1);
-            }
-          } else if (this.patchVersion.length === 5) {
-            this.minorVersion = this.patchVersion.slice(0, 3);
-            if (this.minorVersion.includes('1.7')) {
-              this.majorVersion = '1.7';
-            } else if (this.minorVersion.includes('1.6')) {
-              this.majorVersion = '1.6';
-            } else {
-              this.majorVersion = this.minorVersion.slice(0, 1);
-            }
-          } else {
-            throw new Error(`Error with version '${this.patchVersion}'`);
-          }
-        */
 
-        throw new InvalidVersionException('Error with version ' . $this->patchVersion);
+        if (strlen($this->patchVersion) === 7 || strlen($this->patchVersion) === 8) {
+            $this->minorVersion = substr($this->patchVersion, 0, 5);
+            if (str_starts_with($this->minorVersion, '1.7')) {
+                $this->majorVersion = '1.7';
+            } else if (str_starts_with($this->minorVersion, '1.6')) {
+                $this->majorVersion = '1.6';
+            } else {
+                $this->majorVersion = substr($this->minorVersion, 0, 1);
+            }
+        } else if (strlen($this->patchVersion) === 5) {
+            $this->minorVersion = substr($this->patchVersion, 0, 3);
+            if (str_starts_with($this->minorVersion, '1.7')) {
+                $this->majorVersion = '1.7';
+            } else if (str_starts_with($this->minorVersion, '1.6')) {
+                $this->majorVersion = '1.6';
+            } else {
+                $this->majorVersion = substr($this->minorVersion, 0, 1);
+            }
+        } else {
+            throw new InvalidVersionException('Error with version ' . $this->patchVersion);
+        }
     }
 }
