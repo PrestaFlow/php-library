@@ -6,5 +6,4 @@ use PrestaFlow\Library\Pages\CommonPage;
 
 class BasePage extends CommonPage
 {
-    public string $pageTitle = '';
 }

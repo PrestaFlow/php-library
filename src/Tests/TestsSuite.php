@@ -3,6 +3,8 @@
 namespace PrestaFlow\Library\Tests;
 
 use Exception;
+use HeadlessChromium\BrowserFactory;
+use UnexpectedValueException;
 
 class TestsSuite
 {
@@ -26,6 +28,11 @@ class TestsSuite
         $this->suites[$this->_latestSuite] = [
             'title' => $description,
             'tests' => $this->_tests,
+            'stats' => [
+                'passes' => 0,
+                'failures' => 0,
+                'skips' => 0,
+            ]
         ];
         $this->_tests = [];
     }
@@ -36,6 +43,24 @@ class TestsSuite
             'title' => $description,
             'steps' => $steps
         ];
+    }
+
+    public function skip(string $description, $steps)
+    {
+        $this->_tests[] = [
+            'title' => $description,
+            'steps' => $steps,
+            'skip' => true,
+        ];
+    }
+
+    public function isSkippable($test)
+    {
+        if (isset($test['skip']) && $test['skip']) {
+            return true;
+        }
+
+        return false;
     }
 
     public function before()
@@ -66,18 +91,26 @@ class TestsSuite
 
         $this->before();
 
-        echo('Run : '. $this->_runestSuite.'<br />');
-        echo('-'.'Describe : ' . $this->suites[$this->_runestSuite]['title'].'<br />');
         foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
-            echo('--'.$test['title'].'<br />');
-
             try {
-                $test['steps']->call($this);
+                if ($this->isSkippable($test) === false) {
+                    $test['steps']->call($this);
 
-                $this->stats['passes']++;
-            } catch (\UnexpectedValueException $e) {
-                $tests['error'] = $e->getMessage();
-                echo('----'.$tests['error'].'<br />');
+                    $test['state'] = 'pass';
+                    $this->stats['passes']++;
+                } else {
+                    $test['state'] = 'skip';
+                    $this->stats['skips']++;
+                }
+            } catch (UnexpectedValueException $e) {
+                $test['state'] = 'fail';
+                $test['error'] = $e->getMessage();
+                $this->screen($this->page, 'error');
+                $this->stats['failures']++;
+            } catch (Exception $e) {
+                $test['state'] = 'fail';
+                $test['error'] = $e->getMessage();
+                $this->screen($this->page, 'error');
                 $this->stats['failures']++;
             } finally {
             }
@@ -91,5 +124,20 @@ class TestsSuite
         ];
 
         $this->after();
+    }
+
+    public function screen($page, $type = '')
+    {
+        $pages = $this->browser->getPages();
+        //$this->browser->getPage()->screenshot()->saveToFile('../../screens/errors/bar.png');
+    }
+
+    public function results($type = 'json')
+    {
+        if ($type == 'json') {
+            return json_encode($this->suites[$this->_runestSuite]);
+        }
+
+        return $this->suites[$this->_runestSuite];
     }
 }
