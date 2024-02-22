@@ -1,6 +1,6 @@
 <?php
 
-namespace PrestaFlow\Library\Expect;
+namespace PrestaFlow\Library\Expects;
 
 use Nunzion\Expect as ExpectLibrary;
 

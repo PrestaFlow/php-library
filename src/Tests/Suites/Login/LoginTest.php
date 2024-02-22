@@ -2,7 +2,8 @@
 
 namespace PrestaFlow\Library\Tests\Suites\Login;
 
-use PrestaFlow\Library\Excepts\Except;
+use HeadlessChromium\BrowserFactory;
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Tests\TestsSuite;
 
 class LoginTest extends TestsSuite
@@ -14,20 +15,21 @@ class LoginTest extends TestsSuite
             'Check PS version ${global.PS_VERSION} with ${global.LOCALE} language, and login and log out from BO',
             [
                 $this->it('should go to login page', function () use ($page) {
-                    Expect::that("foo")->equals("foo"); //"foo" == "foo"
-
+                    $page->navigate('https://1.7.7.8.test/admin-dev/')->waitForNavigation();
+                    $pageTitle = $page->evaluate('document.title')->getReturnValue();
+                    Expect::that($pageTitle)->equals('Dashboard');
                 }),
                 $this->it('should check PS version', function () use ($page) {
-
+                    Expect::that("foo")->equals("foo"); //"foo" == "foo"
                 }),
                 $this->it('should try to login with wrong email and password', function () use ($page) {
-
+                    Expect::that("foo")->equals("bar"); //"foo" == "foo"
                 }),
                 $this->it('should login into BO with default user', function () use ($page) {
-
+                    Expect::that("foo")->equals("foo"); //"foo" == "foo"
                 }),
                 $this->it('should log out from BO', function () use ($page) {
-
+                    Expect::that("foo")->equals("foo"); //"foo" == "foo"
                 }),
             ]
         );
