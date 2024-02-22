@@ -1,0 +1,70 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "4cb2b0e370597e3a88ac63e1a20fb2ba",
+    "packages": [
+        {
+            "name": "nunzion/php-expect",
+            "version": "1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://bitbucket.org/nunzion/php-expect.git",
+                "reference": "88bbb6fc52904cb1f35edd864c52ab45080418a3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://bitbucket.org/nunzion/php-expect/get/88bbb6fc52904cb1f35edd864c52ab45080418a3.zip",
+                "reference": "88bbb6fc52904cb1f35edd864c52ab45080418a3",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-0": {
+                    "Nunzion": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Henning Dieterichs",
+                    "email": "henning.dieterichs@hediet.de",
+                    "role": "Developer"
+                }
+            ],
+            "description": "An expressive but lightweight library to validate preconditions and invariants.",
+            "keywords": [
+                "argument",
+                "assert",
+                "assertion",
+                "exception",
+                "expect",
+                "invariant",
+                "precondition",
+                "validation"
+            ],
+            "support": {
+                "email": "phpexpect@hediet.de",
+                "source": "https://bitbucket.org/nunzion/php-expect"
+            },
+            "time": "2014-05-18T02:28:53+00:00"
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": [],
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": [],
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
+}

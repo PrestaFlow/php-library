@@ -11,5 +11,8 @@
             "name": "Jonathan Danse",
             "email": "j.danse@prestaedit.com"
         }
-    ]
+    ],
+    "require": {
+        "nunzion/php-expect": "^1.1"
+    }
 }
