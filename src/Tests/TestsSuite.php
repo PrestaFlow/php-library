@@ -4,7 +4,9 @@ namespace PrestaFlow\Library\Tests;
 
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use PrestaFlow\Library\Expects\Expect;
 use UnexpectedValueException;
+
 
 class TestsSuite
 {
@@ -26,6 +28,7 @@ class TestsSuite
     {
         $this->_latestSuite = get_class($this);
         $this->suites[$this->_latestSuite] = [
+            'source' => '',
             'title' => $description,
             'tests' => $this->_tests,
             'stats' => [
@@ -65,6 +68,10 @@ class TestsSuite
 
     public function before()
     {
+        $this->_runestSuite = get_class($this);
+        $this->suites[$this->_runestSuite]['source'] = str_replace('\\', '/', $this->_runestSuite);
+        $this->start_time = hrtime(true);
+
         $browserFactory = new BrowserFactory();
 
         // starts headless Chrome
@@ -83,16 +90,33 @@ class TestsSuite
     public function after()
     {
         $this->browser->close();
+
+        $this->end_time = hrtime(true);
+        $this->suites[$this->_runestSuite]['stats']['time'] = round(($this->end_time - $this->start_time) / 1e+6);
+        ;
+    }
+
+    public function getInstructions(&$test)
+    {
+        $instructions = [];
+        $reflection = new \ReflectionFunction($test['steps']);
+
+        $lines = file($reflection->getFileName());
+        for ($i = ($reflection->getStartLine() - 1) ; $i < ($reflection->getEndLine()) ; $i++) {
+            $instructions[$i] = $lines[$i];
+        }
+
+        return $test['code'] = $instructions;
     }
 
     public function run()
     {
-        $this->_runestSuite = get_class($this);
-
         $this->before();
 
         foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
             try {
+                $start_time = hrtime(true);
+                $this->getInstructions($test);
                 if ($this->isSkippable($test) === false) {
                     $test['steps']->call($this);
 
@@ -105,14 +129,16 @@ class TestsSuite
             } catch (UnexpectedValueException $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
-                $this->screen($this->page, 'error');
+                $this->attachScreen($test);
                 $this->stats['failures']++;
             } catch (Exception $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
-                $this->screen($this->page, 'error');
+                $this->attachScreen($test);
                 $this->stats['failures']++;
             } finally {
+                $end_time = hrtime(true);
+                $test['time'] = round(($end_time - $start_time) / 1e+6);
             }
         }
 
@@ -126,10 +152,9 @@ class TestsSuite
         $this->after();
     }
 
-    public function screen($page, $type = '')
+    public function attachScreen(&$test)
     {
-        $pages = $this->browser->getPages();
-        //$this->browser->getPage()->screenshot()->saveToFile('../../screens/errors/bar.png');
+        $test['screen'] = Expect::$latestError;
     }
 
     public function results($type = 'json')
