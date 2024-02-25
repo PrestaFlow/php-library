@@ -2,7 +2,6 @@
 
 namespace PrestaFlow\Library\Tests\Suites\Login;
 
-use function Amp\async;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Tests\TestsSuite;
 
@@ -34,10 +33,10 @@ class LoginTest extends TestsSuite
         $this->describe(
             'Check PS version {$PS_VERSION} with {$LOCALE} language, and login and log out from BO',
             [
-                $this->it('should go to login page', async(function () use ($page, $globals, $loginPage) {
+                $this->it('should go to login page', function () use ($page, $globals, $loginPage) {
                     $loginPage->goTo($globals['BO']['URL'], $page);
                     Expect::that($loginPage->getPageTitle($page))->with($page)->contains($loginPage->pageTitle());
-                })),
+                }),
                 $this->it('should check PS version', function () use ($page, $globals, $loginPage) {
                     $psVersion = $loginPage->getPrestaShopVersion($page);
                     Expect::that($psVersion)->with($page)->contains($globals['PS_VERSION']);
