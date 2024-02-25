@@ -14,7 +14,6 @@
     ],
     "require": {
         "nunzion/php-expect": "^1.1",
-        "chrome-php/chrome": "^1.10",
-        "amphp/amp": "^3.0"
+        "chrome-php/chrome": "^1.10"
     }
 }
