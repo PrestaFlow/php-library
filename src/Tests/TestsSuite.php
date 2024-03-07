@@ -4,9 +4,9 @@ namespace PrestaFlow\Library\Tests;
 
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Expects\Expect;
 use UnexpectedValueException;
-
 
 class TestsSuite
 {
@@ -28,7 +28,7 @@ class TestsSuite
     {
         $this->_latestSuite = get_class($this);
         $this->suites[$this->_latestSuite] = [
-            'source' => '',
+            'suite' => '',
             'title' => $description,
             'tests' => $this->_tests,
             'stats' => [
@@ -69,14 +69,15 @@ class TestsSuite
     public function before()
     {
         $this->_runestSuite = get_class($this);
-        $this->suites[$this->_runestSuite]['source'] = str_replace('\\', '/', $this->_runestSuite);
+        $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
         $this->start_time = hrtime(true);
 
         $browserFactory = new BrowserFactory();
 
         // starts headless Chrome
         $this->browser = $browserFactory->createBrowser([
-            'headless' => true, // disable headless mode
+            'userAgent' => 'PrestaFlow',
+            'headless' => false, // disable headless mode
         ]);
 
         try {
@@ -126,6 +127,11 @@ class TestsSuite
                     $test['state'] = 'skip';
                     $this->stats['skips']++;
                 }
+            } catch (OperationTimedOut $e) {
+                $test['state'] = 'fail';
+                $test['error'] = $e->getMessage();
+                $this->attachScreen($test);
+                $this->stats['failures']++;
             } catch (UnexpectedValueException $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
@@ -139,6 +145,7 @@ class TestsSuite
             } finally {
                 $end_time = hrtime(true);
                 $test['time'] = round(($end_time - $start_time) / 1e+6);
+
             }
         }
 
@@ -157,9 +164,9 @@ class TestsSuite
         $test['screen'] = Expect::$latestError;
     }
 
-    public function results($type = 'json')
+    public function results($json = true)
     {
-        if ($type == 'json') {
+        if (true === $json) {
             return json_encode($this->suites[$this->_runestSuite]);
         }
 
