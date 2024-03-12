@@ -24,7 +24,8 @@ class FirstTest extends TestsSuite
         ];
         // END
 
-        $this->before();
+        $headless = true;
+        $this->before($headless);
         $page = $this->page;
 
         $loginPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Login\Page;
@@ -33,7 +34,7 @@ class FirstTest extends TestsSuite
             'Test',
             [
                 $this->it('should go to home page', function () use ($page, $globals, $loginPage) {
-                    $page->setUserAgent('my user-agent');
+                    $page->setUserAgent('PrestaFlow');
                     $loginPage->goTo($globals['FO']['URL'], $page);
                     Expect::that($loginPage->getPageTitle($page))->with($page)->contains($loginPage->pageTitle());
                 }),

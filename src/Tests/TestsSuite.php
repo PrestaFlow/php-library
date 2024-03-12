@@ -66,7 +66,7 @@ class TestsSuite
         return false;
     }
 
-    public function before()
+    public function before(bool $headless = true)
     {
         $this->_runestSuite = get_class($this);
         $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
@@ -77,7 +77,7 @@ class TestsSuite
         // starts headless Chrome
         $this->browser = $browserFactory->createBrowser([
             'userAgent' => 'PrestaFlow',
-            'headless' => false, // disable headless mode
+            'headless' => $headless, // disable headless mode
         ]);
 
         try {
