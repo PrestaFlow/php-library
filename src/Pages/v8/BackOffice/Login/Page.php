@@ -27,29 +27,36 @@ class Page extends BasePage
     /**
      * Enter credentials and submit login form
      */
-    public function login($page, $email = null, $password = null, $waitForNavigation = true)
+    public function login($email = null, $password = null, $waitForNavigation = false)
     {
-        $this->setValue($page, $this->emailInput, $email);
-        $this->setValue($page, $this->passwordInput, $password);
+        if ($email === null) {
+            $email = $this->getGlobal('BO_EMAIL');
+        }
+        if ($password === null) {
+            $password = $this->getGlobal('BO_PASSWD');
+        }
+
+        $this->setValue($this->emailInput, $email);
+        $this->setValue($this->passwordInput, $password);
 
         // Wait for navigation if login is successful
         if ($waitForNavigation) {
             //await this.clickAndWaitForNavigation(page, this.submitLoginButton);
         } else {
-            $this->click($page, $this->submitLoginButton);
+            $this->click($this->submitLoginButton);
         }
     }
 
     /**
      * Get login error
      */
-    public function getLoginError($page)
+    public function getLoginError()
     {
-        return $this->getTextContent($page, $this->alertDangerTextBlock);
+        return $this->getTextContent($this->alertDangerTextBlock);
     }
 
-    public function getPrestashopVersion($page)
+    public function getPrestashopVersion()
     {
-        return $this->getTextContent($page, $this->psVersionBlock);
+        return $this->getTextContent($this->psVersionBlock);
     }
 }
