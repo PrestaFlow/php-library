@@ -121,6 +121,8 @@ class TestsSuite
                 if ($this->isSkippable($test) === false) {
                     $test['steps']->call($this);
 
+                    $this->attachWarning($test);
+
                     $test['state'] = 'pass';
                     $this->stats['passes']++;
                 } else {
@@ -130,16 +132,19 @@ class TestsSuite
             } catch (OperationTimedOut $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
+                $this->attachWarning($test);
                 $this->attachScreen($test);
                 $this->stats['failures']++;
             } catch (UnexpectedValueException $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
+                $this->attachWarning($test);
                 $this->attachScreen($test);
                 $this->stats['failures']++;
             } catch (Exception $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
+                $this->attachWarning($test);
                 $this->attachScreen($test);
                 $this->stats['failures']++;
             } finally {
@@ -157,6 +162,11 @@ class TestsSuite
         ];
 
         $this->after();
+    }
+
+    public function attachWarning(&$test)
+    {
+        $test['warning'] = Expect::$latestWarning;
     }
 
     public function attachScreen(&$test)
