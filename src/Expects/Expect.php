@@ -10,7 +10,13 @@ class Expect extends ExpectLibrary
     protected $page;
     protected static $expectedValue;
 
+    public static $latestWarning = '';
     public static $latestError = '';
+
+    public static function setWarning($message)
+    {
+        self::$latestWarning = $message;
+    }
 
     public function with($page)
     {
@@ -29,6 +35,22 @@ class Expect extends ExpectLibrary
         return self::$expectedValue;
     }
 
+    private function format($template, $arguments)
+    {
+        return preg_replace_callback('/\\{(?<parameterName>.*?)(\\:(?<formatOptions>.*))?\\}/',
+                function ($match) use ($arguments)
+        {
+            $parameterName = $match["parameterName"];
+            if (isset($arguments[$parameterName]))
+            {
+                $result = $arguments[$parameterName];
+                if (is_object($result) || is_array($result))
+                    $result = print_r($result, true);
+                return $result;
+            }
+        }, $template);
+    }
+
     protected function getExceptionConstructor($explanation, $arguments = array())
     {
         if ($this->page instanceof HeadlessChromiumPage) {
@@ -41,10 +63,45 @@ class Expect extends ExpectLibrary
                 $this->page->screenshot()->saveToFile('../../screens/errors/'.$fileName);
             }
         }
-        return parent::getExceptionConstructor($explanation, $arguments);
+
+        return $this->getConditionViolationExceptionConstructor(
+            $this->format($explanation, $arguments), $arguments);
     }
 
-    //AssertionError: expected 'catalogue de modules • 1.7.6.9' to include 'marketplace'
+    protected function getUnexpectedValueExceptionConstructor($explanation, $arguments = array())
+    {
+        $arguments["actual"] = $this->getValue();
+
+        return $this->getExceptionConstructor($explanation, $arguments);
+    }
+
+    public function visible($selector = null)
+    {
+        $this->isDefined();
+        if ($selector === null) {
+            $selector = 'Element';
+        }
+        if ($this->getValue() != true)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor("{selector} must be visible", array("selector" => $selector));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
+
+    public function notVisible($selector = null)
+    {
+        $this->isDefined();
+        if ($selector === null) {
+            $selector = 'Element';
+        }
+        if ($this->getValue() != false)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor("{selector} must be not visible", array("selector" => $selector));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
 
     public function contains($needle)
     {
@@ -52,7 +109,20 @@ class Expect extends ExpectLibrary
 
         if (str_contains($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("to include {expected}", array("expected" => $needle));
+            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to include '{actual}'", array("expected" => $needle));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+
+        return $this;
+    }
+
+    public function notContains($needle)
+    {
+        $this->isDefined();
+
+        if (!str_contains($this->getValue(), $needle) === false)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to not include '{actual}'", array("expected" => $needle));
             throw call_user_func_array($e[0], $e[1]);
         }
 
@@ -65,7 +135,7 @@ class Expect extends ExpectLibrary
 
         if (str_starts_with($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("to starts with {expected}", array("expected" => $needle));
+            $e = $this->getUnexpectedValueExceptionConstructor("'{actual}' to starts with {expected}", array("expected" => $needle));
             throw call_user_func_array($e[0], $e[1]);
         }
 
@@ -78,7 +148,7 @@ class Expect extends ExpectLibrary
 
         if (str_ends_with($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("to ends with {expected}", array("expected" => $needle));
+            $e = $this->getUnexpectedValueExceptionConstructor("'{actual}' to ends with {expected}", array("expected" => $needle));
             throw call_user_func_array($e[0], $e[1]);
         }
 
