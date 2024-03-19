@@ -12,9 +12,9 @@ class WishlistTest extends TestsSuite
         // TEMP
         $globals = [
             'PS_VERSION' => '8.0.4',
-            'LOCALE' => 'en',
+            'LOCALE' => 'fr',
             'FO' => [
-                'URL' => 'https://8.0.4.test',
+                'URL' => 'https://8.0.4.test/fr/',
             ],
             'BO' => [
                 'URL' => 'https://8.0.4.test/admin-dev',
@@ -26,63 +26,69 @@ class WishlistTest extends TestsSuite
 
         $headless = true;
         $this->before($headless);
-        $page = $this->page;
 
         $homePage = new \PrestaFlow\Library\Pages\v8\FrontOffice\Home\Page();
-        $homePage->setPage($page);
         $homePage->setGlobals($globals);
-        $homePage->setUserAgent('PrestaFlow');
+        //$homePage->setUserAgent('PrestaFlow');
+
+        $frontOfficeLoginPage = new \PrestaFlow\Library\Pages\v8\FrontOffice\Login\Page();
+        $frontOfficeLoginPage->setGlobals($globals);
 
         $loginPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Login\Page();
-        $loginPage->setPage($page);
         $loginPage->setGlobals($globals);
-        $loginPage->setUserAgent('PrestaFlow');
 
         $dashboardPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Dashboard\Page();
-        $dashboardPage->setPage($page);
         $dashboardPage->setGlobals($globals);
-        $dashboardPage->setUserAgent('PrestaFlow');
 
         $this->describe(
             'Wishlist module - Statistics tab settings',
             [
-                $this->it('should login in BO', function () use (&$loginPage, &$dashboardPage) {
+                $this->it('should login in BO', function () use ($loginPage, $dashboardPage) {
                     $loginPage->goToPage('login');
 
-                    Expect::that($loginPage->getPageTitle())->with($loginPage->getPage())->contains($loginPage->pageTitle());
+                    Expect::that($loginPage->getPageTitle())->contains($loginPage->pageTitle());
 
                     $loginPage->login();
 
-                    Expect::that($dashboardPage->getPageTitle())->with($dashboardPage->getPage())->contains($dashboardPage->pageTitle());
+                    Expect::that($loginPage->getPageTitle())->contains($loginPage->pageTitle());
+                }),
+                $this->skip('should go to \'Modules > Module Manager\' page', function () use ($homePage) {
+                }),
+                $this->skip('should search the module ${Modules.blockwishlist.name}', function () use ($homePage) {
+                }),
+                $this->skip('should go to the configuration page of the module ${Modules.blockwishlist.name}', function () use ($homePage) {
+                }),
+                $this->skip('should go on Statistics Tab', function () use ($homePage) {
+                }),
+                $this->it('should go to the FO', function () use ($homePage) {
+                    $homePage->goToPage('home');
 
+                    Expect::that()->elementIsVisible($homePage->selector('homePageSection'), 1000);
                 }),
-                $this->skip('should go to \'Modules > Module Manager\' page', function () use (&$homePage) {
+                $this->it('should go to login page', function () use ($frontOfficeLoginPage) {
+                    $frontOfficeLoginPage->goToPage('login');
+
+                    Expect::that($frontOfficeLoginPage->getPageTitle())->contains($frontOfficeLoginPage->pageTitle());
                 }),
-                $this->skip('should search the module ${Modules.blockwishlist.name}', function () use (&$homePage) {
+                $this->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
+                    $frontOfficeLoginPage->login('pub@prestashop.com', '123456789');
+
+                    // Expect that customer is connected
+                    Expect::that()->elementIsVisible($frontOfficeLoginPage->selector('logoutLink'), 1000);
                 }),
-                $this->skip('should go to the configuration page of the module ${Modules.blockwishlist.name}', function () use (&$homePage) {
+                $this->skip('should go to all products page', function () use ($homePage) {
                 }),
-                $this->skip('should go on Statistics Tab', function () use (&$homePage) {
+                $this->skip('should add product #${idxProduct} to wishlist', function () use ($homePage) {
                 }),
-                $this->skip('should go to the FO', function () use (&$homePage) {
+                $this->skip('should add product #${idxProduct} to wishlist', function () use ($homePage) {
                 }),
-                $this->skip('should go to login page', function () use (&$homePage) {
+                $this->skip('should add product #${idxProduct} to wishlist', function () use ($homePage) {
                 }),
-                $this->skip('should sign in with default customer', function () use (&$homePage) {
+                $this->skip('should logout', function () use ($homePage) {
                 }),
-                $this->skip('should go to all products page', function () use (&$homePage) {
+                $this->skip('should go to BO', function () use ($homePage) {
                 }),
-                $this->skip('should add product #${idxProduct} to wishlist', function () use (&$homePage) {
-                }),
-                $this->skip('should add product #${idxProduct} to wishlist', function () use (&$homePage) {
-                }),
-                $this->skip('should add product #${idxProduct} to wishlist', function () use (&$homePage) {
-                }),
-                $this->skip('should logout', function () use (&$homePage) {
-                }),
-                $this->skip('should go to BO', function () use (&$homePage) {
-                }),
-                $this->skip('should click on the refresh button', function () use (&$homePage) {
+                $this->skip('should click on the refresh button', function () use ($homePage) {
                 }),
             ]
         );

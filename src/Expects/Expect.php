@@ -2,12 +2,14 @@
 
 namespace PrestaFlow\Library\Expects;
 
+use HeadlessChromium\Exception\ElementNotFoundException;
+use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as HeadlessChromiumPage;
 use Nunzion\Expect as ExpectLibrary;
+use PrestaFlow\Library\Tests\TestsSuite;
 
 class Expect extends ExpectLibrary
 {
-    protected $page;
     protected static $expectedValue;
 
     public static $latestWarning = '';
@@ -18,13 +20,7 @@ class Expect extends ExpectLibrary
         self::$latestWarning = $message;
     }
 
-    public function with($page)
-    {
-        $this->page = $page;
-        return $this;
-    }
-
-    public static function that($value)
+    public static function that($value = null)
     {
         self::$expectedValue = $value;
         return parent::that($value);
@@ -53,15 +49,21 @@ class Expect extends ExpectLibrary
 
     protected function getExceptionConstructor($explanation, $arguments = array())
     {
-        if ($this->page instanceof HeadlessChromiumPage) {
-            sleep(3);
-            $fileName = 'error_'.$this->page->getSession()->getTargetId().'.png';
-            self::$latestError = $fileName;
-            if (function_exists('storage_path')) {
-                $this->page->screenshot()->saveToFile(storage_path().'/screens/errors/'.$fileName);
-            } else {
-                $this->page->screenshot()->saveToFile('../../screens/errors/'.$fileName);
+        try {
+            $page = TestsSuite::getPage();
+            if ($page instanceof HeadlessChromiumPage) {
+                sleep(3);
+                $fileName = 'error_'.$page->getSession()->getTargetId().'.png';
+                self::$latestError = $fileName;
+                $screenshot = $page->screenshot();
+                if (function_exists('storage_path')) {
+                    $screenshot->saveToFile(storage_path().'/screens/errors/'.$fileName);
+                } else {
+                    $screenshot->saveToFile('../../screens/errors/'.$fileName);
+                }
             }
+        } catch (OperationTimedOut $e) {
+            self::$latestError = null;
         }
 
         return $this->getConditionViolationExceptionConstructor(
@@ -73,6 +75,33 @@ class Expect extends ExpectLibrary
         $arguments["actual"] = $this->getValue();
 
         return $this->getExceptionConstructor($explanation, $arguments);
+    }
+
+    public function elementIsVisible($selector = null, $timeout = 30000)
+    {
+        $isVisible = $this->_elementIsVisible($selector, $timeout);
+
+        Expect::that($isVisible)->visible($selector);
+    }
+
+    public function elementIsNotVisible($selector = null, $timeout = 30000)
+    {
+        $isVisible = $this->_elementIsVisible($selector, $timeout);
+
+        Expect::that($isVisible)->notVisible($selector);
+    }
+
+    protected function _elementIsVisible($selector, $timeout)
+    {
+        try {
+            TestsSuite::getPage()->waitUntilContainsElement($selector, $timeout);
+        } catch (OperationTimedOut $exception) {
+            return false;
+        } catch (ElementNotFoundException $exception) {
+            return false;
+        }
+
+        return true;
     }
 
     public function visible($selector = null)
@@ -100,6 +129,13 @@ class Expect extends ExpectLibrary
             $e = $this->getUnexpectedValueExceptionConstructor("{selector} must be not visible", array("selector" => $selector));
             throw call_user_func_array($e[0], $e[1]);
         }
+        return $this;
+    }
+
+    public function customerIsLogged($selector, $timeout = 30000)
+    {
+        Expect::that()->_("customer is logged")->elementIsVisible($selector, $timeout);
+
         return $this;
     }
 

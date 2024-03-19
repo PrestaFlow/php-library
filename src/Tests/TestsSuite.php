@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Tests;
 
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Expects\Expect;
 use UnexpectedValueException;
@@ -20,9 +21,6 @@ class TestsSuite
     private $_latestSuite = null;
     private $_runestSuite = null;
     private $_tests = [];
-
-    private $browser;
-    public $page;
 
     public function describe(string $description)
     {
@@ -66,31 +64,69 @@ class TestsSuite
         return false;
     }
 
+    public static function getSocketFilePath()
+    {
+        if (function_exists('storage_path')) {
+            $socketFilePath = storage_path().'/datas/.broswer';
+        } else {
+            $socketFilePath = '../../datas/.broswer';
+        }
+
+        return $socketFilePath;
+    }
+
+    public static function getBrowser(bool $headless = true)
+    {
+        $browser = null;
+
+        $socketFile = TestsSuite::getSocketFilePath();
+
+        $socket = null;
+        if (file_exists($socketFile)) {
+            $socket = \file_get_contents($socketFile);
+        }
+
+        try {
+            if ($socket === null) {
+                throw new BrowserConnectionFailed('');
+            }
+            $browser = BrowserFactory::connectToBrowser($socket);
+        } catch (BrowserConnectionFailed $e) {
+            $browserFactory = new BrowserFactory();
+
+            $browserFactory->addOptions(['headless' => (bool) $headless]);
+
+            $browser = $browserFactory->createBrowser([
+                'userAgent' => 'PrestaFlow',
+                'keepAlive' => true,
+            ]);
+            \file_put_contents($socketFile, $browser->getSocketUri(), LOCK_EX);
+        }
+
+        return $browser;
+    }
+
+    public static function getPage()
+    {
+        $pages = TestsSuite::getBrowser()?->getPages();
+        if (count($pages) == 0) {
+            TestsSuite::getBrowser()?->createPage();
+        }
+        return TestsSuite::getBrowser()?->getPages()[0];
+    }
+
     public function before(bool $headless = true)
     {
         $this->_runestSuite = get_class($this);
         $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
         $this->start_time = hrtime(true);
 
-        $browserFactory = new BrowserFactory();
-
-        // starts headless Chrome
-        $this->browser = $browserFactory->createBrowser([
-            'userAgent' => 'PrestaFlow',
-            'headless' => $headless, // disable headless mode
-        ]);
-
-        try {
-            // creates a new page and navigate to an URL
-            $this->page = $this->browser->createPage();
-        } catch (Exception $e) {
-            $this->after();
-        }
+        TestsSuite::getBrowser($headless);
     }
 
     public function after()
     {
-        $this->browser->close();
+        TestsSuite::getBrowser()?->close();
 
         $this->end_time = hrtime(true);
         $this->suites[$this->_runestSuite]['stats']['time'] = round(($this->end_time - $this->start_time) / 1e+6);
@@ -150,7 +186,6 @@ class TestsSuite
             } finally {
                 $end_time = hrtime(true);
                 $test['time'] = round(($end_time - $start_time) / 1e+6);
-
             }
         }
 

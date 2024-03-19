@@ -4,22 +4,18 @@ namespace PrestaFlow\Library\Pages;
 
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use PrestaFlow\Library\Tests\TestsSuite;
 
 class CommonPage
 {
-    protected $page;
     protected $globals;
     public $selectors = [];
 
     public string $url = '';
     public string $pageTitle = '';
 
-    public function __construct($page = null)
+    public function __construct()
     {
-        if ($page !== null) {
-            $this->page = $page;
-        }
-
         return $this;
     }
 
@@ -39,7 +35,7 @@ class CommonPage
 
     public function __call($name, $arguments)
     {
-        if (method_exists($this->getPage(), $name)) {
+        if (!is_null($this->getPage()) && method_exists($this->getPage(), $name)) {
             call_user_func_array([$this->getPage(), $name], $arguments);
         }
     }
@@ -77,14 +73,9 @@ class CommonPage
         return null;
     }
 
-    public function setPage($page)
-    {
-        $this->page = $page;
-    }
-
     public function getPage()
     {
-        return $this->page;
+        return TestsSuite::getPage();
     }
 
     public function pageTitle()
@@ -97,7 +88,7 @@ class CommonPage
         return $this->getPage()->evaluate('document.title')->getReturnValue();
     }
 
-    public function goTo(string $url)
+    public function goToURL(string $url)
     {
         $this->getPage()->navigate($url)->waitForNavigation();
     }
