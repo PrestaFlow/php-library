@@ -6,13 +6,23 @@ use PrestaFlow\Library\Pages\v8\FrontOffice\BasePage;
 
 class Page extends BasePage
 {
-    public function __construct()
+    public function defineSelectors()
     {
-        $selectors = [
+        return [
+            'homePageSection' => '#content.page-home',
             'maintenanceBlock' => '#content.page-maintenance',
             'desktopLogo' => '#_desktop_logo',
+            'allProductsLink' => '#content section.featured-products:nth-of-type(1) .all-product-link',
+            'testallProductsLink' => '#content .all-product-link',
         ];
+    }
 
-        $this->selectors = $selectors;
+    public function goToAllProducts()
+    {
+        $this->goToPage('home');
+
+        $elem = $this->getPage()->dom()->querySelector($this->selector('allProductsLink'));
+        $url = $elem->getAttribute('href');
+        $this->getPage()->navigate($url)->waitForNavigation();
     }
 }

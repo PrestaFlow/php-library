@@ -4,9 +4,13 @@ namespace PrestaFlow\Library\Tests;
 
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Cookies\Cookie;
+use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
+use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
+use Symfony\Component\ErrorHandler\Error\FatalError;
 use UnexpectedValueException;
 
 class TestsSuite
@@ -18,41 +22,51 @@ class TestsSuite
         'skips' => 0,
     ];
 
+    private $_runs = 0;
     private $_latestSuite = null;
     private $_runestSuite = null;
     private $_tests = [];
 
+    protected function getSuite()
+    {
+        return get_class($this);
+    }
+
     public function describe(string $description)
     {
-        $this->_latestSuite = get_class($this);
-        $this->suites[$this->_latestSuite] = [
+        $this->suites[$this->getSuite()] = [
             'suite' => '',
             'title' => $description,
-            'tests' => $this->_tests,
+            'tests' => [],
             'stats' => [
                 'passes' => 0,
                 'failures' => 0,
                 'skips' => 0,
             ]
         ];
-        $this->_tests = [];
+
+        return $this;
     }
 
     public function it(string $description, $steps)
     {
-        $this->_tests[] = [
+        $this->suites[$this->getSuite()]['tests'][] = [
             'title' => $description,
             'steps' => $steps
         ];
+
+        return $this;
     }
 
     public function skip(string $description, $steps)
     {
-        $this->_tests[] = [
+        $this->suites[$this->getSuite()]['tests'][] = [
             'title' => $description,
             'steps' => $steps,
             'skip' => true,
         ];
+
+        return $this;
     }
 
     public function isSkippable($test)
@@ -77,6 +91,7 @@ class TestsSuite
 
     public static function getBrowser(bool $headless = true)
     {
+        $headless = false;
         $browser = null;
 
         $socketFile = TestsSuite::getSocketFilePath();
@@ -99,6 +114,7 @@ class TestsSuite
             $browser = $browserFactory->createBrowser([
                 'userAgent' => 'PrestaFlow',
                 'keepAlive' => true,
+                //'headless' => false,
             ]);
             \file_put_contents($socketFile, $browser->getSocketUri(), LOCK_EX);
         }
@@ -122,6 +138,21 @@ class TestsSuite
         $this->start_time = hrtime(true);
 
         TestsSuite::getBrowser($headless);
+
+        try {
+            $cookies = TestsSuite::getPage()?->getCookies();
+            if ($cookies instanceof CookiesCollection && count($cookies)) {
+                foreach ($cookies as $cookie) {
+                    if (str_starts_with($cookie->getName(), 'PrestaShop-')) {
+                        TestsSuite::getPage()->setCookies([
+                            Cookie::create($cookie->getName(), '', ['expires'])
+                        ])->await();
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            //
+        }
     }
 
     public function after()
@@ -148,8 +179,6 @@ class TestsSuite
 
     public function run()
     {
-        $this->before();
-
         foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
             try {
                 $start_time = hrtime(true);
@@ -165,19 +194,7 @@ class TestsSuite
                     $test['state'] = 'skip';
                     $this->stats['skips']++;
                 }
-            } catch (OperationTimedOut $e) {
-                $test['state'] = 'fail';
-                $test['error'] = $e->getMessage();
-                $this->attachWarning($test);
-                $this->attachScreen($test);
-                $this->stats['failures']++;
-            } catch (UnexpectedValueException $e) {
-                $test['state'] = 'fail';
-                $test['error'] = $e->getMessage();
-                $this->attachWarning($test);
-                $this->attachScreen($test);
-                $this->stats['failures']++;
-            } catch (Exception $e) {
+            } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Exception $e) {
                 $test['state'] = 'fail';
                 $test['error'] = $e->getMessage();
                 $this->attachWarning($test);

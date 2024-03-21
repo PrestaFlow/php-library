@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Pages\v8\FrontOffice;
 
 use Exception;
+use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Tests\TestsSuite;
@@ -15,8 +16,8 @@ class BasePage extends CommonPage
             'maintenanceBlock' => '#content.page-maintenance',
             'desktopLogo' => '#_desktop_logo',
             'userInfoLink' => '#_desktop_user_info',
-            'accountLink' => '#_desktop_user_info .user-info a[href*="/my-account"]',
-            'logoutLink' => '#_desktop_user_info .user-info a[href*="/?mylogout="]',
+            'accountLink' => '#_desktop_user_info .user-info a[href*=\'/my-account\']',
+            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\']',
         ];
 
         $pageSelectors = [];
@@ -25,6 +26,17 @@ class BasePage extends CommonPage
         }
 
         $this->selectors = [...$selectors, ...$pageSelectors];
+
+        $messages = [
+
+        ];
+
+        $pageMessages = [];
+        if (method_exists($this, 'defineMessages')) {
+            $pageMessages = $this->defineMessages();
+        }
+
+        $this->messages = [...$messages, ...$pageMessages];
 
         parent::__construct();
     }
@@ -43,7 +55,7 @@ class BasePage extends CommonPage
         try {
             $bodyContent = $this->getTextContent('body');
             Expect::that($bodyContent)->notContains('[Debug] This page has moved');
-        } catch (Exception $e) {
+        } catch (OperationTimedOut | Exception $e) {
             Expect::setWarning('debug-mode');
 
             $this->click('a');
@@ -67,5 +79,11 @@ class BasePage extends CommonPage
         }
 
         return $url;
+    }
+
+    public function logout()
+    {
+        $this->click($this->getSelector('logoutLink'));
+        //TestsSuite::getPage()->waitForReload();
     }
 }

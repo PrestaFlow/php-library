@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages;
 
+use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Tests\TestsSuite;
@@ -10,6 +11,7 @@ class CommonPage
 {
     protected $globals;
     public $selectors = [];
+    public $messages = [];
 
     public string $url = '';
     public string $pageTitle = '';
@@ -17,6 +19,20 @@ class CommonPage
     public function __construct()
     {
         return $this;
+    }
+
+    public function message($message)
+    {
+        return $this->getMessage($message);
+    }
+
+    public function getMessage($message)
+    {
+        if (isset($this->messages[$message])) {
+            return $this->messages[$message];
+        }
+
+        return null;
     }
 
     public function selector($selector)
@@ -93,18 +109,22 @@ class CommonPage
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
-    public function getTextContent($selector, $waitForSelector = true, $timeout = 10000)
+    public function getTextContent($selector, $waitForSelector = true, $timeout = 3000)
     {
-        if ($waitForSelector) {
-            $this->getPage()->waitUntilContainsElement($selector);
+        try {
+            if ($waitForSelector) {
+                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            }
+            $element = $this->getPage()->dom()->querySelector($selector);
+            return trim($element->getText());
+        } catch (OperationTimedOut | Exception $e) {
+            return false;
         }
-        $element = $this->getPage()->dom()->querySelector($selector);
-        return trim($element->getText());
     }
 
-    public function click($selector)
+    public function click($selector, $nth = 1)
     {
-        $this->getPage()->mouse()->find($selector)->click();
+        $this->getPage()->mouse()->find($selector, $nth)->click();
     }
 
     /**
@@ -123,9 +143,7 @@ class CommonPage
     {
         try {
             $this->getPage()->waitUntilContainsElement($selector, $timeout);
-        } catch (OperationTimedOut $exception) {
-            return false;
-        } catch (ElementNotFoundException $exception) {
+        } catch (ElementNotFoundException | OperationTimedOut | Exception $e) {
             return false;
         }
 

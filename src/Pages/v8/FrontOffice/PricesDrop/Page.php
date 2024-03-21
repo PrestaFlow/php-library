@@ -2,7 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v8\FrontOffice\PricesDrop;
 
-use PrestaFlow\Library\Pages\v8\FrontOffice\ListingPage\Page as ListingPage;
+use PrestaFlow\Library\Pages\v8\FrontOffice\Listing\Page as ListingPage;
 
 class Page extends ListingPage
 {

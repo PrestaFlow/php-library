@@ -2,15 +2,19 @@
 
 namespace PrestaFlow\Library\Expects;
 
+use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as HeadlessChromiumPage;
 use Nunzion\Expect as ExpectLibrary;
 use PrestaFlow\Library\Tests\TestsSuite;
+use Symfony\Component\ErrorHandler\Error\FatalError;
 
 class Expect extends ExpectLibrary
 {
     protected static $expectedValue;
+    protected static $keepOverrideMessage = false;
+    protected static $overrideMessage = null;
 
     public static $latestWarning = '';
     public static $latestError = '';
@@ -22,8 +26,25 @@ class Expect extends ExpectLibrary
 
     public static function that($value = null)
     {
+        if (!self::$keepOverrideMessage) {
+            self::$overrideMessage = null;
+        }
+        self::$keepOverrideMessage = false;
         self::$expectedValue = $value;
         return parent::that($value);
+    }
+
+    public function keepOverrideMessage()
+    {
+        self::$keepOverrideMessage = true;
+        return $this;
+    }
+
+    public function __($explanation)
+    {
+        $this->keepOverrideMessage();
+        self::$overrideMessage = $explanation;
+        return $this;
     }
 
     protected function getValue()
@@ -66,6 +87,10 @@ class Expect extends ExpectLibrary
             self::$latestError = null;
         }
 
+        if (self::$overrideMessage !== null) {
+            $explanation = self::$overrideMessage;
+        }
+
         return $this->getConditionViolationExceptionConstructor(
             $this->format($explanation, $arguments), $arguments);
     }
@@ -95,9 +120,7 @@ class Expect extends ExpectLibrary
     {
         try {
             TestsSuite::getPage()->waitUntilContainsElement($selector, $timeout);
-        } catch (OperationTimedOut $exception) {
-            return false;
-        } catch (ElementNotFoundException $exception) {
+        } catch (OperationTimedOut | ElementNotFoundException | FatalError | Exception $e) {
             return false;
         }
 
@@ -134,7 +157,14 @@ class Expect extends ExpectLibrary
 
     public function customerIsLogged($selector, $timeout = 30000)
     {
-        Expect::that()->_("customer is logged")->elementIsVisible($selector, $timeout);
+        Expect::that()->__("customer is not logged")->elementIsVisible($selector, $timeout);
+
+        return $this;
+    }
+
+    public function customerIsNotLogged($selector, $timeout = 30000)
+    {
+        Expect::that()->__("customer is logged")->elementIsNotVisible($selector, $timeout);
 
         return $this;
     }

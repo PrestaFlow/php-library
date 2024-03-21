@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Pages\v8\FrontOffice\Login;
 
 use PrestaFlow\Library\Pages\v8\FrontOffice\BasePage;
+use PrestaFlow\Library\Tests\TestsSuite;
 
 class Page extends BasePage
 {
@@ -19,7 +20,6 @@ class Page extends BasePage
     public function defineSelectors()
     {
         return [
-            'homePageSection' => '#content.page-home',
             'emailInput' => '#login-form input[name=\'email\']',
             'passwordInput' => '#login-form input[name=\'password\']',
             'submitLoginButton' => '#login-form button#submit-login',
@@ -30,7 +30,7 @@ class Page extends BasePage
     /**
      * Enter credentials and submit login form
      */
-    public function login($email = null, $password = null, $waitForNavigation = false)
+    public function login($email = null, $password = null, $waitForNavigation = true)
     {
         if ($email === null) {
             $email = $this->getGlobal('FO_EMAIL');
@@ -44,7 +44,8 @@ class Page extends BasePage
 
         // Wait for navigation if login is successful
         if ($waitForNavigation) {
-            //await this.clickAndWaitForNavigation(page, this.submitLoginButton);
+            $this->click($this->getSelector('submitLoginButton'));
+            //TestsSuite::getPage()->waitForReload();
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
