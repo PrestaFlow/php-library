@@ -35,15 +35,21 @@ class CommonPage
         return null;
     }
 
-    public function selector($selector)
+    public function selector($selector, $replacements = [])
     {
-        return $this->getSelector($selector);
+        return $this->getSelector($selector, $replacements);
     }
 
-    public function getSelector($selector)
+    public function getSelector($selector, $replacements = [])
     {
         if (isset($this->selectors[$selector])) {
-            return $this->selectors[$selector];
+            $selector = $this->selectors[$selector];
+            if (is_array($replacements)) {
+                foreach ($replacements as $key => $value) {
+                    $selector = str_replace('${'.$key.'}', $value, $selector);
+                }
+            }
+            return $selector;
         }
 
         return null;
@@ -109,7 +115,7 @@ class CommonPage
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
-    public function getTextContent($selector, $waitForSelector = true, $timeout = 3000)
+    public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
             if ($waitForSelector) {
@@ -139,7 +145,7 @@ class CommonPage
         $this->getPage()->keyboard()->typeText($value);
     }
 
-    public function elementIsVisible($selector, $timeout)
+    public function elementIsVisible($selector, $timeout = 1000)
     {
         try {
             $this->getPage()->waitUntilContainsElement($selector, $timeout);

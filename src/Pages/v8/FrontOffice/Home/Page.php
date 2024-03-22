@@ -13,7 +13,6 @@ class Page extends BasePage
             'maintenanceBlock' => '#content.page-maintenance',
             'desktopLogo' => '#_desktop_logo',
             'allProductsLink' => '#content section.featured-products:nth-of-type(1) .all-product-link',
-            'testallProductsLink' => '#content .all-product-link',
         ];
     }
 

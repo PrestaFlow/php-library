@@ -30,7 +30,7 @@ class WishlistTest extends TestsSuite
         $basePage = new \PrestaFlow\Library\Pages\v8\FrontOffice\BasePage();
         $basePage->setGlobals($globals);
 
-        $listingPage = new \PrestaFlow\Library\Pages\v8\FrontOffice\Listing();
+        $listingPage = new \PrestaFlow\Library\Pages\v8\FrontOffice\Listing\Page();
         $listingPage->setGlobals($globals);
 
         $homePage = new \PrestaFlow\Library\Pages\v8\FrontOffice\Home\Page();
