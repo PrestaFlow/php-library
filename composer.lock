@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6c6618bfbc43a6719102685d2c702b1b",
+    "content-hash": "d9aa3946488d26f664e3dc77b04df58a",
     "packages": [
         {
             "name": "chrome-php/chrome",
@@ -188,6 +188,43 @@
                 "source": "https://github.com/igorw/evenement/tree/v3.0.2"
             },
             "time": "2023-08-08T05:53:35+00:00"
+        },
+        {
+            "name": "inceddy/image-compare",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/inceddy/ImageCompare.git",
+                "reference": "4cbd20f25d450a38d7a631e46bed3059ed0be4fa"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/inceddy/ImageCompare/zipball/4cbd20f25d450a38d7a631e46bed3059ed0be4fa",
+                "reference": "4cbd20f25d450a38d7a631e46bed3059ed0be4fa",
+                "shasum": ""
+            },
+            "type": "library",
+            "autoload": {
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Philipp Steingrebe",
+                    "email": "development@steingrebe.de"
+                }
+            ],
+            "description": "micro Lib for image comparison",
+            "support": {
+                "issues": "https://github.com/inceddy/ImageCompare/issues",
+                "source": "https://github.com/inceddy/ImageCompare/tree/master"
+            },
+            "time": "2018-01-31T10:52:22+00:00"
         },
         {
             "name": "monolog/monolog",

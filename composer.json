@@ -15,7 +15,8 @@
     "require": {
         "nunzion/php-expect": "^1.1",
         "chrome-php/chrome": "^1.10",
-        "sapientpro/image-comparator": "^1.0"
+        "sapientpro/image-comparator": "^1.0",
+        "inceddy/image-compare": "^1.0"
     },
     "scripts": {
         "run-suite" : "PrestaFlow\\Library\\Composer\\Run::execute",
