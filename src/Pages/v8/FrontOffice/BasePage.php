@@ -7,6 +7,8 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Tests\TestsSuite;
+use SapientPro\ImageComparator\ImageComparator;
+
 
 class BasePage extends CommonPage
 {
@@ -27,9 +29,7 @@ class BasePage extends CommonPage
 
         $this->selectors = [...$selectors, ...$pageSelectors];
 
-        $messages = [
-
-        ];
+        $messages = [];
 
         $pageMessages = [];
         if (method_exists($this, 'defineMessages')) {
@@ -62,7 +62,7 @@ class BasePage extends CommonPage
         }
     }
 
-    public function getPageURL($page) : string
+    public function getPageURL($page): string
     {
         $url = $this->getGlobals()['FO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -72,6 +72,7 @@ class BasePage extends CommonPage
             $url .= match ($page) {
                 'home', 'index' => '',
                 'login', 'authentification', 'connexion' => 'connexion',
+                'prices-drop' => 'promotions',
                 default => ''
             };
         } else if (is_object($page)) {
@@ -85,5 +86,34 @@ class BasePage extends CommonPage
     {
         $this->click($this->getSelector('logoutLink'));
         //TestsSuite::getPage()->waitForReload();
+    }
+
+    public function compare()
+    {
+        $score = 0;
+
+        if (false) {
+            sleep(3);
+            $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.png';
+            $screenshot = $this->getPage()->screenshot([
+                'captureBeyondViewport' => true,
+                'clip' => $this->getPage()->getFullPageClip(),
+                'format' => 'jpeg',
+            ]);
+            if (function_exists('storage_path')) {
+                $screenshot->saveToFile(storage_path() . '/screens/references/' . $fileName);
+            } else {
+                $screenshot->saveToFile('../../screens/references/' . $fileName);
+            }
+        }
+        $reference = 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
+        $actual = 'reference_8436AF790BA11A210AF420AE9F3E01C6.png';
+
+        $imageComparator = new ImageComparator();
+        $score = $imageComparator->compare(storage_path() . '/screens/references/' . $reference, storage_path() . '/screens/references/' . $actual);
+
+        dump($score);
+
+        return $score;
     }
 }
