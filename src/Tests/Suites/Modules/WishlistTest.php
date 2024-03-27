@@ -18,8 +18,6 @@ class WishlistTest extends TestsSuite
             ],
             'BO' => [
                 'URL' => 'https://8.0.4.test/admin-dev',
-                'EMAIL' => 'j.danse@prestaedit.com',
-                'PASSWD' => 'w9Djrekg#',
             ],
         ];
         // END

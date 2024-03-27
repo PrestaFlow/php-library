@@ -8,8 +8,6 @@ use function Termwind\{render};
 use Symfony\Component\Console\Output\OutputInterface;
 use Termwind\HtmlRenderer;
 
-
-
 class Run
 {
     public static function execute(Event $event)
