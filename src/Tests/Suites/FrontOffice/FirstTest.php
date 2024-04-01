@@ -40,6 +40,14 @@ class FirstTest extends TestsSuite
         ->it('seems not broken', function () use ($homePage) {
             Expect::that()->elementIsVisible($homePage->selector('desktopLogo'), 1000);
         })
+        ->it('will fail, obviously', function () use ($homePage) {
+            Expect::that(false)->equals(true);
+        })
+        ->skip('skipped test', function () use ($homePage) {
+            Expect::that(false)->equals(true);
+        })
+        ->todo('TODO test', function () use ($homePage) {
+        })
         ->it('go to prices drop', function () use ($homePage, $pricesDropPage) {
             $homePage->goToPage($pricesDropPage, 1000); // eq: $homePage->goToPage('prices-drop')
 
