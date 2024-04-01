@@ -20,6 +20,7 @@ class TestsSuite
         'passes' => 0,
         'failures' => 0,
         'skips' => 0,
+        'todos' => 0,
     ];
 
     private $_runs = 0;
@@ -69,9 +70,29 @@ class TestsSuite
         return $this;
     }
 
+    public function todo(string $description, $steps)
+    {
+        $this->suites[$this->getSuite()]['tests'][] = [
+            'title' => $description,
+            'steps' => $steps,
+            'todo' => true,
+        ];
+
+        return $this;
+    }
+
     public function isSkippable($test)
     {
         if (isset($test['skip']) && $test['skip']) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function isTodoable($test)
+    {
+        if (isset($test['todo']) && $test['todo']) {
             return true;
         }
 
@@ -183,16 +204,19 @@ class TestsSuite
             try {
                 $start_time = hrtime(true);
                 $this->getInstructions($test);
-                if ($this->isSkippable($test) === false) {
+                if ($this->isSkippable($test) === true) {
+                    $test['state'] = 'skip';
+                    $this->stats['skips']++;
+                } else if ($this->isTodoable($test) === true) {
+                    $test['state'] = 'todo';
+                    $this->stats['todos']++;
+                } else {
                     $test['steps']->call($this);
 
                     $this->attachWarning($test);
 
                     $test['state'] = 'pass';
                     $this->stats['passes']++;
-                } else {
-                    $test['state'] = 'skip';
-                    $this->stats['skips']++;
                 }
             } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Exception $e) {
                 $test['state'] = 'fail';
