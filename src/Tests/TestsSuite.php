@@ -23,10 +23,10 @@ class TestsSuite
         'todos' => 0,
     ];
 
-    private $_runs = 0;
-    private $_latestSuite = null;
     private $_runestSuite = null;
-    private $_tests = [];
+
+    protected $start_time;
+    protected $end_time;
 
     protected function getSuite()
     {
@@ -43,6 +43,7 @@ class TestsSuite
                 'passes' => 0,
                 'failures' => 0,
                 'skips' => 0,
+                'todos' => 0,
             ]
         ];
 
@@ -104,7 +105,7 @@ class TestsSuite
         if (function_exists('storage_path')) {
             $socketFilePath = storage_path().'/datas/.broswer';
         } else {
-            $socketFilePath = '../../datas/.broswer';
+            $socketFilePath = __DIR__.'/../../datas/.broswer';
         }
 
         return $socketFilePath;
@@ -120,6 +121,10 @@ class TestsSuite
         $socket = null;
         if (file_exists($socketFile)) {
             $socket = \file_get_contents($socketFile);
+
+            if (!strlen($socket)) {
+                $socket = null;
+            }
         }
 
         try {
