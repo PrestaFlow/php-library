@@ -30,6 +30,11 @@ class VisualTest extends TestsSuite
         })
         ->it('compare', function () use ($basePage) {
             $score = $basePage->compare();
+            //67.2
+            Expect::that($score)->isGreaterThanOrEqualTo(90);
+        })
+        ->skip('compare 2', function () use ($basePage) {
+            $score = $basePage->compare2();
             Expect::that($score)->isGreaterThanOrEqualTo(90);
         });
     }

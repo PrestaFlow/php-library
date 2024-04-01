@@ -94,7 +94,7 @@ class BasePage extends CommonPage
 
         if (false) {
             sleep(3);
-            $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.png';
+            $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.jpeg';
             $screenshot = $this->getPage()->screenshot([
                 'captureBeyondViewport' => true,
                 'clip' => $this->getPage()->getFullPageClip(),
@@ -107,13 +107,23 @@ class BasePage extends CommonPage
             }
         }
         $reference = 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
-        $actual = 'reference_8436AF790BA11A210AF420AE9F3E01C6.png';
+        $actual = 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
 
         $imageComparator = new ImageComparator();
         $score = $imageComparator->compare(storage_path() . '/screens/references/' . $reference, storage_path() . '/screens/references/' . $actual);
 
-        dump($score);
-
         return $score;
+    }
+
+    public function compare2()
+    {
+
+        $reference = storage_path() . '/screens/references/' . 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
+        $actual = storage_path() . '/screens/references/' . 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
+
+        $mask = \Image::fromFile($reference);
+
+        // Load images
+        $image1 = \Image::fromFile($actual)->subtract($mask, 75)->save('masked_image1', storage_path() . '/');
     }
 }
