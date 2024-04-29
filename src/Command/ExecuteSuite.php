@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Command;
 
 use Exception;
+use stdClass;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -29,26 +30,85 @@ class ExecuteSuite extends Command
 
     public const TODO = 'todo';
 
+    public const OUTPUT_FULL = 'full';
+    public const OUTPUT_COMPACT = 'compact';
+    public const OUTPUT_JSON = 'json';
+
     protected $output;
+    protected $outputMode = 'full';
+    protected $json = [];
 
     protected function configure(): void
     {
         $this
+            ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
             ->addArgument('suite', InputArgument::REQUIRED, 'The suite name');
+    }
+
+    protected function defineOutputMode(InputInterface $input)
+    {
+        $optionValue = $input->getOption('output');
+        if (false === $optionValue) {
+            // in this case, the option was not passed when running the command
+            $this->outputMode = self::OUTPUT_FULL;
+        } elseif (null === $optionValue) {
+            // in this case, the option was passed when running the command
+            // but no value was given to it
+            $this->outputMode = self::OUTPUT_FULL;
+        } else {
+            // in this case, the option was passed when running the command and
+            // some specific value was given to it
+            $this->outputMode = self::OUTPUT_FULL;
+            if (self::OUTPUT_COMPACT === $optionValue) {
+                $this->outputMode = self::OUTPUT_COMPACT;
+            } elseif (self::OUTPUT_JSON === $optionValue) {
+                $this->outputMode = self::OUTPUT_JSON;
+            }
+        }
+    }
+
+    protected function getOutputMode() : string
+    {
+        return $this->outputMode;
+    }
+
+    protected function debug(string $message)
+    {
+        $this->output->writeln('<fg=blue;options=bold>INFO</> <fg=white>' . $message . '</>');
+    }
+
+    protected function error(string $message)
+    {
+        if (self::OUTPUT_FULL === $this->getOutputMode()) {
+            $this->output->writeln('<fg=red;options=bold>ERROR</> <fg=white>' . $message . '</>');
+        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
+            $this->output->writeln('<fg=red;options=bold>ERROR</>');
+        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->output->writeln(
+                json_encode(
+                    [
+                        'hasError' => true,
+                        'error' => $message,
+                    ]
+                )
+            );
+        }
     }
 
     public function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->output = $output;
 
+        $this->defineOutputMode($input);
+
         $suitePath = $input->getArgument('suite');
 
         $className = '\\PrestaFlow\\Library\\Tests\\Suites\\' . str_replace('/', '\\', $suitePath);
 
         if (!class_exists($className)) {
-            $output->writeln('<fg=red;options=bold>Suite seems not exists</>');
-
+            $this->debug($className);
+            $this->error('The test suite doesn\'t seem to exist');
             return Command::FAILURE;
         }
 
@@ -88,7 +148,7 @@ class ExecuteSuite extends Command
                 sprintf(
                     '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
                     implode('<fg=gray>,</> ', $tests),
-                    '?'
+                    (int) $results['stats']['assertions']
                 ),
             ]);
 
@@ -96,7 +156,7 @@ class ExecuteSuite extends Command
             $seconds = number_format($results['stats']['time'] / 1000, 2, '.', '');
             $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $seconds));
         } catch (Exception $e) {
-            $output->writeln('<fg=red;options=bold>' . $e->getMessage() . '</>');
+            $this->error($e->getMessage());
 
             return Command::FAILURE;
         }
@@ -107,25 +167,33 @@ class ExecuteSuite extends Command
     public function pass($test)
     {
         $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $test['title']));
-        $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>that true is true</>', self::makeIcon(self::PASS)));
+        if (!empty($test['expect'])) {
+            $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $test['expect']));
+        }
     }
 
     public function fail($test)
     {
         $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $test['title']));
-        $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>that true is true</>', self::makeIcon(self::FAIL)));
+        if (!empty($test['expect'])) {
+            $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $test['expect']));
+        }
     }
 
     public function skip($test)
     {
         $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $test['title']));
-        $this->output->writeln(sprintf('  <fg=yellow>%s</> <fg=gray>that true is true</>', self::makeIcon(self::SKIPPED)));
+        if (!empty($test['expect'])) {
+            $this->output->writeln(sprintf('  <fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $test['expect']));
+        }
     }
 
     public function todo($test)
     {
         $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $test['title']));
-        $this->output->writeln(sprintf('  <fg=blue>%s</> <fg=gray>that true is true</>', self::makeIcon(self::TODO)));
+        if (!empty($test['expect'])) {
+            $this->output->writeln(sprintf('  <fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $test['expect']));
+        }
     }
 
     /**

@@ -21,6 +21,7 @@ class TestsSuite
         'failures' => 0,
         'skips' => 0,
         'todos' => 0,
+        'assertions' => 0,
     ];
 
     private $_runestSuite = null;
@@ -44,6 +45,7 @@ class TestsSuite
                 'failures' => 0,
                 'skips' => 0,
                 'todos' => 0,
+                'assertions' => 0,
             ]
         ];
 
@@ -217,6 +219,7 @@ class TestsSuite
                     $this->stats['todos']++;
                 } else {
                     $test['steps']->call($this);
+                    $this->stats['assertions'] += Expect::getNbAssertions();
 
                     $this->attachWarning($test);
 
@@ -228,8 +231,13 @@ class TestsSuite
                 $test['error'] = $e->getMessage();
                 $this->attachWarning($test);
                 $this->attachScreen($test);
+                $this->stats['assertions'] += Expect::getNbAssertions();
                 $this->stats['failures']++;
             } finally {
+                if (!Expect::isDebug()) {
+                    $test['expect'] = Expect::getExpectMessage();
+                }
+                Expect::getNbAssertions();
                 $end_time = hrtime(true);
                 $test['time'] = round(($end_time - $start_time) / 1e+6);
             }
@@ -240,6 +248,8 @@ class TestsSuite
             'passes' => 0,
             'failures' => 0,
             'skips' => 0,
+            'todos' => 0,
+            'assertions' => 0,
         ];
 
         $this->after();

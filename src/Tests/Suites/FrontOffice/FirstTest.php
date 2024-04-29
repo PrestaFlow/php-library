@@ -41,6 +41,7 @@ class FirstTest extends TestsSuite
             Expect::that()->elementIsVisible($homePage->selector('desktopLogo'), 1000);
         })
         ->it('will fail, obviously', function () use ($homePage) {
+            Expect::that(true)->equals(true);
             Expect::that(false)->equals(true);
         })
         ->skip('skipped test', function () use ($homePage) {

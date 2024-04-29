@@ -15,22 +15,54 @@ class Expect extends ExpectLibrary
     protected static $expectedValue;
     protected static $keepOverrideMessage = false;
     protected static $overrideMessage = null;
+    protected static $isDebug = false;
+
+    public static $expectMessage = '';
 
     public static $latestWarning = '';
     public static $latestError = '';
+    public static $nbAssertions = 0;
+
+    public static function debug()
+    {
+        self::$isDebug = true;
+    }
+
+    public static function isDebug()
+    {
+        return self::$isDebug;
+    }
 
     public static function setWarning($message)
     {
         self::$latestWarning = $message;
     }
 
-    public static function that($value = null)
+    public static function getExpectMessage()
+    {
+        $expectMessage = self::$expectMessage;
+        self::$expectMessage = '';
+        return $expectMessage;
+    }
+
+    public static function getNbAssertions()
+    {
+        $nbAssertions = self::$nbAssertions;
+        self::$nbAssertions = 0;
+        return $nbAssertions;
+    }
+
+    public static function that($value = null, $internal = false)
     {
         if (!self::$keepOverrideMessage) {
             self::$overrideMessage = null;
         }
         self::$keepOverrideMessage = false;
         self::$expectedValue = $value;
+        if (!$internal) {
+            self::$nbAssertions++;
+        }
+        self::$isDebug = false;
         return parent::that($value);
     }
 
@@ -52,8 +84,14 @@ class Expect extends ExpectLibrary
         return self::$expectedValue;
     }
 
-    private function format($template, $arguments)
+    private function format($template, $arguments = [])
     {
+        $arguments["actual"] = $this->getValue();
+
+        if (is_bool($arguments["actual"])) {
+            $arguments["actual"] = $arguments["actual"] ? 'true' : 'false';
+        }
+
         return preg_replace_callback('/\\{(?<parameterName>.*?)(\\:(?<formatOptions>.*))?\\}/',
                 function ($match) use ($arguments)
         {
@@ -61,8 +99,11 @@ class Expect extends ExpectLibrary
             if (isset($arguments[$parameterName]))
             {
                 $result = $arguments[$parameterName];
-                if (is_object($result) || is_array($result))
+                if (is_object($result) || is_array($result)) {
                     $result = print_r($result, true);
+                } else if (is_bool($result)) {
+                    $result = $result ? 'true' : 'false';
+                }
                 return $result;
             }
         }, $template);
@@ -99,6 +140,10 @@ class Expect extends ExpectLibrary
     {
         $arguments["actual"] = $this->getValue();
 
+        if (is_bool($arguments["actual"])) {
+            $arguments["actual"] = $arguments["actual"] ? 'true' : 'false';
+        }
+
         return $this->getExceptionConstructor($explanation, $arguments);
     }
 
@@ -106,14 +151,14 @@ class Expect extends ExpectLibrary
     {
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
-        Expect::that($isVisible)->visible($selector);
+        Expect::that($isVisible, true)->visible($selector);
     }
 
     public function elementIsNotVisible($selector = null, $timeout = 30000)
     {
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
-        Expect::that($isVisible)->notVisible($selector);
+        Expect::that($isVisible, true)->notVisible($selector);
     }
 
     protected function _elementIsVisible($selector, $timeout)
@@ -129,6 +174,8 @@ class Expect extends ExpectLibrary
 
     public function visible($selector = null)
     {
+        self::$expectMessage = $this->format("{selector} must be visible", array("selector" => $selector));
+
         $this->isDefined();
         if ($selector === null) {
             $selector = 'Element';
@@ -143,6 +190,8 @@ class Expect extends ExpectLibrary
 
     public function notVisible($selector = null)
     {
+        self::$expectMessage = $this->format("{selector} must be not visible", array("selector" => $selector));
+
         $this->isDefined();
         if ($selector === null) {
             $selector = 'Element';
@@ -157,25 +206,31 @@ class Expect extends ExpectLibrary
 
     public function customerIsLogged($selector, $timeout = 30000)
     {
-        Expect::that()->__("customer is not logged")->elementIsVisible($selector, $timeout);
+        self::$expectMessage = $this->format("customer is not logged");
+
+        Expect::that(null, true)->__("customer is not logged")->elementIsVisible($selector, $timeout);
 
         return $this;
     }
 
     public function customerIsNotLogged($selector, $timeout = 30000)
     {
-        Expect::that()->__("customer is logged")->elementIsNotVisible($selector, $timeout);
+        self::$expectMessage = $this->format("customer is logged");
+
+        Expect::that(null, true)->__("customer is logged")->elementIsNotVisible($selector, $timeout);
 
         return $this;
     }
 
     public function contains($needle)
     {
+        self::$expectMessage = $this->format("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+
         $this->isDefined();
 
         if (str_contains($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to include '{actual}'", array("expected" => $needle));
+            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
 
@@ -184,11 +239,13 @@ class Expect extends ExpectLibrary
 
     public function notContains($needle)
     {
+        self::$expectMessage = $this->format("expected '{expected}' to not include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+
         $this->isDefined();
 
         if (!str_contains($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to not include '{actual}'", array("expected" => $needle));
+            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to not include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
 
@@ -197,6 +254,8 @@ class Expect extends ExpectLibrary
 
     public function startsWith($needle)
     {
+        self::$expectMessage = $this->format("expected '{expected}' to starts with '{actual}'", array("expected" => $needle));
+
         $this->isDefined();
 
         if (str_starts_with($this->getValue(), $needle) === false)
@@ -210,6 +269,8 @@ class Expect extends ExpectLibrary
 
     public function endsWith($needle)
     {
+        self::$expectMessage = $this->format("expected '{expected}' to ends with '{actual}'", array("expected" => $needle));
+
         $this->isDefined();
 
         if (str_ends_with($this->getValue(), $needle) === false)
@@ -219,5 +280,82 @@ class Expect extends ExpectLibrary
         }
 
         return $this;
+    }
+
+    public function isTheSameAs($other)
+    {
+        self::$expectMessage = $this->format("{actual} must be the same as {expected}", array("expected" => $other));
+
+        return parent::isTheSameAs($other);
+    }
+
+    public function equals($other)
+    {
+        self::$expectMessage = $this->format("{actual} must be equal to {expected}", array("expected" => $other));
+
+        return parent::equals($other);
+    }
+
+    public function isNull()
+    {
+        self::$expectMessage = $this->format("must be null");
+
+        return parent::isNull();
+    }
+
+    public function isNotNull()
+    {
+        self::$expectMessage = $this->format("cannot be null");
+
+        return parent::isNotNull();
+    }
+
+    public function isEmpty()
+    {
+        self::$expectMessage = $this->format("must be empty");
+
+        return parent::isEmpty();
+    }
+
+    public function isNotEmpty()
+    {
+        self::$expectMessage = $this->format("cannot be empty");
+
+        return parent::isNotEmpty();
+    }
+
+    public function isBetween($min, $max)
+    {
+        self::$expectMessage = $this->format("{actual} must be between {min} and {max}", array("min" => $min, "max" => $max));
+
+        return parent::isBetween($min, $max);
+    }
+
+    public function isGreaterThan($other)
+    {
+        self::$expectMessage = $this->format("'{actual}' must be greater than '{other}'", array("other" => $other));
+
+        return parent::isGreaterThan($other);
+    }
+
+    public function isLessThan($other)
+    {
+        self::$expectMessage = $this->format("'{actual}' must be less than '{other}'", array("other" => $other));
+
+        return parent::isLessThan($other);
+    }
+
+    public function isGreaterThanOrEqualTo($other)
+    {
+        self::$expectMessage = $this->format("must be greater or equal than '{other}'", array("other" => $other));
+
+        return parent::isGreaterThanOrEqualTo($other);
+    }
+
+    public function isLessThanOrEqualTo($other)
+    {
+        self::$expectMessage = $this->format("'{actual}' must be less or equal than '{other}'", array("other" => $other));
+
+        return parent::isLessThanOrEqualTo($other);
     }
 }

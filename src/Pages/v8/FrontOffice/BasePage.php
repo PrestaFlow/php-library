@@ -54,7 +54,7 @@ class BasePage extends CommonPage
 
         try {
             $bodyContent = $this->getTextContent('body');
-            Expect::that($bodyContent)->notContains('[Debug] This page has moved');
+            Expect::that($bodyContent)->notContains('[Debug] This page has moved')->debug();
         } catch (OperationTimedOut | Exception $e) {
             Expect::setWarning('debug-mode');
 
