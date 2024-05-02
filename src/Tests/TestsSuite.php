@@ -234,9 +234,7 @@ class TestsSuite
                 $this->stats['assertions'] += Expect::getNbAssertions();
                 $this->stats['failures']++;
             } finally {
-                if (!Expect::isDebug()) {
-                    $test['expect'] = Expect::getExpectMessage();
-                }
+                $test['expect'] = Expect::getExpectMessage();
                 Expect::getNbAssertions();
                 $end_time = hrtime(true);
                 $test['time'] = round(($end_time - $start_time) / 1e+6);

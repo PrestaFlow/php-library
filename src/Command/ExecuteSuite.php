@@ -68,7 +68,7 @@ class ExecuteSuite extends Command
         }
     }
 
-    protected function getOutputMode() : string
+    protected function getOutputMode(): string
     {
         return $this->outputMode;
     }
@@ -164,36 +164,51 @@ class ExecuteSuite extends Command
         return Command::SUCCESS;
     }
 
+    public function expects($test)
+    {
+        if (!empty($test['expect'])) {
+            foreach ($test['expect'] as $state => $expectMessages) {
+                foreach ($expectMessages as $expectMessage) {
+                    if (!str_contains($expectMessage, '[Debug] This page has moved')) {
+                        match ($state) {
+                            self::PASS => $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $expectMessage)),
+                            self::FAIL => $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $expectMessage)),
+                            self::SKIPPED => $this->output->writeln(sprintf('  <fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $expectMessage)),
+                            self::TODO => $this->output->writeln(sprintf('  <fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage)),
+                            default => $this->output->writeln(sprintf('  <fg=gray>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage))
+                        };
+                    }
+                }
+            }
+        }
+    }
+
     public function pass($test)
     {
         $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $test['title']));
-        if (!empty($test['expect'])) {
-            $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $test['expect']));
-        }
+
+        $this->expects($test);
     }
 
     public function fail($test)
     {
         $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $test['title']));
-        if (!empty($test['expect'])) {
-            $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $test['expect']));
-        }
+
+        $this->expects($test);
     }
 
     public function skip($test)
     {
         $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $test['title']));
-        if (!empty($test['expect'])) {
-            $this->output->writeln(sprintf('  <fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $test['expect']));
-        }
+
+        $this->expects($test);
     }
 
     public function todo($test)
     {
         $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $test['title']));
-        if (!empty($test['expect'])) {
-            $this->output->writeln(sprintf('  <fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $test['expect']));
-        }
+
+        $this->expects($test);
     }
 
     /**

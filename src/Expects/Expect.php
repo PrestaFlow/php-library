@@ -15,33 +15,22 @@ class Expect extends ExpectLibrary
     protected static $expectedValue;
     protected static $keepOverrideMessage = false;
     protected static $overrideMessage = null;
-    protected static $isDebug = false;
 
-    public static $expectMessage = '';
+    public static $expectMessage = [];
 
     public static $latestWarning = '';
     public static $latestError = '';
     public static $nbAssertions = 0;
-
-    public static function debug()
-    {
-        self::$isDebug = true;
-    }
-
-    public static function isDebug()
-    {
-        return self::$isDebug;
-    }
 
     public static function setWarning($message)
     {
         self::$latestWarning = $message;
     }
 
-    public static function getExpectMessage()
+    public static function getExpectMessage() : array
     {
         $expectMessage = self::$expectMessage;
-        self::$expectMessage = '';
+        self::$expectMessage = [];
         return $expectMessage;
     }
 
@@ -62,7 +51,6 @@ class Expect extends ExpectLibrary
         if (!$internal) {
             self::$nbAssertions++;
         }
-        self::$isDebug = false;
         return parent::that($value);
     }
 
@@ -132,6 +120,9 @@ class Expect extends ExpectLibrary
             $explanation = self::$overrideMessage;
         }
 
+        self::$expectMessage['fail'][] = self::$expectMessage['pass'][(count(self::$expectMessage['pass'])-1)];
+        unset(self::$expectMessage['pass'][(count(self::$expectMessage['pass'])-1)]);
+
         return $this->getConditionViolationExceptionConstructor(
             $this->format($explanation, $arguments), $arguments);
     }
@@ -174,7 +165,7 @@ class Expect extends ExpectLibrary
 
     public function visible($selector = null)
     {
-        self::$expectMessage = $this->format("{selector} must be visible", array("selector" => $selector));
+        self::$expectMessage['pass'][] = $this->format("{selector} must be visible", array("selector" => $selector));
 
         $this->isDefined();
         if ($selector === null) {
@@ -190,7 +181,7 @@ class Expect extends ExpectLibrary
 
     public function notVisible($selector = null)
     {
-        self::$expectMessage = $this->format("{selector} must be not visible", array("selector" => $selector));
+        self::$expectMessage['pass'][] = $this->format("{selector} must be not visible", array("selector" => $selector));
 
         $this->isDefined();
         if ($selector === null) {
@@ -206,7 +197,7 @@ class Expect extends ExpectLibrary
 
     public function customerIsLogged($selector, $timeout = 30000)
     {
-        self::$expectMessage = $this->format("customer is not logged");
+        self::$expectMessage['pass'][] = $this->format("customer is not logged");
 
         Expect::that(null, true)->__("customer is not logged")->elementIsVisible($selector, $timeout);
 
@@ -215,7 +206,7 @@ class Expect extends ExpectLibrary
 
     public function customerIsNotLogged($selector, $timeout = 30000)
     {
-        self::$expectMessage = $this->format("customer is logged");
+        self::$expectMessage['pass'][] = $this->format("customer is logged");
 
         Expect::that(null, true)->__("customer is logged")->elementIsNotVisible($selector, $timeout);
 
@@ -224,7 +215,7 @@ class Expect extends ExpectLibrary
 
     public function contains($needle)
     {
-        self::$expectMessage = $this->format("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+        self::$expectMessage['pass'][] = $this->format("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
 
         $this->isDefined();
 
@@ -239,7 +230,7 @@ class Expect extends ExpectLibrary
 
     public function notContains($needle)
     {
-        self::$expectMessage = $this->format("expected '{expected}' to not include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+        self::$expectMessage['pass'][] = $this->format("expected '{expected}' to not include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
 
         $this->isDefined();
 
@@ -254,7 +245,7 @@ class Expect extends ExpectLibrary
 
     public function startsWith($needle)
     {
-        self::$expectMessage = $this->format("expected '{expected}' to starts with '{actual}'", array("expected" => $needle));
+        self::$expectMessage['pass'][] = $this->format("expected '{expected}' to starts with '{actual}'", array("expected" => $needle));
 
         $this->isDefined();
 
@@ -269,7 +260,7 @@ class Expect extends ExpectLibrary
 
     public function endsWith($needle)
     {
-        self::$expectMessage = $this->format("expected '{expected}' to ends with '{actual}'", array("expected" => $needle));
+        self::$expectMessage['pass'][] = $this->format("expected '{expected}' to ends with '{actual}'", array("expected" => $needle));
 
         $this->isDefined();
 
@@ -284,77 +275,77 @@ class Expect extends ExpectLibrary
 
     public function isTheSameAs($other)
     {
-        self::$expectMessage = $this->format("{actual} must be the same as {expected}", array("expected" => $other));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be the same as {expected}", array("expected" => $other));
 
         return parent::isTheSameAs($other);
     }
 
     public function equals($other)
     {
-        self::$expectMessage = $this->format("{actual} must be equal to {expected}", array("expected" => $other));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be equal to {expected}", array("expected" => $other));
 
         return parent::equals($other);
     }
 
     public function isNull()
     {
-        self::$expectMessage = $this->format("must be null");
+        self::$expectMessage['pass'][] = $this->format("must be null");
 
         return parent::isNull();
     }
 
     public function isNotNull()
     {
-        self::$expectMessage = $this->format("cannot be null");
+        self::$expectMessage['pass'][] = $this->format("cannot be null");
 
         return parent::isNotNull();
     }
 
     public function isEmpty()
     {
-        self::$expectMessage = $this->format("must be empty");
+        self::$expectMessage['pass'][] = $this->format("must be empty");
 
         return parent::isEmpty();
     }
 
     public function isNotEmpty()
     {
-        self::$expectMessage = $this->format("cannot be empty");
+        self::$expectMessage['pass'][] = $this->format("cannot be empty");
 
         return parent::isNotEmpty();
     }
 
     public function isBetween($min, $max)
     {
-        self::$expectMessage = $this->format("{actual} must be between {min} and {max}", array("min" => $min, "max" => $max));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be between {min} and {max}", array("min" => $min, "max" => $max));
 
         return parent::isBetween($min, $max);
     }
 
     public function isGreaterThan($other)
     {
-        self::$expectMessage = $this->format("'{actual}' must be greater than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("'{actual}' must be greater than '{other}'", array("other" => $other));
 
         return parent::isGreaterThan($other);
     }
 
     public function isLessThan($other)
     {
-        self::$expectMessage = $this->format("'{actual}' must be less than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("'{actual}' must be less than '{other}'", array("other" => $other));
 
         return parent::isLessThan($other);
     }
 
     public function isGreaterThanOrEqualTo($other)
     {
-        self::$expectMessage = $this->format("must be greater or equal than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("must be greater or equal than '{other}'", array("other" => $other));
 
         return parent::isGreaterThanOrEqualTo($other);
     }
 
     public function isLessThanOrEqualTo($other)
     {
-        self::$expectMessage = $this->format("'{actual}' must be less or equal than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("'{actual}' must be less or equal than '{other}'", array("other" => $other));
 
         return parent::isLessThanOrEqualTo($other);
     }
