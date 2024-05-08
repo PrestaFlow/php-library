@@ -22,6 +22,11 @@ class Expect extends ExpectLibrary
     public static $latestError = '';
     public static $nbAssertions = 0;
 
+    public function __call($methodName, $args = [])
+    {
+        self::$expectMessage['fail'][] = $this->format("{methodName} does not exists", array("methodName" => $methodName));
+    }
+
     public static function setWarning($message)
     {
         self::$latestWarning = $message;
