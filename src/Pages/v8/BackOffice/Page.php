@@ -4,7 +4,7 @@ namespace PrestaFlow\Library\Pages\v8\BackOffice;
 
 use PrestaFlow\Library\Pages\CommonPage;
 
-class BasePage extends CommonPage
+class Page extends CommonPage
 {
     public function goToPage($page = null)
     {

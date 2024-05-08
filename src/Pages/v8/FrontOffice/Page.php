@@ -10,7 +10,7 @@ use PrestaFlow\Library\Tests\TestsSuite;
 use SapientPro\ImageComparator\ImageComparator;
 
 
-class BasePage extends CommonPage
+class Page extends CommonPage
 {
     public function __construct()
     {
@@ -92,7 +92,7 @@ class BasePage extends CommonPage
     {
         $score = 0;
 
-        if (false) {
+        if (true) {
             sleep(3);
             $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.jpeg';
             $screenshot = $this->getPage()->screenshot([
@@ -100,29 +100,29 @@ class BasePage extends CommonPage
                 'clip' => $this->getPage()->getFullPageClip(),
                 'format' => 'jpeg',
             ]);
-            if (function_exists('storage_path')) {
-                $screenshot->saveToFile(storage_path() . '/screens/references/' . $fileName);
-            } else {
-                $screenshot->saveToFile('../../screens/references/' . $fileName);
-            }
+            $screenshot->saveToFile($this->getStoragePath() . '/screens/references/' . $fileName);
         }
         $reference = 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
         $actual = 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
 
+        if (!file_exists($this->getStoragePath() . '/screens/references/' . $reference) || !file_exists($this->getStoragePath() . '/screens/references/' . $actual)) {
+            return 0;
+        }
+
         $imageComparator = new ImageComparator();
-        $score = $imageComparator->compare(storage_path() . '/screens/references/' . $reference, storage_path() . '/screens/references/' . $actual);
+        $score = $imageComparator->compare($this->getStoragePath() . '/screens/references/' . $reference, $this->getStoragePath() . '/screens/references/' . $actual);
 
         return $score;
     }
 
     public function compare2()
     {
-        $reference = storage_path() . '/screens/references/' . 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
-        $actual = storage_path() . '/screens/references/' . 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
+        $reference = $this->getStoragePath() . '/screens/references/' . 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
+        $actual = $this->getStoragePath() . '/screens/references/' . 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
 
         $mask = \Image::fromFile($reference);
 
         // Load images
-        $image1 = \Image::fromFile($actual)->subtract($mask, 75)->save('masked_image1', storage_path() . '/');
+        $image1 = \Image::fromFile($actual)->subtract($mask, 75)->save('masked_image1', $this->getStoragePath() . '/');
     }
 }

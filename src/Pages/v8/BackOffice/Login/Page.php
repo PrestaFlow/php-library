@@ -2,7 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v8\BackOffice\Login;
 
-use PrestaFlow\Library\Pages\v8\BackOffice\BasePage;
+use PrestaFlow\Library\Pages\v8\BackOffice\Page as BasePage;
 
 class Page extends BasePage
 {
