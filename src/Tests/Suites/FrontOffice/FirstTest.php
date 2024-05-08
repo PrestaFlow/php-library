@@ -9,9 +9,6 @@ class FirstTest extends TestsSuite
 {
     public function init()
     {
-        $headless = true;
-        $this->before($headless);
-
         $this->importPage('FrontOffice\Home');
         $this->importPage('FrontOffice\PricesDrop');
 
@@ -24,10 +21,16 @@ class FirstTest extends TestsSuite
         })
         ->it('check that is not in maintenance', function () use ($frontOfficeHomePage) {
             $frontOfficeHomePage->setUserAgent('PrestaFlow-custom');
+            // After
             Expect::that()->elementIsNotVisible($frontOfficeHomePage->selector('maintenanceBlock'), 1000);
+            // Before
+            Expect::that()->shopIsNotInMaintenance($frontOfficeHomePage);
         })
         ->it('seems not broken', function () use ($frontOfficeHomePage) {
+            // After
             Expect::that()->elementIsVisible($frontOfficeHomePage->selector('desktopLogo'), 1000);
+            // Before
+            Expect::that()->shopIsVisible($frontOfficeHomePage);
         })
         ->it('will fail, obviously', function () use ($frontOfficeHomePage) {
             Expect::that(true)->equals(true);

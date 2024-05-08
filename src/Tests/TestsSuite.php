@@ -39,6 +39,8 @@ class TestsSuite
     public function __construct()
     {
         $this->loadGlobals();
+
+        $this->before();
     }
 
     protected function getSuite()
