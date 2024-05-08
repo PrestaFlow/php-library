@@ -81,6 +81,10 @@ class CommonPage
                 return $globals[$index];
             }
         } else {
+            // Test is, by the way, like PS_VERSION
+            if (isset($globals[$index])) {
+                return $globals[$index];
+            }
             $indexes = explode('_', $index);
             if (is_array($indexes) && count($indexes)) {
                 foreach ($indexes as $_index) {
