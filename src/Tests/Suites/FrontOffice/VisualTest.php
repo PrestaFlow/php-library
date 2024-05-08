@@ -37,7 +37,5 @@ class VisualTest extends TestsSuite
             $score = $basePage->compare2();
             Expect::that($score)->isGreaterThanOrEqualTo(90);
         });
-
-        parent::init();
     }
 }

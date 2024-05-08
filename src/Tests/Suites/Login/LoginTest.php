@@ -68,7 +68,5 @@ class LoginTest extends TestsSuite
             await expect(pageTitle).to.contains(loginPage.pageTitle);
             */
         });
-
-        parent::init();
     }
 }

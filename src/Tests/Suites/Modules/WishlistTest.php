@@ -103,7 +103,5 @@ class WishlistTest extends TestsSuite
         })
         ->skip('should click on the refresh button', function () use ($homePage) {
         });
-
-        parent::init();
     }
 }

@@ -43,7 +43,5 @@ class FirstTest extends TestsSuite
 
             Expect::that($frontOfficePricesDropPage->getListingTitle())->contains($frontOfficePricesDropPage->pageTitle());
         });
-
-        parent::init();
     }
 }
