@@ -369,28 +369,28 @@ class Expect extends ExpectLibrary
 
     public function isGreaterThan($other)
     {
-        self::$expectMessage['pass'][] = $this->format("'{actual}' must be greater than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be greater than {other}", array("other" => $other));
 
         return parent::isGreaterThan($other);
     }
 
     public function isLessThan($other)
     {
-        self::$expectMessage['pass'][] = $this->format("'{actual}' must be less than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be less than '{other}'", array("other" => $other));
 
         return parent::isLessThan($other);
     }
 
     public function isGreaterThanOrEqualTo($other)
     {
-        self::$expectMessage['pass'][] = $this->format("must be greater or equal than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("{actual} must be greater or equal than {other}", array("other" => $other));
 
         return parent::isGreaterThanOrEqualTo($other);
     }
 
     public function isLessThanOrEqualTo($other)
     {
-        self::$expectMessage['pass'][] = $this->format("'{actual}' must be less or equal than '{other}'", array("other" => $other));
+        self::$expectMessage['pass'][] = $this->format("'{actual}' must be less or equal than {other}", array("other" => $other));
 
         return parent::isLessThanOrEqualTo($other);
     }
