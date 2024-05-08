@@ -171,11 +171,18 @@ class TestsSuite
         return TestsSuite::getBrowser()?->getPages()[0];
     }
 
-    public function before(bool $headless = true)
+    public function before($headless = null)
     {
         $this->_runestSuite = get_class($this);
         $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
         $this->start_time = hrtime(true);
+
+        if ($headless === null) {
+            $headless = true;
+            if ($this->globals['HEADLESS'] === 'false' || !$this->globals['HEADLESS']) {
+                $headless = false;
+            }
+        }
 
         TestsSuite::getBrowser($headless);
 
@@ -239,6 +246,7 @@ class TestsSuite
                 'EMAIL' => $_ENV['FO_EMAIL'] ?? 'pub@prestashop.com',
                 'PASSWD' => $_ENV['FO_PASSWD'] ?? '123456789',
             ],
+            'HEADLESS' => $_ENV['HEADLESS'] ?? true,
         ];
     }
 
@@ -249,8 +257,10 @@ class TestsSuite
         $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$version.'\\'.$pageName.'\\Page';
 
         $pageInstance = new $pageClass();
-        if ($globals !== null) {
+        if ($globals === null || !is_array($globals)) {
             $pageInstance->setGlobals($this->globals);
+        } else {
+            $pageInstance->setGlobals($globals);
         }
         $pageInstance->setUserAgent($userAgent);
 
