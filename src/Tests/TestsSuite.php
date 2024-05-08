@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Tests;
 
+use Dotenv\Dotenv;
 use Exception;
 use HeadlessChromium\BrowserFactory;
 use HeadlessChromium\Cookies\Cookie;
