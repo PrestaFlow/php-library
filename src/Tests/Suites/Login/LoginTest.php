@@ -9,48 +9,29 @@ class LoginTest extends TestsSuite
 {
     public function init()
     {
-        // TEMP
-        $globals = [
-            'PS_VERSION' => '8.0.4',
-            'LOCALE' => 'en',
-            'FO' => [
-                'URL' => 'https://8.0.4.test',
-            ],
-            'BO' => [
-                'URL' => 'https://8.0.4.test/admin-dev',
-                'EMAIL' => '',
-                'PASSWD' => '',
-            ],
-        ];
-        // END
+        $this->importPage('BackOffice\Dashboard');
+        $this->importPage('BackOffice\Login');
 
-        $headless = false;
-        $this->before($headless);
-
-        $dashboardPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Dashboard\Page();
-        $dashboardPage->setGlobals($globals);
-
-        $loginPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Login\Page();
-        $loginPage->setGlobals($globals);
+        extract($this->pages);
 
         $this
         ->describe('Check PS version {$PS_VERSION} with {$LOCALE} language, and login and log out from BO')
-        ->it('should go to login page', function () use ($loginPage) {
-            $loginPage->goToPage('index');
-            Expect::that($loginPage->getPageTitle())->contains($loginPage->pageTitle());
+        ->it('should go to login page', function () use ($backOfficeLoginPage) {
+            $backOfficeLoginPage->goToPage('index');
+            Expect::that($backOfficeLoginPage->getPageTitle())->contains($backOfficeLoginPage->pageTitle());
         })
-        ->it('should check PS version', function () use ($loginPage) {
-            $psVersion = $loginPage->getPrestaShopVersion();
-            Expect::that($psVersion)->contains($loginPage->getGlobal('PS_VERSION'));
+        ->it('should check PS version', function () use ($backOfficeLoginPage) {
+            $psVersion = $backOfficeLoginPage->getPrestaShopVersion();
+            Expect::that($psVersion)->contains($backOfficeLoginPage->getGlobal('PS_VERSION'));
         })
-        ->it('should try to login with wrong email and password', function () use ($loginPage) {
-            $loginPage->login('wrongEmail@prestashop.com', 'wrongPass', false);
+        ->it('should try to login with wrong email and password', function () use ($backOfficeLoginPage) {
+            $backOfficeLoginPage->login('wrongEmail@prestashop.com', 'wrongPass', false);
 
             // Get error displayed
-            $errorMessage = $loginPage->getLoginError();
-            Expect::that($errorMessage)->contains($loginPage->getMessage('loginErrorText'));
+            $errorMessage = $backOfficeLoginPage->getLoginError();
+            Expect::that($errorMessage)->contains($backOfficeLoginPage->getMessage('loginErrorText'));
         })
-        ->skip('should login into BO with default user', function () use ($loginPage, $dashboardPage) {
+        ->skip('should login into BO with default user', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
             /*
 
             await loginPage.login(page, global.BO.EMAIL, global.BO.PASSWD);
@@ -60,7 +41,7 @@ class LoginTest extends TestsSuite
             await expect(pageTitle).to.contains(dashboardPage.pageTitle);
             */
         })
-        ->skip('should log out from BO', function () use ($loginPage, $dashboardPage) {
+        ->skip('should log out from BO', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
             /*
             await dashboardPage.logoutBO(page);
 
