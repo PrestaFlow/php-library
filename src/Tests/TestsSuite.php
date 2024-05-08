@@ -239,7 +239,7 @@ class TestsSuite
             'PS_VERSION' => $_ENV['PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['LOCALE'] ?? 'en',
             'BO' => [
-                'URL' => $_ENV['BO_URL'] ?? 'https://localhost//admin-dev/',
+                'URL' => $_ENV['BO_URL'] ?? ($_ENV['FO_URL'] ?? 'https://localhost') . '/admin-dev/',
                 'EMAIL' => $_ENV['BO_EMAIL'] ?? 'demo@prestashop.com',
                 'PASSWD' => $_ENV['BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
