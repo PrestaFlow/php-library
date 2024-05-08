@@ -159,4 +159,13 @@ class CommonPage
 
         return true;
     }
+
+    public function getStoragePath()
+    {
+        if (function_exists('storage_path')) {
+            return storage_path();
+        }
+
+        return '../..';
+    }
 }
