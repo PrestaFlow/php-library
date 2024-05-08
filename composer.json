@@ -12,6 +12,9 @@
             "email": "j.danse@prestaedit.com"
         }
     ],
+    "scripts": {
+        "tests": "./bin/prestaflow run src/Tests"
+    },
     "require": {
         "nunzion/php-expect": "^1.1",
         "chrome-php/chrome": "^1.10",
