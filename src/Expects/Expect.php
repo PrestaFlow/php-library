@@ -168,6 +168,42 @@ class Expect extends ExpectLibrary
         return true;
     }
 
+    public function shopIsInMaintenance($page, $timeout = 1000)
+    {
+        self::$expectMessage['pass'][] = $this->format("shop is in maintenance");
+
+        Expect::that(null, true)->__("shop is not in maintenance")->elementIsVisible($page->selector('maintenanceBlock'), $timeout);
+
+        return $this;
+    }
+
+    public function shopIsNotInMaintenance($page, $timeout = 1000)
+    {
+        self::$expectMessage['pass'][] = $this->format("shop is not in maintenance");
+
+        Expect::that(null, true)->__("shop is in maintenance")->elementIsNotVisible($page->selector('maintenanceBlock'), $timeout);
+
+        return $this;
+    }
+
+    public function shopIsVisible($page, $timeout = 1000)
+    {
+        self::$expectMessage['pass'][] = $this->format("shop is visible");
+
+        Expect::that(null, true)->__("shop is not visible")->elementIsVisible($page->selector('desktopLogo'), $timeout);
+
+        return $this;
+    }
+
+    public function shopIsNotVisible($page, $timeout = 1000)
+    {
+        self::$expectMessage['pass'][] = $this->format("shop is not visible");
+
+        Expect::that(null, true)->__("shop is visible")->elementIsNotVisible($page->selector('desktopLogo'), $timeout);
+
+        return $this;
+    }
+
     public function visible($selector = null)
     {
         self::$expectMessage['pass'][] = $this->format("{selector} must be visible", array("selector" => $selector));
