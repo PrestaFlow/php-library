@@ -90,9 +90,11 @@ class Page extends CommonPage
 
     public function compare()
     {
+        ini_set('memory_limit', '-1');
+
         $score = 0;
 
-        if (true) {
+        if (false) {
             sleep(3);
             $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.jpeg';
             $screenshot = $this->getPage()->screenshot([
@@ -100,29 +102,36 @@ class Page extends CommonPage
                 'clip' => $this->getPage()->getFullPageClip(),
                 'format' => 'jpeg',
             ]);
-            $screenshot->saveToFile($this->getStoragePath() . '/screens/references/' . $fileName);
+            $screenshot->saveToFile($this->getStoragePath(__DIR__) . '/screens/references/' . $fileName);
         }
-        $reference = 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
-        $actual = 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
+        $reference = 'reference_1EF3347A43C8621081BB3865E78241F3.jpeg';
+        $actual = 'reference_DE67A27A300C825129F2D5B4BE813202.jpeg';
 
-        if (!file_exists($this->getStoragePath() . '/screens/references/' . $reference) || !file_exists($this->getStoragePath() . '/screens/references/' . $actual)) {
+        if (!file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $reference) || !file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)) {
             return 0;
         }
 
         $imageComparator = new ImageComparator();
-        $score = $imageComparator->compare($this->getStoragePath() . '/screens/references/' . $reference, $this->getStoragePath() . '/screens/references/' . $actual);
+        $score = $imageComparator->compare($this->getStoragePath(__DIR__) . '/screens/references/' . $reference, $this->getStoragePath(__DIR__) . '/screens/references/' . $actual);
 
         return $score;
     }
 
-    public function compare2()
+    public function compareWithMaskedImage()
     {
-        $reference = $this->getStoragePath() . '/screens/references/' . 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
-        $actual = $this->getStoragePath() . '/screens/references/' . 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
+        ini_set('memory_limit', '-1');
 
-        $mask = \Image::fromFile($reference);
+        $reference = 'reference_1EF3347A43C8621081BB3865E78241F3.jpeg';
+        $actual = 'reference_DE67A27A300C825129F2D5B4BE813202.jpeg';
 
-        // Load images
-        $image1 = \Image::fromFile($actual)->subtract($mask, 75)->save('masked_image1', $this->getStoragePath() . '/');
+        if (!file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $reference) || !file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)) {
+            return 0;
+        }
+
+        $mask = \Image::fromFile($this->getStoragePath(__DIR__) . '/screens/references/' . $reference);
+
+        \Image::fromFile($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)->subtract($mask, 75)->save(time(), $this->getStoragePath(__DIR__) . '/screens/masked/');
+
+        return $this->compare();
     }
 }

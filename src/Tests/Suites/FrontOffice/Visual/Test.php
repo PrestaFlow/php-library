@@ -18,13 +18,13 @@ class Test extends TestsSuite
         ->it('should go to home page', function () use ($frontOfficePage) {
             $frontOfficePage->goToPage('home');
         })
-        ->it('compare', function () use ($frontOfficePage) {
+        ->it('compare without masked image', function () use ($frontOfficePage) {
             $score = $frontOfficePage->compare();
             //67.2
             Expect::that($score)->isGreaterThanOrEqualTo(90);
         })
-        ->skip('compare 2', function () use ($frontOfficePage) {
-            $score = $frontOfficePage->compare2();
+        ->it('compare with masked image', function () use ($frontOfficePage) {
+            $score = $frontOfficePage->compareWithMaskedImage();
             Expect::that($score)->isGreaterThanOrEqualTo(90);
         });
     }
