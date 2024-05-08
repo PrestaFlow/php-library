@@ -6,6 +6,30 @@ use PrestaFlow\Library\Pages\CommonPage;
 
 class Page extends CommonPage
 {
+    public function __construct()
+    {
+        $selectors = [
+        ];
+
+        $pageSelectors = [];
+        if (method_exists($this, 'defineSelectors')) {
+            $pageSelectors = $this->defineSelectors();
+        }
+
+        $this->selectors = [...$selectors, ...$pageSelectors];
+
+        $messages = [];
+
+        $pageMessages = [];
+        if (method_exists($this, 'defineMessages')) {
+            $pageMessages = $this->defineMessages();
+        }
+
+        $this->messages = [...$messages, ...$pageMessages];
+
+        parent::__construct();
+    }
+
     public function goToPage($page = null)
     {
         if ($page === null) {
