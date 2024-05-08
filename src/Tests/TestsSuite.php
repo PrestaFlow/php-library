@@ -12,6 +12,7 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
 use Symfony\Component\ErrorHandler\Error\FatalError;
+use Throwable;
 use UnexpectedValueException;
 
 class TestsSuite
@@ -29,6 +30,16 @@ class TestsSuite
 
     protected $start_time;
     protected $end_time;
+
+    protected $init = false;
+
+    public $globals = [];
+    public $pages = [];
+
+    public function __construct()
+    {
+        $this->loadGlobals();
+    }
 
     protected function getSuite()
     {
@@ -206,39 +217,88 @@ class TestsSuite
         return $test['code'] = $instructions;
     }
 
+    public function init()
+    {
+    }
+
+    public function loadGlobals()
+    {
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../');
+        $dotenv->safeLoad();
+
+        $this->globals = [
+            'PS_VERSION' => $_ENV['PS_VERSION'] ?? '8.1.0',
+            'LOCALE' => $_ENV['LOCALE'] ?? 'en',
+            'BO' => [
+                'URL' => $_ENV['BO_URL'] ?? 'https://localhost//admin-dev/',
+                'EMAIL' => $_ENV['BO_EMAIL'] ?? 'demo@prestashop.com',
+                'PASSWD' => $_ENV['BO_PASSWD'] ?? 'Correct Horse Battery Staple',
+            ],
+            'FO' => [
+                'URL' => $_ENV['FO_URL'] ?? 'https://localhost/',
+                'EMAIL' => $_ENV['FO_EMAIL'] ?? 'pub@prestashop.com',
+                'PASSWD' => $_ENV['FO_PASSWD'] ?? '123456789',
+            ],
+        ];
+    }
+
+    public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)
+    {
+        $version = 'v8';
+
+        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$version.'\\'.$pageName.'\\Page';
+
+        $pageInstance = new $pageClass();
+        if ($globals !== null) {
+            $pageInstance->setGlobals($this->globals);
+        }
+        $pageInstance->setUserAgent($userAgent);
+
+        $pageVarName = lcfirst(str_replace('\\', '', ucwords($pageName, '\\'))).'Page';
+
+        $this->pages[$pageVarName] = $pageInstance;
+    }
+
     public function run()
     {
-        foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
-            try {
-                $start_time = hrtime(true);
-                $this->getInstructions($test);
-                if ($this->isSkippable($test) === true) {
-                    $test['state'] = 'skip';
-                    $this->stats['skips']++;
-                } else if ($this->isTodoable($test) === true) {
-                    $test['state'] = 'todo';
-                    $this->stats['todos']++;
-                } else {
-                    $test['steps']->call($this);
-                    $this->stats['assertions'] += Expect::getNbAssertions();
+        if (!$this->init) {
+            $this->init();
+            $this->init = true;
+        }
 
+        if (is_array($this->suites[$this->_runestSuite]['tests'])) {
+            foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
+                try {
+                    $start_time = hrtime(true);
+                    $this->getInstructions($test);
+                    if ($this->isSkippable($test) === true) {
+                        $test['state'] = 'skip';
+                        $this->stats['skips']++;
+                    } else if ($this->isTodoable($test) === true) {
+                        $test['state'] = 'todo';
+                        $this->stats['todos']++;
+                    } else {
+                        $test['steps']->call($this);
+                        $this->stats['assertions'] += Expect::getNbAssertions();
+
+                        $this->attachWarning($test);
+
+                        $test['state'] = 'pass';
+                        $this->stats['passes']++;
+                    }
+                } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
+                    $test['state'] = 'fail';
+                    $test['error'] = $e->getMessage();
                     $this->attachWarning($test);
-
-                    $test['state'] = 'pass';
-                    $this->stats['passes']++;
+                    $this->attachScreen($test);
+                    $this->stats['assertions'] += Expect::getNbAssertions();
+                    $this->stats['failures']++;
+                } finally {
+                    $test['expect'] = Expect::getExpectMessage();
+                    Expect::getNbAssertions();
+                    $end_time = hrtime(true);
+                    $test['time'] = round(($end_time - $start_time) / 1e+6);
                 }
-            } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Exception $e) {
-                $test['state'] = 'fail';
-                $test['error'] = $e->getMessage();
-                $this->attachWarning($test);
-                $this->attachScreen($test);
-                $this->stats['assertions'] += Expect::getNbAssertions();
-                $this->stats['failures']++;
-            } finally {
-                $test['expect'] = Expect::getExpectMessage();
-                Expect::getNbAssertions();
-                $end_time = hrtime(true);
-                $test['time'] = round(($end_time - $start_time) / 1e+6);
             }
         }
 

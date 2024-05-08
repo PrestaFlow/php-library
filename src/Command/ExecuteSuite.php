@@ -3,9 +3,11 @@
 namespace PrestaFlow\Library\Command;
 
 use Exception;
+use PrestaFlow\Library\Tests\TestsSuite;
 use stdClass;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -34,6 +36,7 @@ class ExecuteSuite extends Command
     public const OUTPUT_COMPACT = 'compact';
     public const OUTPUT_JSON = 'json';
 
+    protected $io;
     protected $output;
     protected $outputMode = 'full';
     protected $json = [];
@@ -43,7 +46,7 @@ class ExecuteSuite extends Command
         $this
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
-            ->addArgument('suite', InputArgument::REQUIRED, 'The suite name');
+            ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests');
     }
 
     protected function defineOutputMode(InputInterface $input)
@@ -96,72 +99,140 @@ class ExecuteSuite extends Command
         }
     }
 
+    protected function success(string $message)
+    {
+        if (self::OUTPUT_FULL === $this->getOutputMode()) {
+            $this->output->writeln('<fg=green;options=bold>SUCCESS</> <fg=white>' . $message . '</>');
+        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
+            $this->output->writeln('<fg=green;options=bold>SUCCESS</>');
+        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->output->writeln(
+                json_encode(
+                    [
+                        'hasError' => false,
+                        'message' => $message,
+                    ]
+                )
+            );
+        }
+    }
+
     public function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
 
         $this->defineOutputMode($input);
 
-        $suitePath = $input->getArgument('suite');
+        $folderPath = $input->getArgument('folder');
 
-        $className = '\\PrestaFlow\\Library\\Tests\\Suites\\' . str_replace('/', '\\', $suitePath);
-
-        if (!class_exists($className)) {
-            $this->debug($className);
-            $this->error('The test suite doesn\'t seem to exist');
+        if (!is_dir($folderPath) || !is_dir(ucfirst($folderPath))) {
+            $this->debug($folderPath);
+            $this->error('The suites folder doesn\'t seem to exist');
             return Command::FAILURE;
         }
 
-        try {
-            $suite = new $className();
-            $suite->run();
+        $testSuites = $this->getTestsSuites($folderPath);
 
-            $results = $suite->results(false);
-
-            foreach ($results['tests'] as $test) {
-                $output->writeln('');
-                match ($test['state']) {
-                    self::PASS => $this->pass($test),
-                    self::FAIL => $this->fail($test),
-                    self::SKIPPED => $this->skip($test),
-                    self::TODO => $this->todo($test),
-                };
+        if (!count($testSuites)) {
+            $this->success('Tests folder is empty');
+            return Command::SUCCESS;
+        }
+        foreach ($testSuites as $suitePath) {
+            if (!str_ends_with($suitePath, '.php')) {
+                continue;
             }
 
-            $output->writeln(['']);
-
-            $tests = [];
-            if ($results['stats']['failures']) {
-                $tests[] = sprintf('<fg=red;options=bold>%d failures</>', $results['stats']['failures']);
-            }
-            if ($results['stats']['passes']) {
-                $tests[] = sprintf('<fg=green;options=bold>%d passed</>', $results['stats']['passes']);
-            }
-            if ($results['stats']['skips']) {
-                $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skips</>', $results['stats']['skips']);
-            }
-            if ($results['stats']['todos']) {
-                $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $results['stats']['todos']);
+            $testFile = file_get_contents($suitePath);
+            $namespace = str_replace('namespace ', '', str_replace(';', '', preg_grep('/namespace\s+(.+?);$/sm', explode("\n", $testFile))));
+            if (is_array($namespace)) {
+                $namespace = array_values($namespace)[0];
+            } else {
+                $namespace = '';
             }
 
-            $output->writeln([
-                sprintf(
-                    '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
-                    implode('<fg=gray>,</> ', $tests),
-                    (int) $results['stats']['assertions']
-                ),
-            ]);
+            $pathSplits = explode('/', $suitePath);
 
-            //
-            $seconds = number_format($results['stats']['time'] / 1000, 2, '.', '');
-            $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $seconds));
-        } catch (Exception $e) {
-            $this->error($e->getMessage());
+            $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits)-1]);
 
-            return Command::FAILURE;
+            try {
+                $suite = new $className();
+                if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
+                    && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
+                    $this->debug($className);
+
+                    $suite->run();
+
+                    $results = $suite->results(false);
+
+                    foreach ($results['tests'] as $test) {
+                        $output->writeln('');
+                        match ($test['state']) {
+                            self::PASS => $this->pass($test),
+                            self::FAIL => $this->fail($test),
+                            self::SKIPPED => $this->skip($test),
+                            self::TODO => $this->todo($test),
+                        };
+                    }
+
+                    $this->io->newLine();
+
+                    $tests = [];
+                    if ($results['stats']['failures']) {
+                        $tests[] = sprintf('<fg=red;options=bold>%d failures</>', $results['stats']['failures']);
+                    }
+                    if ($results['stats']['passes']) {
+                        $tests[] = sprintf('<fg=green;options=bold>%d passed</>', $results['stats']['passes']);
+                    }
+                    if ($results['stats']['skips']) {
+                        $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skips</>', $results['stats']['skips']);
+                    }
+                    if ($results['stats']['todos']) {
+                        $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $results['stats']['todos']);
+                    }
+
+                    $output->writeln([
+                        sprintf(
+                            '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
+                            implode('<fg=gray>,</> ', $tests),
+                            (int) $results['stats']['assertions']
+                        ),
+                    ]);
+
+                    //
+                    $seconds = number_format($results['stats']['time'] / 1000, 2, '.', '');
+                    $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $seconds));
+                }
+            } catch (Exception $e) {
+                $this->error($e->getMessage());
+
+                //return Command::FAILURE;
+            }
+            $this->io->newLine();
         }
 
         return Command::SUCCESS;
+    }
+
+    public function getTestsSuites($folderPath)
+    {
+        $testSuites = [];
+        $folderFiles = scandir($folderPath);
+        if (is_array($folderFiles)) {
+            foreach ($folderFiles as $folderFile) {
+                if ($folderFile != '.' && $folderFile != '..') {
+                    if (is_dir($folderPath.'/'.$folderFile)) {
+                        foreach ($this->getTestsSuites($folderPath.'/'.$folderFile) as $childFolderFile)
+                        {
+                            $testSuites[] = $childFolderFile;
+                        }
+                    } else {
+                        $testSuites[] = $folderPath.'/'.$folderFile;
+                    }
+                }
+            }
+        }
+        return $testSuites;
     }
 
     public function expects($test)

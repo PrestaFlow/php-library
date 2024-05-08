@@ -7,7 +7,7 @@ use PrestaFlow\Library\Tests\TestsSuite;
 
 class LoginTest extends TestsSuite
 {
-    public function __construct()
+    public function init()
     {
         // TEMP
         $globals = [
@@ -24,49 +24,51 @@ class LoginTest extends TestsSuite
         ];
         // END
 
-        $this->before();
-        $page = $this->page;
+        $headless = false;
+        $this->before($headless);
 
-        $dashboardPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Dashboard\Page;
-        $loginPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Login\Page;
+        $dashboardPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Dashboard\Page();
+        $dashboardPage->setGlobals($globals);
 
-        $this->describe(
-            'Check PS version {$PS_VERSION} with {$LOCALE} language, and login and log out from BO',
-            [
-                $this->it('should go to login page', function () use ($page, $globals, $loginPage) {
-                    $loginPage->goTo($globals['BO']['URL'], $page);
-                    Expect::that($loginPage->getPageTitle($page))->with($page)->contains($loginPage->pageTitle());
-                }),
-                $this->it('should check PS version', function () use ($page, $globals, $loginPage) {
-                    $psVersion = $loginPage->getPrestaShopVersion($page);
-                    Expect::that($psVersion)->with($page)->contains($globals['PS_VERSION']);
-                }),
-                $this->it('should try to login with wrong email and password', function () use ($page, $globals, $loginPage) {
-                    $loginPage->login($page, 'wrongEmail@prestashop.com', 'wrongPass', false);
+        $loginPage = new \PrestaFlow\Library\Pages\v8\BackOffice\Login\Page();
+        $loginPage->setGlobals($globals);
 
-                    // Get error displayed
-                    $errorMessage = $loginPage->getLoginError($page);
-                    Expect::that($errorMessage)->with($page)->contains($loginPage->loginErrorText);
-                }),
-                $this->skip('should login into BO with default user', function () use ($page, $globals, $loginPage, $dashboardPage) {
-                    /*
+        $this
+        ->describe('Check PS version {$PS_VERSION} with {$LOCALE} language, and login and log out from BO')
+        ->it('should go to login page', function () use ($loginPage) {
+            $loginPage->goToPage('index');
+            Expect::that($loginPage->getPageTitle())->contains($loginPage->pageTitle());
+        })
+        ->it('should check PS version', function () use ($loginPage) {
+            $psVersion = $loginPage->getPrestaShopVersion();
+            Expect::that($psVersion)->contains($loginPage->getGlobal('PS_VERSION'));
+        })
+        ->it('should try to login with wrong email and password', function () use ($loginPage) {
+            $loginPage->login('wrongEmail@prestashop.com', 'wrongPass', false);
 
-                    await loginPage.login(page, global.BO.EMAIL, global.BO.PASSWD);
-                    await dashboardPage.closeOnboardingModal(page);
+            // Get error displayed
+            $errorMessage = $loginPage->getLoginError();
+            Expect::that($errorMessage)->contains($loginPage->getMessage('loginErrorText'));
+        })
+        ->skip('should login into BO with default user', function () use ($loginPage, $dashboardPage) {
+            /*
 
-                    const pageTitle = await dashboardPage.getPageTitle(page);
-                    await expect(pageTitle).to.contains(dashboardPage.pageTitle);
-                    */
-                }),
-                $this->skip('should log out from BO', function () use ($page, $globals, $loginPage, $dashboardPage) {
-                    /*
-                    await dashboardPage.logoutBO(page);
+            await loginPage.login(page, global.BO.EMAIL, global.BO.PASSWD);
+            await dashboardPage.closeOnboardingModal(page);
 
-                    const pageTitle = await loginPage.getPageTitle(page);
-                    await expect(pageTitle).to.contains(loginPage.pageTitle);
-                    */
-                }),
-            ]
-        );
+            const pageTitle = await dashboardPage.getPageTitle(page);
+            await expect(pageTitle).to.contains(dashboardPage.pageTitle);
+            */
+        })
+        ->skip('should log out from BO', function () use ($loginPage, $dashboardPage) {
+            /*
+            await dashboardPage.logoutBO(page);
+
+            const pageTitle = await loginPage.getPageTitle(page);
+            await expect(pageTitle).to.contains(loginPage.pageTitle);
+            */
+        });
+
+        parent::init();
     }
 }
