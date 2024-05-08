@@ -6,22 +6,36 @@ use PrestaFlow\Library\Pages\v8\BackOffice\BasePage;
 
 class Page extends BasePage
 {
+    public string $pageTitle = 'PrestaShop';
+
     public function __construct()
     {
         $this->pageTitle = 'PrestaShop';
 
-        $this->loginErrorText = 'The employee does not exist, or the password provided is incorrect.';
+        parent::__construct();
+    }
 
-        // Login header selectors
-        $this->loginHeaderBlock = '#login-header';
-        $this->psVersionBlock = $this->loginHeaderBlock . ' div.text-center';
+    public function defineSelectors()
+    {
+        return [
+            // Login header selectors
+            'loginHeaderBlock' => '#login-header',
+            'psVersionBlock' => '#login-header div.text-center',
+            // Login Form selectors
+            'emailInput' => '#email',
+            'passwordInput' => '#passwd',
+            'submitLoginButton' => '#submit_login',
+            'alertDangerDiv' => '#error',
+            'alertDangerTextBlock' => '#error li',
+        ];
+    }
 
-        // Login Form selectors
-        $this->emailInput = '#email';
-        $this->passwordInput = '#passwd';
-        $this->submitLoginButton = '#submit_login';
-        $this->alertDangerDiv = '#error';
-        $this->alertDangerTextBlock = $this->alertDangerDiv . ' li';
+    public function defineMessages()
+    {
+        return [
+            //'addedToWishlist' => 'Product added',
+            'loginErrorText' => 'The employee does not exist, or the password provided is incorrect.',
+        ];
     }
 
     /**
@@ -36,14 +50,14 @@ class Page extends BasePage
             $password = $this->getGlobal('BO_PASSWD');
         }
 
-        $this->setValue($this->emailInput, $email);
-        $this->setValue($this->passwordInput, $password);
+        $this->setValue($this->getSelector('emailInput'), $email);
+        $this->setValue($this->getSelector('passwordInput'), $password);
 
         // Wait for navigation if login is successful
         if ($waitForNavigation) {
             //await this.clickAndWaitForNavigation(page, this.submitLoginButton);
         } else {
-            $this->click($this->submitLoginButton);
+            $this->click($this->getSelector('submitLoginButton'));
         }
     }
 
@@ -52,11 +66,11 @@ class Page extends BasePage
      */
     public function getLoginError()
     {
-        return $this->getTextContent($this->alertDangerTextBlock);
+        return $this->getTextContent($this->getSelector('lertDangerTextBlock'));
     }
 
     public function getPrestashopVersion()
     {
-        return $this->getTextContent($this->psVersionBlock);
+        return $this->getTextContent($this->getSelector('psVersionBlock'));
     }
 }

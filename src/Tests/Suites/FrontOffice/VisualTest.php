@@ -7,7 +7,7 @@ use PrestaFlow\Library\Tests\TestsSuite;
 
 class VisualTest extends TestsSuite
 {
-    public function __construct()
+    public function init()
     {
         $globals = [
             'PS_VERSION' => '8.0.4',
@@ -37,5 +37,7 @@ class VisualTest extends TestsSuite
             $score = $basePage->compare2();
             Expect::that($score)->isGreaterThanOrEqualTo(90);
         });
+
+        parent::init();
     }
 }

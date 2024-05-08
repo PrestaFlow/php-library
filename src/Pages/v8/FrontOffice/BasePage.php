@@ -117,7 +117,6 @@ class BasePage extends CommonPage
 
     public function compare2()
     {
-
         $reference = storage_path() . '/screens/references/' . 'reference_2A63960A89AF7BF17D3A8A3C4A5EACF8.png';
         $actual = storage_path() . '/screens/references/' . 'reference_06683FDCAA46193A3D20779F937D4394.jpeg';
 

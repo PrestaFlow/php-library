@@ -7,7 +7,7 @@ use PrestaFlow\Library\Tests\TestsSuite;
 
 class WishlistTest extends TestsSuite
 {
-    public function __construct()
+    public function init()
     {
         // TEMP
         $globals = [
@@ -103,5 +103,7 @@ class WishlistTest extends TestsSuite
         })
         ->skip('should click on the refresh button', function () use ($homePage) {
         });
+
+        parent::init();
     }
 }
