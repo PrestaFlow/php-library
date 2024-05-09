@@ -52,7 +52,7 @@ class CommonPage
             return $selector;
         }
 
-        return null;
+        throw new Exception('Selector "' . $selector . '" is not defined');
     }
 
     public function __call($name, $arguments)
