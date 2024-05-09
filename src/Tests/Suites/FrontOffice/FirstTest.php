@@ -26,10 +26,6 @@ class FirstTest extends TestsSuite
         ->it('seems not broken', function () use ($frontOfficeHomePage) {
             Expect::that()->shopIsVisible($frontOfficeHomePage);
         })
-        ->it('will fail, obviously', function () use ($frontOfficeHomePage) {
-            Expect::that(true)->equals(true);
-            Expect::that(false)->equals(true);
-        })
         ->skip('skipped test', function () use ($frontOfficeHomePage) {
             Expect::that(false)->equals(true);
         })
