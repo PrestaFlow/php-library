@@ -5,7 +5,7 @@ namespace PrestaFlow\Library\Tests\Suites\Login;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Tests\TestsSuite;
 
-class LoginTest extends TestsSuite
+class Test extends TestsSuite
 {
     public function init()
     {
@@ -23,6 +23,8 @@ class LoginTest extends TestsSuite
         ->it('should check PS version', function () use ($backOfficeLoginPage) {
             $psVersion = $backOfficeLoginPage->getPrestaShopVersion();
             Expect::that($psVersion)->contains($backOfficeLoginPage->getGlobal('PS_VERSION'));
+
+            //Expect::that()->matchPrestaShopVersion();
         })
         ->it('should try to login with wrong email and password', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->login('wrongEmail@prestashop.com', 'wrongPass', false);
@@ -31,7 +33,7 @@ class LoginTest extends TestsSuite
             $errorMessage = $backOfficeLoginPage->getLoginError();
             Expect::that($errorMessage)->contains($backOfficeLoginPage->getMessage('loginErrorText'));
         })
-        ->skip('should login into BO with default user', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
+        ->it('should login into BO with default user', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
             /*
 
             await loginPage.login(page, global.BO.EMAIL, global.BO.PASSWD);
@@ -40,6 +42,9 @@ class LoginTest extends TestsSuite
             const pageTitle = await dashboardPage.getPageTitle(page);
             await expect(pageTitle).to.contains(dashboardPage.pageTitle);
             */
+            $backOfficeLoginPage->login();
+
+            Expect::that($backOfficeDashboardPage->getPageTitle())->contains($backOfficeDashboardPage->pageTitle());
         })
         ->skip('should log out from BO', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
             /*
@@ -48,6 +53,9 @@ class LoginTest extends TestsSuite
             const pageTitle = await loginPage.getPageTitle(page);
             await expect(pageTitle).to.contains(loginPage.pageTitle);
             */
+            $backOfficeDashboardPage->logout();
+
+            Expect::that($backOfficeLoginPage->getPageTitle())->contains($backOfficeLoginPage->pageTitle());
         });
     }
 }

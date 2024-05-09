@@ -33,8 +33,8 @@ class Page extends BasePage
     public function defineMessages()
     {
         return [
-            //'addedToWishlist' => 'Product added',
-            'loginErrorText' => 'The employee does not exist, or the password provided is incorrect.',
+            //'loginErrorText' => 'The employee does not exist, or the password provided is incorrect.',
+            'loginErrorText' => 'Ce compte employé n\'existe pas, ou le mot de passe est erroné.',
         ];
     }
 
