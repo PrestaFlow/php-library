@@ -66,7 +66,7 @@ class Page extends BasePage
      */
     public function getLoginError()
     {
-        return $this->getTextContent($this->getSelector('lertDangerTextBlock'));
+        return $this->getTextContent($this->getSelector('alertDangerTextBlock'));
     }
 
     public function getPrestashopVersion()
