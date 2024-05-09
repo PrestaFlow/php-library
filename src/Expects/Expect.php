@@ -24,7 +24,8 @@ class Expect extends ExpectLibrary
 
     public function __call($methodName, $args = [])
     {
-        self::$expectMessage['fail'][] = $this->format("{methodName} does not exists", array("methodName" => $methodName));
+        $e = $this->getUnexpectedValueExceptionConstructor("{methodName} does not exists", array("methodName" => $methodName));
+        throw call_user_func_array($e[0], $e[1]);
     }
 
     public static function setWarning($message)
