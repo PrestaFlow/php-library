@@ -129,7 +129,6 @@ class TestsSuite
 
     public static function getBrowser(bool $headless = true)
     {
-        $headless = false;
         $browser = null;
 
         $socketFile = TestsSuite::getSocketFilePath();
@@ -151,12 +150,12 @@ class TestsSuite
         } catch (BrowserConnectionFailed $e) {
             $browserFactory = new BrowserFactory();
 
-            $browserFactory->addOptions(['headless' => (bool) $headless]);
+            //$browserFactory->addOptions(['headless' => (bool) $headless]);
 
             $browser = $browserFactory->createBrowser([
                 'userAgent' => 'PrestaFlow',
                 'keepAlive' => true,
-                //'headless' => false,
+                'headless' => (bool) $headless,
             ]);
             \file_put_contents($socketFile, $browser->getSocketUri(), LOCK_EX);
         }
