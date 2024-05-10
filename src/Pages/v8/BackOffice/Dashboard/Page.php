@@ -8,6 +8,9 @@ class Page extends BasePage
 {
     public function __construct()
     {
-        $this->pageTitle = 'Dashboard';
+        //$this->pageTitle = 'Dashboard';
+        $this->pageTitle = 'Tableau de bord';
+
+        parent::__construct();
     }
 }

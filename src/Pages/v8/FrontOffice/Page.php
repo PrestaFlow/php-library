@@ -85,7 +85,7 @@ class Page extends CommonPage
     public function logout()
     {
         $this->click($this->getSelector('logoutLink'));
-        //TestsSuite::getPage()->waitForReload();
+        $this->waitForReload();
     }
 
     public function compare()

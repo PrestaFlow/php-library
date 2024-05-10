@@ -48,14 +48,14 @@ class Test extends TestsSuite
 
             Expect::that($backOfficeDashboardPage->getPageTitle())->contains($backOfficeDashboardPage->pageTitle());
         })
-        ->skip('should log out from BO', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
+        ->it('should log out from BO', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
             /*
             await dashboardPage.logoutBO(page);
 
             const pageTitle = await loginPage.getPageTitle(page);
             await expect(pageTitle).to.contains(loginPage.pageTitle);
             */
-            $backOfficeDashboardPage->logout();
+            $backOfficeLoginPage->logout();
 
             Expect::that($backOfficeLoginPage->getPageTitle())->contains($backOfficeLoginPage->pageTitle());
         });

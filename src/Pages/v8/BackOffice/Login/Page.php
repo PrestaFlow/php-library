@@ -27,6 +27,9 @@ class Page extends BasePage
             'submitLoginButton' => '#submit_login',
             'alertDangerDiv' => '#error',
             'alertDangerTextBlock' => '#error li',
+            //
+            'employeeInfosDropDown' => '#employee_infos a',
+            'logoutLink' => '#header_logout',
         ];
     }
 
@@ -41,7 +44,7 @@ class Page extends BasePage
     /**
      * Enter credentials and submit login form
      */
-    public function login($email = null, $password = null, $waitForNavigation = false)
+    public function login($email = null, $password = null, $waitForNavigation = true)
     {
         if ($email === null) {
             $email = $this->getGlobal('BO_EMAIL');
@@ -55,7 +58,8 @@ class Page extends BasePage
 
         // Wait for navigation if login is successful
         if ($waitForNavigation) {
-            //await this.clickAndWaitForNavigation(page, this.submitLoginButton);
+            $this->click($this->getSelector('submitLoginButton'));
+            $this->waitForPageReload();
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
@@ -67,6 +71,12 @@ class Page extends BasePage
     public function getLoginError()
     {
         return $this->getTextContent($this->getSelector('alertDangerTextBlock'));
+    }
+
+    public function logout()
+    {
+        $this->click($this->getSelector('employeeInfosDropDown'));
+        $this->click($this->getSelector('logoutLink'));
     }
 
     public function getPrestashopVersion()

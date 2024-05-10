@@ -134,7 +134,12 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
-        $this->getPage()->mouse()->find($selector, $nth)->click();
+        return $this->getPage()->mouse()->find($selector, $nth)->click();
+    }
+
+    public function waitForPageReload()
+    {
+        $this->getPage()->evaluate('some js that will reload the page')->waitForPageReload();
     }
 
     /**
