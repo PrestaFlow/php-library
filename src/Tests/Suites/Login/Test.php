@@ -34,6 +34,8 @@ class Test extends TestsSuite
             Expect::that($errorMessage)->contains($backOfficeLoginPage->getMessage('loginErrorText'));
         })
         ->it('should login into BO with default user', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
+            // Avoid this line : only there cause the DELETE raw key doesn't work as now
+            $backOfficeLoginPage->goToPage('index');
             /*
 
             await loginPage.login(page, global.BO.EMAIL, global.BO.PASSWD);
