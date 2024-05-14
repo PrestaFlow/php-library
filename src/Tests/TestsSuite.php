@@ -127,7 +127,7 @@ class TestsSuite
         return $socketFilePath;
     }
 
-    public static function getBrowser(bool $headless = true)
+    public static function getBrowser(bool $headless = true, bool $force = true)
     {
         $browser = null;
 
@@ -144,10 +144,16 @@ class TestsSuite
 
         try {
             if ($socket === null) {
+                if (!$force) {
+                    return null;
+                }
                 throw new BrowserConnectionFailed('');
             }
             $browser = BrowserFactory::connectToBrowser($socket);
-        } catch (BrowserConnectionFailed $e) {
+        } catch (BrowserConnectionFailed | OperationTimedOut $e) {
+            if (!$force) {
+                return null;
+            }
             $browserFactory = new BrowserFactory();
 
             //$browserFactory->addOptions(['headless' => (bool) $headless]);
@@ -157,7 +163,7 @@ class TestsSuite
                 'keepAlive' => true,
                 'headless' => (bool) $headless,
             ]);
-            \file_put_contents($socketFile, $browser->getSocketUri(), LOCK_EX);
+            \file_put_contents($socketFile, $browser->getSocketUri());
         }
 
         return $browser;
@@ -205,7 +211,7 @@ class TestsSuite
 
     public function after()
     {
-        TestsSuite::getBrowser()?->close();
+        TestsSuite::getBrowser(force: false)?->close();
 
         $this->end_time = hrtime(true);
         $this->suites[$this->_runestSuite]['stats']['time'] = round(($this->end_time - $this->start_time) / 1e+6);
