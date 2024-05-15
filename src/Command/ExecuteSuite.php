@@ -161,7 +161,7 @@ class ExecuteSuite extends Command
                     && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
                     $this->debug($className);
 
-                    $suite->run();
+                    $suite->run(cli: true);
 
                     $results = $suite->results(false);
 
@@ -222,8 +222,7 @@ class ExecuteSuite extends Command
             foreach ($folderFiles as $folderFile) {
                 if ($folderFile != '.' && $folderFile != '..') {
                     if (is_dir($folderPath.'/'.$folderFile)) {
-                        foreach ($this->getTestsSuites($folderPath.'/'.$folderFile) as $childFolderFile)
-                        {
+                        foreach ($this->getTestsSuites($folderPath.'/'.$folderFile) as $childFolderFile) {
                             $testSuites[] = $childFolderFile;
                         }
                     } else {
@@ -240,7 +239,7 @@ class ExecuteSuite extends Command
         if (!empty($test['expect'])) {
             foreach ($test['expect'] as $state => $expectMessages) {
                 foreach ($expectMessages as $expectMessage) {
-                    if (!str_contains($expectMessage, '[Debug] This page has moved')) {
+                    if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
                         match ($state) {
                             self::PASS => $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $expectMessage)),
                             self::FAIL => $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $expectMessage)),

@@ -48,7 +48,7 @@ class WishlistTest extends TestsSuite
             Expect::that($frontOfficeLoginPage->getPageTitle())->contains($frontOfficeLoginPage->pageTitle());
         })
         ->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
-            $frontOfficeLoginPage->login('pub@prestashop.com', '123456789');
+            $frontOfficeLoginPage->login();
 
             Expect::that()->customerIsLogged($frontOfficeLoginPage->selector('logoutLink'), 1000);
         })

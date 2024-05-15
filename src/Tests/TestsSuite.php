@@ -36,6 +36,8 @@ class TestsSuite
     public $globals = [];
     public $pages = [];
 
+    protected static $lines = [];
+
     public function __construct()
     {
         $this->loadGlobals();
@@ -223,7 +225,12 @@ class TestsSuite
         $instructions = [];
         $reflection = new \ReflectionFunction($test['steps']);
 
-        $lines = file($reflection->getFileName());
+        if (isset(self::$lines[$reflection->getFileName()])) {
+            $lines = self::$lines[$reflection->getFileName()];
+        } else {
+            $lines = file($reflection->getFileName());
+            self::$lines[$reflection->getFileName()] = $lines;
+        }
         for ($i = ($reflection->getStartLine() - 1) ; $i < ($reflection->getEndLine()) ; $i++) {
             $instructions[$i] = $lines[$i];
         }
@@ -276,7 +283,7 @@ class TestsSuite
         $this->pages[$pageVarName] = $pageInstance;
     }
 
-    public function run()
+    public function run($cli = false)
     {
         if (!$this->init) {
             $this->init();
@@ -287,7 +294,9 @@ class TestsSuite
             foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
                 try {
                     $start_time = hrtime(true);
-                    $this->getInstructions($test);
+                    if (!$cli) {
+                        $this->getInstructions($test);
+                    }
                     if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
