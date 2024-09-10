@@ -27,9 +27,14 @@ class Page extends BasePage
         ];
     }
 
-    public function getListingTitle()
+    public function getTitle()
     {
         return $this->getTextContent($this->selector('listTitle'));
+    }
+
+    public function getListingTitle()
+    {
+        return $this->getTitle();
     }
 
     public function addToWishList($index)
