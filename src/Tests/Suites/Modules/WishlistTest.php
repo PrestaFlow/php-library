@@ -20,22 +20,20 @@ class WishlistTest extends TestsSuite
 
         $this
         ->describe('Wishlist module - Statistics tab settings')
-        ->it('should login in BO', function () use ($backOfficeLoginPage) {
-            $backOfficeLoginPage->goToPage('login');
-
-            Expect::that($backOfficeLoginPage->getPageTitle())->contains($backOfficeLoginPage->pageTitle());
+        ->it('should login into BO', function () use ($backOfficeLoginPage, $backOfficeDashboardPage) {
+            $backOfficeLoginPage->goToPage('index');
 
             $backOfficeLoginPage->login();
 
-            Expect::that($backOfficeLoginPage->getPageTitle())->contains($backOfficeLoginPage->pageTitle());
+            Expect::that($backOfficeDashboardPage->getPageTitle())->contains($backOfficeDashboardPage->pageTitle());
         })
-        ->skip('should go to \'Modules > Module Manager\' page', function () use ($frontOfficeHomePage) {
+        ->todo('should go to \'Modules > Module Manager\' page', function () use ($frontOfficeHomePage) {
         })
-        ->skip('should search the module ${Modules.blockwishlist.name}', function () use ($frontOfficeHomePage) {
+        ->todo('should search the module ${Modules.blockwishlist.name}', function () use ($frontOfficeHomePage) {
         })
-        ->skip('should go to the configuration page of the module ${Modules.blockwishlist.name}', function () use ($frontOfficeHomePage) {
+        ->todo('should go to the configuration page of the module ${Modules.blockwishlist.name}', function () use ($frontOfficeHomePage) {
         })
-        ->skip('should go on Statistics Tab', function () use ($frontOfficeHomePage) {
+        ->todo('should go on Statistics Tab', function () use ($frontOfficeHomePage) {
         })
         ->it('should go to the FO', function () use ($frontOfficeHomePage) {
             $frontOfficeHomePage->goToPage('home');
@@ -49,6 +47,8 @@ class WishlistTest extends TestsSuite
         })
         ->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->login();
+
+            var_dump($frontOfficeLoginPage->selector('logoutLink'));
 
             Expect::that()->customerIsLogged($frontOfficeLoginPage->selector('logoutLink'), 1000);
         })
@@ -68,14 +68,14 @@ class WishlistTest extends TestsSuite
             });
         };
 
-        $this->it('should logout', function () use ($frontOfficePage) {
-            $frontOfficePage->logout();
+        $this->it('should logout', function () use ($frontOfficeLoginPage) {
+            $frontOfficeLoginPage->logout();
 
-            Expect::that()->customerIsNotLogged($frontOfficePage->selector('logoutLink'), 1000);
+            Expect::that()->customerIsNotLogged($frontOfficeLoginPage->selector('logoutLink'), 1000);
         })
-        ->skip('should go to BO', function () use ($frontOfficeHomePage) {
+        ->todo('should go to BO', function () use ($frontOfficeHomePage) {
         })
-        ->skip('should click on the refresh button', function () use ($frontOfficeHomePage) {
+        ->todo('should click on the refresh button', function () use ($frontOfficeHomePage) {
         });
     }
 }
