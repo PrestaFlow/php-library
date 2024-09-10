@@ -24,6 +24,7 @@ class Page extends BasePage
             'passwordInput' => '#login-form input[name=\'password\']',
             'submitLoginButton' => '#login-form button#submit-login',
             'alertDangerTextBlock' => '#content section.login-form div.help-block li.alert-danger',
+            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\']',
         ];
     }
 
@@ -50,5 +51,11 @@ class Page extends BasePage
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
+    }
+
+    public function logout()
+    {
+        $this->click($this->getSelector('logoutLink'));
+        $this->waitForReload();
     }
 }
