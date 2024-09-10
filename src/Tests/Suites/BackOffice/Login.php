@@ -1,11 +1,11 @@
 <?php
 
-namespace PrestaFlow\Library\Tests\Suites\Login;
+namespace PrestaFlow\Library\Tests\Suites\BackOffice;
 
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Tests\TestsSuite;
 
-class Test extends TestsSuite
+class Login extends TestsSuite
 {
     public function init()
     {
