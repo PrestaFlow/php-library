@@ -19,7 +19,6 @@ class Page extends CommonPage
             'desktopLogo' => '#_desktop_logo',
             'userInfoLink' => '#_desktop_user_info',
             'accountLink' => '#_desktop_user_info .user-info a[href*=\'/my-account\']',
-            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\']',
         ];
 
         $pageSelectors = [];
@@ -80,12 +79,6 @@ class Page extends CommonPage
         }
 
         return $url;
-    }
-
-    public function logout()
-    {
-        $this->click($this->getSelector('logoutLink'));
-        $this->waitForReload();
     }
 
     public function compare()
