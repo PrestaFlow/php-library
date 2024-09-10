@@ -15,6 +15,7 @@ class Page extends CommonPage
     public function __construct()
     {
         $selectors = [
+            'pageTitle' => 'h1',
             'maintenanceBlock' => '#content.page-maintenance',
             'desktopLogo' => '#_desktop_logo',
             'userInfoLink' => '#_desktop_user_info',
@@ -79,6 +80,16 @@ class Page extends CommonPage
         }
 
         return $url;
+    }
+
+    public function getTitle()
+    {
+        return $this->getTextContent($this->selector('pageTitle'));
+    }
+
+    public function getPageTitle()
+    {
+        return $this->getTitle();
     }
 
     public function compare()

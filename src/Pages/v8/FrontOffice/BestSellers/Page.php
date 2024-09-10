@@ -1,10 +1,10 @@
 <?php
 
-namespace PrestaFlow\Library\Pages\v8\FrontOffice\Product;
+namespace PrestaFlow\Library\Pages\v8\FrontOffice\BestSellers;
 
-use PrestaFlow\Library\Pages\v8\FrontOffice\Page as BasePage;
+use PrestaFlow\Library\Pages\v8\FrontOffice\Listing\Page as ListingPage;
 
-class Page extends BasePage
+class Page extends ListingPage
 {
     public function defineSelectors()
     {

@@ -9,7 +9,7 @@ class Page extends BasePage
     public function defineSelectors()
     {
         return [
-            'listTitle' => '#js-product-list-header',
+            'pageTitle' => '#js-product-list-header',
             'productArticle' => '#js-product-list .products div:nth-child(${index}) article',
             // Wishlist
             'productAddToWishlist' => '#js-product-list .products div:nth-child(${index}) article button.wishlist-button-add',
@@ -25,11 +25,6 @@ class Page extends BasePage
             //'addedToWishlist' => 'Product added',
             'addedToWishlist' => 'Produit ajouté',
         ];
-    }
-
-    public function getTitle()
-    {
-        return $this->getTextContent($this->selector('listTitle'));
     }
 
     public function getListingTitle()
