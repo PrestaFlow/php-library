@@ -246,22 +246,31 @@ class TestsSuite
     {
         $dotenv = Dotenv::createImmutable(__DIR__.'/../../');
         $dotenv->safeLoad();
+        // When importing the library in a project, the .env file is not in the same directory
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../');
+        $dotenv->safeLoad();
 
         $this->globals = [
-            'PS_VERSION' => $_ENV['PS_VERSION'] ?? '8.1.0',
-            'LOCALE' => $_ENV['LOCALE'] ?? 'en',
+            'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
+            'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
             'BO' => [
-                'URL' => $_ENV['BO_URL'] ?? ($_ENV['FO_URL'] ?? 'https://localhost') . '/admin-dev/',
-                'EMAIL' => $_ENV['BO_EMAIL'] ?? 'demo@prestashop.com',
-                'PASSWD' => $_ENV['BO_PASSWD'] ?? 'Correct Horse Battery Staple',
+                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? ($_ENV['FO_URL'] ?? 'https://localhost') . '/admin-dev/',
+                'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
+                'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
             'FO' => [
-                'URL' => $_ENV['FO_URL'] ?? 'https://localhost/',
-                'EMAIL' => $_ENV['FO_EMAIL'] ?? 'pub@prestashop.com',
-                'PASSWD' => $_ENV['FO_PASSWD'] ?? '123456789',
+                'URL' => $_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost/',
+                'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
+                'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
             ],
-            'HEADLESS' => $_ENV['HEADLESS'] ?? true,
+            'HEADLESS' => $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
+            'DEBUG' => $_ENV['PRESTAFLOW_DEBUG'] ?? false,
         ];
+    }
+
+    public function getGlobals() : array
+    {
+        return $this->globals;
     }
 
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)

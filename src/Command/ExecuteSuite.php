@@ -76,9 +76,16 @@ class ExecuteSuite extends Command
         return $this->outputMode;
     }
 
-    protected function debug(string $message)
+    protected function debug(string|array $message, bool $newLine = false)
     {
+        if (is_array($message)) {
+            $message = json_encode($message, JSON_PRETTY_PRINT);
+        }
         $this->output->writeln('<fg=blue;options=bold>INFO</> <fg=white>' . $message . '</>');
+
+        if ($newLine) {
+            $this->output->writeln('');
+        }
     }
 
     protected function error(string $message)
@@ -137,7 +144,8 @@ class ExecuteSuite extends Command
         if (!count($testSuites)) {
             $this->success('Tests folder is empty');
             return Command::SUCCESS;
-        }
+        };
+
         foreach ($testSuites as $suitePath) {
             if (!str_ends_with($suitePath, '.php')) {
                 continue;
@@ -159,6 +167,11 @@ class ExecuteSuite extends Command
                 $suite = new $className();
                 if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
                     && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
+                    $globals = $suite->getGlobals();
+                    if ($globals['DEBUG']) {
+                        $this->debug($globals, newLine: true);
+                    }
+
                     $this->debug($className);
 
                     $suite->run(cli: true);
