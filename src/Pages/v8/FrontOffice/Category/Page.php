@@ -1,6 +1,6 @@
 <?php
 
-namespace PrestaFlow\Library\Pages\v8\FrontOffice\Content;
+namespace PrestaFlow\Library\Pages\v8\FrontOffice\Category;
 
 use PrestaFlow\Library\Pages\v8\FrontOffice\Listing\Page as BasePage;
 
