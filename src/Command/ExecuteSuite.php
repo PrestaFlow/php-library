@@ -184,6 +184,9 @@ class ExecuteSuite extends Command
                     $this->info($suite->getDescribe());
 
                     foreach ($results['tests'] as $test) {
+                        if (isset($test['warning'])) {
+                            $this->warning($test['warning'], true);
+                        }
                         $output->writeln('');
                         match ($test['state']) {
                             self::PASS => $this->pass($test),
@@ -277,18 +280,28 @@ class ExecuteSuite extends Command
             $test = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $test));
+        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', getHumanString($test)));
 
         $this->expects($test);
     }
 
-    public function warning($test)
+    public function warning($test, $newLine = false)
     {
         if (is_array($test)) {
             $test = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $test));
+        $baseLine = '  ';
+        if ($newLine) {
+            $this->output->writeln('');
+            $baseLine = '';
+        }
+
+        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $this->getHumanString($test)));
+
+        if ($newLine) {
+            $this->output->writeln('');
+        }
 
         $this->expects($test);
     }
@@ -299,7 +312,7 @@ class ExecuteSuite extends Command
             $test = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $test));
+        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', getHumanString($test)));
 
         $this->expects($test);
     }
@@ -310,7 +323,7 @@ class ExecuteSuite extends Command
             $test = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $test));
+        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', getHumanString($test)));
 
         $this->expects($test);
     }
@@ -321,9 +334,17 @@ class ExecuteSuite extends Command
             $test = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $test));
+        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', getHumanString($test)));
 
         $this->expects($test);
+    }
+
+    protected function getHumanString(string $message)
+    {
+        return match ($message) {
+            'debug-mode' => 'Your shop is running in debug mode',
+            default => $message
+        };
     }
 
     /**
