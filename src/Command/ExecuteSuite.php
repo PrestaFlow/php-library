@@ -169,6 +169,7 @@ class ExecuteSuite extends Command
                 $suite = new $className();
                 if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
                     && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
+                    $this->io->newLine();
                     $globals = $suite->getGlobals();
                     if ($globals['DEBUG']) {
                         $this->debug($globals, newLine: true);
@@ -186,8 +187,9 @@ class ExecuteSuite extends Command
                     foreach ($results['tests'] as $test) {
                         if (isset($test['warning'])) {
                             $this->warning($test['warning'], true);
+                        } else {
+                            $output->writeln('');
                         }
-                        $output->writeln('');
                         match ($test['state']) {
                             self::PASS => $this->pass($test),
                             self::FAIL => $this->fail($test),
