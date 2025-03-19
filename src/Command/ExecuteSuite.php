@@ -88,6 +88,11 @@ class ExecuteSuite extends Command
         }
     }
 
+    protected function info(string|array $message, bool $newLine = false)
+    {
+        return $this->debug($message, $newLine);
+    }
+
     protected function error(string $message)
     {
         if (self::OUTPUT_FULL === $this->getOutputMode()) {
@@ -177,6 +182,7 @@ class ExecuteSuite extends Command
                     $suite->run(cli: true);
 
                     $results = $suite->results(false);
+                    $this->info($suite->getDescribe());
 
                     foreach ($results['tests'] as $test) {
                         $output->writeln('');

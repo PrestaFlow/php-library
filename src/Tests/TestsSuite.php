@@ -68,6 +68,11 @@ class TestsSuite
         return $this;
     }
 
+    public function getDescribe()
+    {
+        return $this->suites[$this->getSuite()]['title'];
+    }
+
     public function it(string $description, $steps)
     {
         $this->suites[$this->getSuite()]['tests'][] = [
