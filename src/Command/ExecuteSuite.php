@@ -177,7 +177,9 @@ class ExecuteSuite extends Command
                         $this->debug($globals, newLine: true);
                     }
 
-                    $this->debug($className);
+                    if ($globals['DEBUG']) {
+                        $this->debug($className);
+                    }
 
                     $suite->run(cli: true);
 
