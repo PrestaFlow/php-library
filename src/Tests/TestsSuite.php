@@ -255,6 +255,14 @@ class TestsSuite
         $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../');
         $dotenv->safeLoad();
 
+        if (isset($_ENV['PRESTAFLOW_DEBUG'])) {
+            $_ENV['PRESTAFLOW_DEBUG'] = filter_var($_ENV['PRESTAFLOW_DEBUG'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($_ENV['PRESTAFLOW_HEADLESS'])) {
+            $_ENV['PRESTAFLOW_HEADLESS'] = filter_var($_ENV['PRESTAFLOW_HEADLESS'], FILTER_VALIDATE_BOOLEAN);
+        }
+
         $this->globals = [
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
@@ -268,8 +276,8 @@ class TestsSuite
                 'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
             ],
-            'HEADLESS' => $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
-            'DEBUG' => $_ENV['PRESTAFLOW_DEBUG'] ?? false,
+            'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
+            'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
         ];
     }
 
