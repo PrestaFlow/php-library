@@ -336,7 +336,7 @@ class TestsSuite
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';
-                    Expect::$expectMessage['fail'][] = $e->getMessage();
+                    Expect::$expectMessage['fail'] = [$e->getMessage()];
                     $this->attachWarning($test);
                     $this->attachScreen($test);
                     $this->stats['assertions'] += Expect::getNbAssertions();
