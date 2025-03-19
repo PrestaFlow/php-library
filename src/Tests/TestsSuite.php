@@ -259,7 +259,7 @@ class TestsSuite
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
             'BO' => [
-                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? ($_ENV['FO_URL'] ?? 'https://localhost') . '/admin-dev/',
+                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? ($_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost') . '/admin-dev/',
                 'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
