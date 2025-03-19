@@ -41,13 +41,13 @@ class Page extends CommonPage
         parent::__construct();
     }
 
-    public function goToPage($page = null)
+    public function goToPage($page = null, $index = null)
     {
         if ($page === null) {
             $page = 'index';
         }
 
-        $url = $this->getPageURL($page);
+        $url = $this->getPageURL($page, $index);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
         $this->getPage()->navigate($url)->waitForNavigation();
@@ -62,7 +62,7 @@ class Page extends CommonPage
         }
     }
 
-    public function getPageURL($page): string
+    public function getPageURL($page, $index): string
     {
         $url = $this->getGlobals()['FO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -73,10 +73,15 @@ class Page extends CommonPage
                 'home', 'index' => '',
                 'login', 'authentification', 'connexion' => 'connexion',
                 'prices-drop' => 'promotions',
+                'category' => '{index}-category',
                 default => ''
             };
         } else if (is_object($page)) {
             $url .= $page->url;
+        }
+
+        if (is_int($index)) {
+            $url = str_replace('{index}', $index, $url);
         }
 
         return $url;
