@@ -273,28 +273,55 @@ class ExecuteSuite extends Command
 
     public function pass($test)
     {
-        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $test['title']));
+        if (is_array($test)) {
+            $test = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $test));
+
+        $this->expects($test);
+    }
+
+    public function warning($test)
+    {
+        if (is_array($test)) {
+            $test = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $test));
 
         $this->expects($test);
     }
 
     public function fail($test)
     {
-        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $test['title']));
+        if (is_array($test)) {
+            $test = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $test));
 
         $this->expects($test);
     }
 
     public function skip($test)
     {
-        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $test['title']));
+        if (is_array($test)) {
+            $test = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $test));
 
         $this->expects($test);
     }
 
     public function todo($test)
     {
-        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $test['title']));
+        if (is_array($test)) {
+            $test = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $test));
 
         $this->expects($test);
     }
