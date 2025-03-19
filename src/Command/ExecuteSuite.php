@@ -2,12 +2,9 @@
 
 namespace PrestaFlow\Library\Command;
 
-use Exception;
-use PrestaFlow\Library\Tests\TestsSuite;
-use stdClass;
+use Error;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -224,7 +221,7 @@ class ExecuteSuite extends Command
                     $seconds = number_format($results['stats']['time'] / 1000, 2, '.', '');
                     $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $seconds));
                 }
-            } catch (Exception $e) {
+            } catch (Error $e) {
                 $this->error($e->getMessage());
 
                 //return Command::FAILURE;
