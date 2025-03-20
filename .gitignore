@@ -6,3 +6,5 @@ screens/masked/*
 screens/references/*
 screens/errors/*
 .env
+.vscode/settings.json
+datas/.broswer
