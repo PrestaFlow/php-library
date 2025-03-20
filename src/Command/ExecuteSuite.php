@@ -73,23 +73,6 @@ class ExecuteSuite extends Command
         return $this->outputMode;
     }
 
-    protected function debug(string|array $message, bool $newLine = false)
-    {
-        if (is_array($message)) {
-            $message = json_encode($message, JSON_PRETTY_PRINT);
-        }
-        $this->output->writeln('<fg=blue;options=bold>INFO</> <fg=white>' . $message . '</>');
-
-        if ($newLine) {
-            $this->output->writeln('');
-        }
-    }
-
-    protected function info(string|array $message, bool $newLine = false)
-    {
-        return $this->debug($message, $newLine);
-    }
-
     protected function error(string $message)
     {
         if (self::OUTPUT_FULL === $this->getOutputMode()) {
@@ -196,6 +179,10 @@ class ExecuteSuite extends Command
                             self::SKIPPED => $this->skip($test),
                             self::TODO => $this->todo($test),
                         };
+
+                        if ($globals['DEBUG']) {
+                            $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($test['time'])));
+                        }
                     }
 
                     $this->io->newLine();
@@ -223,8 +210,7 @@ class ExecuteSuite extends Command
                     ]);
 
                     //
-                    $seconds = number_format($results['stats']['time'] / 1000, 2, '.', '');
-                    $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $seconds));
+                    $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
                 }
             } catch (Error $e) {
                 $this->error($e->getMessage());
@@ -235,6 +221,11 @@ class ExecuteSuite extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    protected function formatSeconds($time)
+    {
+        return number_format($time / 1000, 2, '.', '');
     }
 
     public function getTestsSuites($folderPath)
@@ -260,6 +251,7 @@ class ExecuteSuite extends Command
     public function expects($test)
     {
         if (!empty($test['expect'])) {
+            var_dump($test['expect']);
             foreach ($test['expect'] as $state => $expectMessages) {
                 foreach ($expectMessages as $expectMessage) {
                     if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
@@ -276,21 +268,10 @@ class ExecuteSuite extends Command
         }
     }
 
-    public function pass($test)
+    protected function debug(string|array $message, bool $newLine = false)
     {
-        if (is_array($test)) {
-            $test = $test['title'];
-        }
-
-        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', getHumanString($test)));
-
-        $this->expects($test);
-    }
-
-    public function warning($test, $newLine = false)
-    {
-        if (is_array($test)) {
-            $test = $test['title'];
+        if (is_array($message)) {
+            $message = json_encode($message, JSON_PRETTY_PRINT);
         }
 
         $baseLine = '  ';
@@ -299,7 +280,44 @@ class ExecuteSuite extends Command
             $baseLine = '';
         }
 
-        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $this->getHumanString($test)));
+        $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>INFO</> <fg=white>%s</>', $this->getHumanString($message)));
+
+        if ($newLine) {
+            $this->output->writeln('');
+        }
+    }
+
+    protected function info(string|array $message, bool $newLine = false)
+    {
+        return $this->debug($message, $newLine);
+    }
+
+    public function pass($test)
+    {
+        $title = $test;
+        if (is_array($test)) {
+            $title = $test['title'];
+        }
+
+        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
+
+        $this->expects($test);
+    }
+
+    public function warning($test, $newLine = false)
+    {
+        $title = $test;
+        if (is_array($test)) {
+            $title = $test['title'];
+        }
+
+        $baseLine = '  ';
+        if ($newLine) {
+            $this->output->writeln('');
+            $baseLine = '';
+        }
+
+        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $this->getHumanString($title)));
 
         if ($newLine) {
             $this->output->writeln('');
@@ -310,33 +328,36 @@ class ExecuteSuite extends Command
 
     public function fail($test)
     {
+        $title = $test;
         if (is_array($test)) {
-            $test = $test['title'];
+            $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', getHumanString($test)));
+        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
 
     public function skip($test)
     {
+        $title = $test;
         if (is_array($test)) {
-            $test = $test['title'];
+            $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', getHumanString($test)));
+        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
 
     public function todo($test)
     {
+        $title = $test;
         if (is_array($test)) {
-            $test = $test['title'];
+            $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', getHumanString($test)));
+        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
