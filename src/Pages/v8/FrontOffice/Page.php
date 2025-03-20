@@ -59,6 +59,8 @@ class Page extends CommonPage
             Expect::setWarning('debug-mode');
 
             $this->click('a');
+
+            $this->waitForReload();
         }
     }
 
