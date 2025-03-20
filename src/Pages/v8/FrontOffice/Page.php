@@ -60,7 +60,7 @@ class Page extends CommonPage
 
             $this->click('a');
 
-            $this->waitForReload();
+            $this->waitForNavigation();
         }
     }
 
