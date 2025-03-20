@@ -251,7 +251,6 @@ class ExecuteSuite extends Command
     public function expects($test)
     {
         if (!empty($test['expect'])) {
-            var_dump($test['expect']);
             foreach ($test['expect'] as $state => $expectMessages) {
                 foreach ($expectMessages as $expectMessage) {
                     if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
