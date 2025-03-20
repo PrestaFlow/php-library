@@ -38,6 +38,8 @@ class ExecuteSuite extends Command
     protected $outputMode = 'full';
     protected $json = [];
 
+    protected $debugModeDetected = null;
+
     protected function configure(): void
     {
         $this
@@ -169,7 +171,10 @@ class ExecuteSuite extends Command
 
                     foreach ($results['tests'] as $test) {
                         if (isset($test['warning']) && !empty($test['warning'])) {
-                            $this->warning($test['warning'], true);
+                            match ($test['warning']) {
+                                'debug-mode' => $this->debugModeDetected = true,
+                                default => $this->warning($test['warning'], newLine: true)
+                            };
                         } else {
                             $output->writeln('');
                         }
@@ -208,6 +213,12 @@ class ExecuteSuite extends Command
                             (int) $results['stats']['assertions']
                         ),
                     ]);
+
+                    if ($this->debugModeDetected) {
+                        $this->output->writeln('');
+                        $this->warning('debug-mode', newLine: false);
+                        $this->output->writeln('');
+                    }
 
                     //
                     $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
@@ -250,16 +261,18 @@ class ExecuteSuite extends Command
 
     public function expects($test)
     {
+        $baseLine = str_repeat('  ', 3);
+
         if (!empty($test['expect'])) {
             foreach ($test['expect'] as $state => $expectMessages) {
                 foreach ($expectMessages as $expectMessage) {
                     if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
                         match ($state) {
-                            self::PASS => $this->output->writeln(sprintf('  <fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $expectMessage)),
-                            self::FAIL => $this->output->writeln(sprintf('  <fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $expectMessage)),
-                            self::SKIPPED => $this->output->writeln(sprintf('  <fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $expectMessage)),
-                            self::TODO => $this->output->writeln(sprintf('  <fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage)),
-                            default => $this->output->writeln(sprintf('  <fg=gray>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage))
+                            self::PASS => $this->output->writeln(sprintf($baseLine . '<fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $expectMessage)),
+                            self::FAIL => $this->output->writeln(sprintf($baseLine . '<fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $expectMessage)),
+                            self::SKIPPED => $this->output->writeln(sprintf($baseLine . '<fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $expectMessage)),
+                            self::TODO => $this->output->writeln(sprintf($baseLine . '<fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage)),
+                            default => $this->output->writeln(sprintf($baseLine . '<fg=gray>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage))
                         };
                     }
                 }
@@ -298,7 +311,9 @@ class ExecuteSuite extends Command
             $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
+        $baseLine = '    ';
+
+        $this->output->writeln(sprintf($baseLine . '<fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
@@ -332,7 +347,9 @@ class ExecuteSuite extends Command
             $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=red;options=bold>FAIL</> <fg=white>%s</>', $this->getHumanString($title)));
+        $baseLine = '    ';
+
+        $this->output->writeln(sprintf($baseLine . '<fg=red;options=bold>FAIL</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
@@ -344,7 +361,9 @@ class ExecuteSuite extends Command
             $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
+        $baseLine = '    ';
+
+        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
@@ -356,7 +375,9 @@ class ExecuteSuite extends Command
             $title = $test['title'];
         }
 
-        $this->output->writeln(sprintf('  <fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
+        $baseLine = '    ';
+
+        $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
