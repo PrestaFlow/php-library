@@ -12,4 +12,15 @@ class Page extends BasePage
 
         parent::__construct();
     }
+
+    public function defineSelectors()
+    {
+        $selectors = parent::defineSelectors();
+
+        $pageSelectors = [
+            'pageTitle' => '#js-product-list-header h1',
+        ];
+
+        return [...$selectors, ...$pageSelectors];
+    }
 }
