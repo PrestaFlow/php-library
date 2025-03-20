@@ -185,7 +185,7 @@ class ExecuteSuite extends Command
                     $this->info($suite->getDescribe());
 
                     foreach ($results['tests'] as $test) {
-                        if (isset($test['warning'])) {
+                        if (isset($test['warning']) && !empty($test['warning'])) {
                             $this->warning($test['warning'], true);
                         } else {
                             $output->writeln('');
