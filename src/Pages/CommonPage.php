@@ -132,6 +132,19 @@ class CommonPage
         }
     }
 
+    public function navigateTo($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
+    {
+        try {
+            if ($waitForSelector) {
+                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            }
+            $element = $this->getPage()->dom()->querySelector($selector);
+            return $element->click();
+        } catch (OperationTimedOut | Exception $e) {
+            return false;
+        }
+    }
+
     public function click($selector, $nth = 1)
     {
         return $this->getPage()->mouse()->find($selector, $nth)->click();

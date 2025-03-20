@@ -32,6 +32,13 @@ class Page extends BasePage
         return $this->getTitle();
     }
 
+    public function goToProduct(int $index = 1)
+    {
+        $this->navigateTo($this->selector('productArticle', ['index' => $index]) . ' .product-title a');
+
+        $this->waitForNavigation();
+    }
+
     public function addToWishList($index)
     {
         if (!$this->isAddedToWishlist($index)) {
