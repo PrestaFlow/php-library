@@ -73,6 +73,14 @@ class TestsSuite
         return $this->suites[$this->getSuite()]['title'];
     }
 
+    public function scenario($class)
+    {
+        $scenario = new $class($this);
+        $scenario->globals = $this->globals;
+
+        return $this;
+    }
+
     public function it(string $description, $steps)
     {
         $this->suites[$this->getSuite()]['tests'][] = [
