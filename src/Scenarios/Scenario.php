@@ -2,15 +2,19 @@
 
 namespace PrestaFlow\Library\Scenarios;
 
+use PrestaFlow\Library\Traits\Version;
+
 class Scenario
 {
+    use Version;
+
     public $globals = [];
     public $params = [];
     public $pages = [];
 
     public function __construct($testSuite, $params = [])
     {
-        $this->params = $params;
+        $this->params = [...$this->params, ...$params];
         $this->steps($testSuite);
     }
 
@@ -19,11 +23,19 @@ class Scenario
         return $this;
     }
 
+    public function it(string $description, $steps)
+    {
+        $this->suites[$this->getSuite()]['tests'][] = [
+            'title' => $description,
+            'steps' => $steps
+        ];
+
+        return $this;
+    }
+
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)
     {
-        $version = 'v8';
-
-        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$version.'\\'.$pageName.'\\Page';
+        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$this->getVersion().'\\'.$pageName.'\\Page';
 
         $pageInstance = new $pageClass();
         if ($globals === null || !is_array($globals)) {

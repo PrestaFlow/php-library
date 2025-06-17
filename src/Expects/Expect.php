@@ -323,14 +323,26 @@ class Expect extends ExpectLibrary
 
     public function isTheSameAs($other)
     {
-        self::$expectMessage['pass'][] = $this->format("{actual} must be the same as {expected}", array("expected" => $other));
+        self::$expectMessage['pass'][] = $this->format("{value} must be the same as {expected}", array("expected" => $other, "value" => $this->getValue()));
 
         return parent::isTheSameAs($other);
     }
 
+    public function samePriceAs($price)
+    {
+        self::$expectMessage['pass'][] = $this->format("{value} must be the same price as {expected}", array("expected" => $price, "value" => $this->getValue()));
+
+        return $this->contains($price);
+    }
+
     public function equals($other)
     {
-        self::$expectMessage['pass'][] = $this->format("{actual} must be equal to {expected}", array("expected" => $other));
+        $other = trim($other);
+
+        var_dump($this->getValue());
+        var_dump($other);
+
+        self::$expectMessage['pass'][] = $this->format("{value} must be equal to {expected}", array("expected" => $other, "value" => $this->getValue()));
 
         return parent::equals($other);
     }

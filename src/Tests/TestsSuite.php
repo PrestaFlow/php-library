@@ -11,12 +11,15 @@ use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Traits\Version;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
 
 class TestsSuite
 {
+    use Version;
+
     public array $suites = [];
     private array $stats = [
         'passes' => 0,
@@ -36,6 +39,9 @@ class TestsSuite
     public $globals = [];
     public $pages = [];
 
+    protected $scenarioName = '';
+    protected $scenarioParams = [];
+
     protected static $lines = [];
 
     public function __construct()
@@ -48,6 +54,11 @@ class TestsSuite
     protected function getSuite()
     {
         return get_class($this);
+    }
+
+    public function getParam($paramName)
+    {
+        return $this->scenarioParams[$this->scenarioName][$paramName] ?? null;
     }
 
     public function describe(string $description)
@@ -73,10 +84,12 @@ class TestsSuite
         return $this->suites[$this->getSuite()]['title'];
     }
 
-    public function scenario($class)
+    public function scenario($class, array $params = [])
     {
-        $scenario = new $class($this);
+        $scenario = new $class($this, $params);
         $scenario->globals = $this->globals;
+
+        $this->scenarioParams[get_class($scenario)] = $scenario->params;
 
         return $this;
     }
@@ -296,9 +309,7 @@ class TestsSuite
 
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)
     {
-        $version = 'v8';
-
-        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$version.'\\'.$pageName.'\\Page';
+        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$this->getVersion().'\\'.$pageName.'\\Page';
 
         $pageInstance = new $pageClass();
         if ($globals === null || !is_array($globals)) {
@@ -334,6 +345,11 @@ class TestsSuite
                         $test['state'] = 'todo';
                         $this->stats['todos']++;
                     } else {
+                        $this->scenarioName = null;
+
+                        $reflection = new \ReflectionFunction($test['steps']);
+                        $this->scenarioName = $reflection->getClosureCalledClass()->name;
+
                         $test['steps']->call($this);
                         $this->stats['assertions'] += Expect::getNbAssertions();
 
