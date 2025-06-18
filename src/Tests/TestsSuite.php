@@ -11,14 +11,15 @@ use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Version;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
-
 class TestsSuite
 {
     use Version;
+    use ImportPage;
 
     public array $suites = [];
     private array $stats = [
@@ -305,23 +306,6 @@ class TestsSuite
     public function getGlobals() : array
     {
         return $this->globals;
-    }
-
-    public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)
-    {
-        $pageClass = '\\PrestaFlow\\Library\\Pages\\'.$this->getVersion().'\\'.$pageName.'\\Page';
-
-        $pageInstance = new $pageClass();
-        if ($globals === null || !is_array($globals)) {
-            $pageInstance->setGlobals($this->globals);
-        } else {
-            $pageInstance->setGlobals($globals);
-        }
-        $pageInstance->setUserAgent($userAgent);
-
-        $pageVarName = lcfirst(str_replace('\\', '', ucwords($pageName, '\\'))).'Page';
-
-        $this->pages[$pageVarName] = $pageInstance;
     }
 
     public function run($cli = false)
