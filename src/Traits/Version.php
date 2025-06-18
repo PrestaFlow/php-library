@@ -4,6 +4,20 @@ namespace PrestaFlow\Library\Traits;
 
 trait Version
 {
+    const SUPPORTER_VERSIONS = [
+        'v8',
+        'v9'
+    ];
+
+    public function isVersionSupported()
+    {
+        if (in_array($this->getVersion(), self::SUPPORTER_VERSIONS)) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function getVersion()
     {
         if (isset($this->globals['PS_VERSION'])) {

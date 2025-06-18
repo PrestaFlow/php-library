@@ -213,6 +213,10 @@ class TestsSuite
         $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
         $this->start_time = hrtime(true);
 
+        if (!$this->isVersionSupported()) {
+            throw new Exception('This version of PrestaShop is not supported by PrestaFlow.');
+        }
+
         if ($headless === null) {
             $headless = true;
             if ($this->globals['HEADLESS'] === 'false' || !$this->globals['HEADLESS']) {
