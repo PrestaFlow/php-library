@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Tests;
 
 use Dotenv\Dotenv;
+use Error;
 use Exception;
 use HeadlessChromium\BrowserFactory;
 use HeadlessChromium\Cookies\Cookie;
@@ -16,6 +17,7 @@ use PrestaFlow\Library\Traits\Version;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
+
 class TestsSuite
 {
     use Version;
@@ -214,7 +216,7 @@ class TestsSuite
         $this->start_time = hrtime(true);
 
         if (!$this->isVersionSupported()) {
-            throw new Exception('This version of PrestaShop is not supported by PrestaFlow.');
+            throw new Error('This version of PrestaShop is not supported by PrestaFlow.');
         }
 
         if ($headless === null) {
