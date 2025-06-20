@@ -5,10 +5,13 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use PrestaFlow\Library\Resolvers\Tanslations;
 use PrestaFlow\Library\Tests\TestsSuite;
 
 class CommonPage
 {
+    use Tanslations;
+
     protected $globals;
     public $selectors = [];
     public $messages = [];

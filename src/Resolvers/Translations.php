@@ -5,15 +5,30 @@ namespace PrestaFlow\Library\Resolvers;
 use PrestaFlow\Library\Utils\Locale;
 use PrestaFlow\Library\Utils\Versions;
 
-class TranslationsResolver
+class Translations
 {
     use Locale;
     use Versions;
+
+    public $translationsCatalog = null;
 
     public function __construct(string $patchVersion, string $locale)
     {
         $this->setVersions($patchVersion);
         $this->setLocale($locale);
+    }
+
+    public function translate($message)
+    {
+        if (is_null($this->translationsCatalog)) {
+            $this->translationsCatalog = $this->getCatalog();
+        }
+
+        if (isset($this->messages[$message])) {
+            return $this->messages[$message];
+        }
+
+        return null;
     }
 
     public function getCatalog()
