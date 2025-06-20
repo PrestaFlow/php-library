@@ -5,7 +5,7 @@ namespace PrestaFlow\Library\Resolvers;
 use PrestaFlow\Library\Utils\Locale;
 use PrestaFlow\Library\Utils\Versions;
 
-class Translations
+trait Translations
 {
     use Locale;
     use Versions;
