@@ -13,6 +13,7 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Traits\ImportPage;
+use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
@@ -20,6 +21,7 @@ use UnexpectedValueException;
 
 class TestsSuite
 {
+    use Locale;
     use Version;
     use ImportPage;
 
@@ -90,7 +92,6 @@ class TestsSuite
     public function scenario($class, array $params = [])
     {
         $scenario = new $class($this, $params);
-        $scenario->globals = $this->globals;
 
         $this->scenarioParams[get_class($scenario)] = $scenario->params;
 
@@ -307,6 +308,9 @@ class TestsSuite
             'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
             'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
         ];
+
+        $this->exctractVersions($_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0');
+        $this->setLocale($_ENV['PRESTAFLOW_LOCALE'] ?? 'en');
     }
 
     public function getGlobals() : array

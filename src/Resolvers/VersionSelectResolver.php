@@ -15,7 +15,7 @@ class VersionSelectResolver
 
     public function __construct(string $patchVersion, string $locale, $configClassMap = [])
     {
-        $this->setVersions($patchVersion);
+        $this->exctractVersions($patchVersion);
         $this->setLocale($locale);
 
         $this->configClassMap = $configClassMap;

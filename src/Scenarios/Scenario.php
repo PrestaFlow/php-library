@@ -3,10 +3,12 @@
 namespace PrestaFlow\Library\Scenarios;
 
 use PrestaFlow\Library\Traits\ImportPage;
+use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
 
 class Scenario
 {
+    use Locale;
     use Version;
     use ImportPage;
 
@@ -16,7 +18,10 @@ class Scenario
 
     public function __construct($testSuite, $params = [])
     {
+        $this->globals = $testSuite->getGlobals();
         $this->params = [...$this->params, ...$params];
+        $this->setVersions($testSuite->getVersions());
+        $this->setLocale($testSuite->getLocale());
         $this->steps($testSuite);
     }
 

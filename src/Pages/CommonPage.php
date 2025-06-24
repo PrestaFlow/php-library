@@ -5,12 +5,12 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
-use PrestaFlow\Library\Resolvers\Tanslations;
+use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
 
 class CommonPage
 {
-    use Tanslations;
+    use Translations;
 
     protected $globals;
     public $selectors = [];
@@ -19,8 +19,13 @@ class CommonPage
     public string $url = '';
     public string $pageTitle = '';
 
-    public function __construct()
+    public function __construct(string $locale, string $patchVersion)
     {
+        $this->initTranslations(
+            $locale,
+            $patchVersion
+        );
+
         return $this;
     }
 

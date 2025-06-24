@@ -6,7 +6,7 @@ use PrestaFlow\Library\Pages\CommonPage;
 
 class Page extends CommonPage
 {
-    public function __construct()
+    public function __construct(string $locale, string $patchVersion)
     {
         $selectors = [
         ];
@@ -27,7 +27,7 @@ class Page extends CommonPage
 
         $this->messages = [...$messages, ...$pageMessages];
 
-        parent::__construct();
+        parent::__construct($locale, $patchVersion);
     }
 
     public function goToPage($page = null)

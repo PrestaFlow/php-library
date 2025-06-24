@@ -3,16 +3,13 @@
 namespace PrestaFlow\Library\Resolvers;
 
 use PrestaFlow\Library\Utils\Locale;
-use PrestaFlow\Library\Utils\Versions;
 
 class DemoDatasResolver
 {
     use Locale;
-    use Versions;
 
     public function __construct(string $patchVersion, string $locale)
     {
-        $this->setVersions($patchVersion);
         $this->setLocale($locale);
     }
 

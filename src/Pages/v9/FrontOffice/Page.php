@@ -12,7 +12,7 @@ use SapientPro\ImageComparator\ImageComparator;
 
 class Page extends CommonPage
 {
-    public function __construct()
+    public function __construct(string $locale, string $patchVersion)
     {
         $selectors = [
             'pageTitle' => 'h1',
@@ -38,7 +38,7 @@ class Page extends CommonPage
 
         $this->messages = [...$messages, ...$pageMessages];
 
-        parent::__construct();
+        parent::__construct($locale, $patchVersion);
     }
 
     public function goToPage($page = null, $index = null)

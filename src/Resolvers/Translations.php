@@ -2,20 +2,20 @@
 
 namespace PrestaFlow\Library\Resolvers;
 
-use PrestaFlow\Library\Utils\Locale;
-use PrestaFlow\Library\Utils\Versions;
+use PrestaFlow\Library\Traits\Locale;
+use PrestaFlow\Library\Traits\Version;
 
 trait Translations
 {
     use Locale;
-    use Versions;
+    use Version;
 
     public $translationsCatalog = null;
 
-    public function __construct(string $patchVersion, string $locale)
+    public function initTranslations(string $locale, string $patchVersion)
     {
-        $this->setVersions($patchVersion);
         $this->setLocale($locale);
+        $this->exctractVersions($patchVersion);
     }
 
     public function translate($message)
@@ -24,17 +24,17 @@ trait Translations
             $this->translationsCatalog = $this->getCatalog();
         }
 
-        if (isset($this->messages[$message])) {
-            return $this->messages[$message];
+        if (isset($this->translationsCatalog[$message])) {
+            return $this->translationsCatalog[$message];
         }
 
-        return null;
+        return $message;
     }
 
     public function getCatalog()
     {
         $basePath = __DIR__.'/../Translations/';
-        $fileName = $this->locale.'.json';
+        $fileName = $this->getLocale().'.json';
         $defaultCatalog = [];
         $patchCatalog = [];
         $minorCatalog = [];
@@ -46,17 +46,17 @@ trait Translations
             $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
-        $pathToCatalog = $basePath.$this->majorVersion.'/'.$fileName;
+        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
         if (file_exists($pathToCatalog)) {
             $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
-        $pathToCatalog = $basePath.$this->majorVersion.'/'.$this->minorVersion.'/'.$fileName;
+        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$fileName;
         if (file_exists($pathToCatalog)) {
             $minorCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
-        $pathToCatalog = $basePath.$this->majorVersion.'/'.$this->minorVersion.'/'.$this->patchVersion.'/'.$fileName;
+        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$this->getPatchVersion().'/'.$fileName;
         if (file_exists($pathToCatalog)) {
             $patchCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
