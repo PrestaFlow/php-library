@@ -38,9 +38,26 @@ trait Translations
             $this->initLocale($this->getGlobal('LOCALE'));
         }
 
+        /*
+        $customDomain = null;
+        $currentClass = get_class($this);
+        if (!str_starts_with($currentClass, 'PrestaFlow\\Library\\')) {
+            $domains = explode('\\', $currentClass);
+            foreach ($domains as $domain) {
+                if ($domain == 'Pages') {
+                    break;
+                }
+                $customDomain .= $domain.'\\';
+            }
+        }
+        var_dump($customDomain);
+        */
+
+        $customPath = __DIR__.'/../../../../../Tests/Translations/';
         $basePath = __DIR__.'/../Translations/';
         $fileName = $this->getLocale().'.json';
         $defaultCatalog = [];
+        $customCatalog = [];
         $patchCatalog = [];
         $minorCatalog = [];
         $majorCatalog = [];
@@ -49,6 +66,11 @@ trait Translations
         $pathToCatalog = $basePath.$fileName;
         if (file_exists($pathToCatalog)) {
             $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
+        }
+
+        $pathToCatalog = $customPath.$fileName;
+        if (file_exists($pathToCatalog)) {
+            $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
         if ($this->getMajorVersion() !== null) {
@@ -77,6 +99,7 @@ trait Translations
             ...$majorCatalog,
             ...$minorCatalog,
             ...$patchCatalog,
+            ...$customCatalog,
         ];
 
         return $mergedCatalog;

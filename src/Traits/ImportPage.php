@@ -4,9 +4,9 @@ namespace PrestaFlow\Library\Traits;
 
 trait ImportPage
 {
-    public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null)
+    public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null, $domain = '\\PrestaFlow\\Library')
     {
-        $pageClass = '\\PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion().'\\'.$pageName.'\\Page';
+        $pageClass = $domain.'\\Pages\\v'.$this->getMajorVersion().'\\'.$pageName.'\\Page';
 
         $pageInstance = new $pageClass($this->getLocale(), $this->getPatchVersion(), $this->globals);
         if ($globals === null || !is_array($globals)) {
