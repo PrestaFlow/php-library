@@ -22,8 +22,7 @@ class Page extends BasePage
     public function defineMessages()
     {
         return [
-            //'addedToWishlist' => 'Product added',
-            'addedToWishlist' => 'Produit ajouté',
+            'addedToWishlist' => $this->translate('Product added'),
         ];
     }
 

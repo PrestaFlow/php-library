@@ -6,11 +6,5 @@ use PrestaFlow\Library\Pages\v8\BackOffice\Page as BasePage;
 
 class Page extends BasePage
 {
-    public function __construct(string $locale, string $patchVersion)
-    {
-        //$this->pageTitle = 'Dashboard';
-        $this->pageTitle = 'Tableau de bord';
-
-        parent::__construct($locale, $patchVersion);
-    }
+    public string $pageTitle = 'Dashboard';
 }

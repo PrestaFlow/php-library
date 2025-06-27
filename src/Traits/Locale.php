@@ -4,7 +4,21 @@ namespace PrestaFlow\Library\Traits;
 
 trait Locale
 {
-    public static string $locale = 'en';
+    protected static $localeInit = null;
+    protected static string $locale = 'en';
+
+    public function localeIsInit(): mixed
+    {
+        return self::$localeInit;
+    }
+
+    public function initLocale(string $locale): mixed
+    {
+        $this->setLocale($locale);
+        self::$localeInit = true;
+
+        return self::$localeInit;
+    }
 
     public function getLocale(): string
     {

@@ -19,8 +19,10 @@ class CommonPage
     public string $url = '';
     public string $pageTitle = '';
 
-    public function __construct(string $locale, string $patchVersion)
+    public function __construct(string $locale, string $patchVersion, array $globals)
     {
+        $this->globals = $globals;
+
         $this->initTranslations(
             $locale,
             $patchVersion
@@ -114,7 +116,7 @@ class CommonPage
 
     public function pageTitle()
     {
-        return $this->pageTitle;
+        return $this->translate($this->pageTitle);
     }
 
     public function getPageTitle()

@@ -8,13 +8,6 @@ class Page extends BasePage
 {
     public string $pageTitle = 'PrestaShop';
 
-    public function __construct(string $locale, string $patchVersion)
-    {
-        $this->pageTitle = 'PrestaShop';
-
-        parent::_$locale, $patchVersion);
-    }
-
     public function defineSelectors()
     {
         return [
@@ -36,8 +29,7 @@ class Page extends BasePage
     public function defineMessages()
     {
         return [
-            //'loginErrorText' => 'The employee does not exist, or the password provided is incorrect.',
-            'loginErrorText' => 'Ce compte employé n\'existe pas, ou le mot de passe est erroné.',
+            'loginErrorText' => $this->translate('The employee does not exist, or the password provided is incorrect.'),
         ];
     }
 

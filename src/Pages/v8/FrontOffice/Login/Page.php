@@ -10,13 +10,6 @@ class Page extends BasePage
     public string $pageTitle = 'Login';
     public string $url = 'login';
 
-    public function __construct(string $locale, string $patchVersion)
-    {
-        $this->pageTitle = 'Identifiant';
-
-        parent::__construct($locale, $patchVersion);
-    }
-
     public function defineSelectors()
     {
         return [

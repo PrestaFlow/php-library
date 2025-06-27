@@ -19,7 +19,7 @@ class Page extends BasePage
     public function defineMessages()
     {
         return [
-            'addedToCart' => 'Produit ajouté au panier avec succès',
+            'addedToCart' => $this->translate('Product successfully added to your shopping cart'),
         ];
     }
 

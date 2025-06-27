@@ -20,6 +20,7 @@ trait Translations
 
     public function translate($message)
     {
+        //get_class($this));
         if (is_null($this->translationsCatalog)) {
             $this->translationsCatalog = $this->getCatalog();
         }
@@ -33,6 +34,10 @@ trait Translations
 
     public function getCatalog()
     {
+        if (!$this->localeIsInit()) {
+            $this->initLocale($this->getGlobal('LOCALE'));
+        }
+
         $basePath = __DIR__.'/../Translations/';
         $fileName = $this->getLocale().'.json';
         $defaultCatalog = [];
@@ -46,19 +51,25 @@ trait Translations
             $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
-        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
-        if (file_exists($pathToCatalog)) {
-            $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+        if ($this->getMajorVersion() !== null) {
+            $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
+            if (file_exists($pathToCatalog)) {
+                $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            }
         }
 
-        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$fileName;
-        if (file_exists($pathToCatalog)) {
-            $minorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+        if ($this->getMinorVersion() !== null) {
+            $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$fileName;
+            if (file_exists($pathToCatalog)) {
+                $minorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            }
         }
 
-        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$this->getPatchVersion().'/'.$fileName;
-        if (file_exists($pathToCatalog)) {
-            $patchCatalog = json_decode(file_get_contents($pathToCatalog), true);
+        if ($this->getPatchVersion() !== null) {
+            $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$this->getPatchVersion().'/'.$fileName;
+            if (file_exists($pathToCatalog)) {
+                $patchCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            }
         }
 
         $mergedCatalog = [

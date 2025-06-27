@@ -6,11 +6,6 @@ use PrestaFlow\Library\Pages\v8\FrontOffice\Listing\Page as ListingPage;
 
 class Page extends ListingPage
 {
-    public function __construct(string $locale, string $patchVersion)
-    {
-        $this->url = 'promotions';
-        $this->pageTitle = 'Promotions';
-
-        parent::__construct($locale, $patchVersion);
-    }
+    public string $pageTitle = 'Prices drop';
+    public string $url = 'prices-drop';
 }

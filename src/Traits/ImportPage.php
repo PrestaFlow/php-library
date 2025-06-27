@@ -8,7 +8,7 @@ trait ImportPage
     {
         $pageClass = '\\PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion().'\\'.$pageName.'\\Page';
 
-        $pageInstance = new $pageClass($this->getLocale(), $this->getPatchVersion());
+        $pageInstance = new $pageClass($this->getLocale(), $this->getPatchVersion(), $this->globals);
         if ($globals === null || !is_array($globals)) {
             $pageInstance->setGlobals($this->globals);
         } else {
