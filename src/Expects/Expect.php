@@ -339,9 +339,6 @@ class Expect extends ExpectLibrary
     {
         $other = trim($other);
 
-        var_dump($this->getValue());
-        var_dump($other);
-
         self::$expectMessage['pass'][] = $this->format("{value} must be equal to {expected}", array("expected" => $other, "value" => $this->getValue()));
 
         return parent::equals($other);

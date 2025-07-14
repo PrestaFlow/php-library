@@ -54,7 +54,6 @@ class FrontOfficePage extends CommonPage
         }
 
         $url = $this->getPageURL($page, $index);
-        var_dump($url);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
         $this->getPage()->navigate($url)->waitForNavigation();
@@ -78,7 +77,10 @@ class FrontOfficePage extends CommonPage
             $url .= '/';
         }
         // TODO: handle language prefix if needed
-        $useIsoCode = $this->getGlobals()['FO']['USE_ISO_CODE'] ?? false;
+        $useIsoCode = $this->getGlobals()['PREFIX_LOCALE'] ?? false;
+        if ($useIsoCode) {
+            $url .= $this->getLocale() . '/';
+        }
         //
         if (is_string($page)) {
             $pageUrl = $this->url($page);

@@ -286,15 +286,26 @@ class TestsSuite
 
         if (isset($_ENV['PRESTAFLOW_DEBUG'])) {
             $_ENV['PRESTAFLOW_DEBUG'] = filter_var($_ENV['PRESTAFLOW_DEBUG'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $_ENV['PRESTAFLOW_DEBUG'] = false;
         }
 
         if (isset($_ENV['PRESTAFLOW_HEADLESS'])) {
             $_ENV['PRESTAFLOW_HEADLESS'] = filter_var($_ENV['PRESTAFLOW_HEADLESS'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $_ENV['PRESTAFLOW_HEADLESS'] = true;
+        }
+
+        if (isset($_ENV['PRESTAFLOW_PREFIX_LOCALE'])) {
+            $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = filter_var($_ENV['PRESTAFLOW_PREFIX_LOCALE'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = false;
         }
 
         $this->globals = [
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
+            'PREFIX_LOCALE' => (bool) $_ENV['PRESTAFLOW_PREFIX_LOCALE'] ?? false,
             'BO' => [
                 'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? ($_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost') . '/admin-dev/',
                 'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
