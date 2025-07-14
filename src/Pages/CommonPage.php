@@ -28,6 +28,10 @@ class CommonPage
             $patchVersion
         );
 
+        $this->initUrls(
+            $locale
+        );
+
         return $this;
     }
 

@@ -2,18 +2,19 @@
 
 namespace PrestaFlow\Library\Pages;
 
-
 use Exception;
 use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Translations;
+use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Tests\TestsSuite;
 use SapientPro\ImageComparator\ImageComparator;
 
 class FrontOfficePage extends CommonPage
 {
     use Translations;
+    use Urls;
 
     public function __construct(string $locale, string $patchVersion, array $globals)
     {
@@ -53,6 +54,7 @@ class FrontOfficePage extends CommonPage
         }
 
         $url = $this->getPageURL($page, $index);
+        var_dump($url);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
         $this->getPage()->navigate($url)->waitForNavigation();
@@ -69,22 +71,35 @@ class FrontOfficePage extends CommonPage
         }
     }
 
-    public function getPageURL($page, $index): string
+    public function getPageURL($page, $index = null): string
     {
         $url = $this->getGlobals()['FO']['URL'];
         if (!str_ends_with($url, '/')) {
             $url .= '/';
         }
+        // TODO: handle language prefix if needed
+        $useIsoCode = $this->getGlobals()['FO']['USE_ISO_CODE'] ?? false;
+        //
         if (is_string($page)) {
-            $url .= match ($page) {
-                'home', 'index' => '',
-                'login', 'authentification', 'connexion' => 'connexion',
-                'prices-drop' => 'promotions',
-                'category' => '{index}-category',
-                default => ''
-            };
+            $pageUrl = $this->url($page);
+            if ($pageUrl !== '') {
+                $url .= $pageUrl;
+            } else {
+                $url .= match ($page) {
+                    'home', 'index' => '',
+                    'login', 'authentification' => 'login',
+                    'prices-drop' => 'prices-drop',
+                    'category' => '{index}-category',
+                    default => ''
+                };
+            }
         } else if (is_object($page)) {
-            $url .= $page->url;
+            $pageUrl = $this->url($page->url);
+            if ($pageUrl !== '') {
+                $url .= $pageUrl;
+            } else {
+                $url .= $page->url;
+            }
         }
 
         if (is_int($index)) {
