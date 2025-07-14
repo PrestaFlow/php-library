@@ -263,13 +263,13 @@ class Expect extends ExpectLibrary
 
     public function contains($needle)
     {
-        self::$expectMessage['pass'][] = $this->format("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+        self::$expectMessage['pass'][] = $this->format("expected '{value}' to contains '{expected}'", array("expected" => $needle, "value" => $this->getValue()));
 
         $this->isDefined();
 
         if (str_contains($this->getValue(), $needle) === false)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor("expected '{expected}' to include '{value}'", array("expected" => $needle, "value" => $this->getValue()));
+            $e = $this->getUnexpectedValueExceptionConstructor("expected '{value}' to contains '{expected}'", array("expected" => $needle, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
 
