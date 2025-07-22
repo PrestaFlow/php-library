@@ -19,10 +19,23 @@ class CommonPage
     public string $url = '';
     public string $pageTitle = '';
 
+    protected $patchVersion = null;
+
     public function __construct(string $locale, string $patchVersion, array $globals)
     {
         $this->globals = $globals;
+        $this->patchVersion = $patchVersion;
 
+        $this->init(
+            $locale,
+            $patchVersion
+        );
+
+        return $this;
+    }
+
+    public function init(string $locale, string $patchVersion) : CommonPage
+    {
         $this->initTranslations(
             $locale,
             $patchVersion
@@ -79,11 +92,32 @@ class CommonPage
     public function setGlobals($globals)
     {
         $this->globals = $globals;
+
+        $locale = $this->getGlobal('LOCALE');
+
+        $this->init(
+            $locale,
+            $this->patchVersion
+        );
     }
 
     public function getGlobals() : array
     {
         return $this->globals;
+    }
+
+    public function setGlobal(string $global, $value)
+    {
+        $this->globals[$global] = $value;
+
+        if ($global === 'LOCALE') {
+            $this->setLocale($value);
+
+            $this->init(
+                $value,
+                $this->patchVersion
+            );
+        }
     }
 
     public function getGlobal($index)
@@ -128,7 +162,7 @@ class CommonPage
         return $this->getPage()->evaluate('document.title')->getReturnValue();
     }
 
-    public function goToURL(string $url)
+    public function goToUrl(string $url)
     {
         $this->getPage()->navigate($url)->waitForNavigation();
     }

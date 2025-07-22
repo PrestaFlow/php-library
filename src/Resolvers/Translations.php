@@ -16,6 +16,7 @@ trait Translations
     {
         $this->setLocale($locale);
         $this->exctractVersions($patchVersion);
+        $this->translationsCatalog = null;
     }
 
     public function translate($message)

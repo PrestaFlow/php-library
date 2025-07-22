@@ -20,8 +20,19 @@ class Scenario
     {
         $this->globals = $testSuite->getGlobals();
         $this->params = [...$this->params, ...$params];
-        $this->setVersions($testSuite->getVersions());
-        $this->setLocale($testSuite->getLocale());
+
+        if (isset($this->params['locale']) && is_string($this->params['locale'])) {
+            $this->globals['LOCALE'] = $this->params['locale'];
+        }
+        if (isset($this->params['useIsoCode'])) {
+            $this->globals['PREFIX_LOCALE'] = (bool) $this->params['useIsoCode'];
+        }
+
+        $locale = $this->globals['LOCALE'] ?? $testSuite->getLocale();
+        $versions = $this->globals['PATCH_VERSION'] ?? $testSuite->getVersions();
+
+        $this->setVersions(versions: $versions);
+        $this->setLocale(locale: $locale);
         $this->steps($testSuite);
     }
 

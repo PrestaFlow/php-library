@@ -76,12 +76,10 @@ class FrontOfficePage extends CommonPage
         if (!str_ends_with($url, '/')) {
             $url .= '/';
         }
-        // TODO: handle language prefix if needed
         $useIsoCode = $this->getGlobals()['PREFIX_LOCALE'] ?? false;
         if ($useIsoCode) {
             $url .= $this->getLocale() . '/';
         }
-        //
         if (is_string($page)) {
             $pageUrl = $this->url($page);
             if ($pageUrl !== '') {
