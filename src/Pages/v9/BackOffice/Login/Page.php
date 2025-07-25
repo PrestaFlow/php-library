@@ -13,13 +13,13 @@ class Page extends BasePage
         return [
             // Login header selectors
             'loginHeaderBlock' => '#login-header',
-            'psVersionBlock' => '#login-header div.text-center',
+            'psVersionBlock' => '#login_form h4',
             // Login Form selectors
             'emailInput' => '#email',
             'passwordInput' => '#passwd',
             'submitLoginButton' => '#submit_login',
-            'alertDangerDiv' => '#error',
-            'alertDangerTextBlock' => '#error li',
+            'alertDangerDiv' => '.alert-danger',
+            'alertDangerTextBlock' => '.alert-danger .alert-text',
             //
             'employeeInfosDropDown' => '#employee_infos a',
             'logoutLink' => '#header_logout',

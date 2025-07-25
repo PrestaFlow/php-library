@@ -302,17 +302,22 @@ class TestsSuite
             $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = false;
         }
 
+        $frontOfficeUrl = $_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost/';
+        if (!str_ends_with($frontOfficeUrl, '/')) {
+            $frontOfficeUrl .= '/';
+        }
+
         $this->globals = [
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
             'PREFIX_LOCALE' => (bool) $_ENV['PRESTAFLOW_PREFIX_LOCALE'] ?? false,
             'BO' => [
-                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? ($_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost') . '/admin-dev/',
+                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/',
                 'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
             'FO' => [
-                'URL' => $_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost/',
+                'URL' => $frontOfficeUrl,
                 'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
             ],

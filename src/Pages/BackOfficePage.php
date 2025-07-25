@@ -40,15 +40,34 @@ class BackOfficePage extends CommonPage
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
-    public function getPageURL($page) : string
+    public function getPageURL($page, $index = null): string
     {
         $url = $this->getGlobals()['BO']['URL'];
+        if (!str_ends_with($url, '/')) {
+            $url .= '/';
+        }
+
         if (is_string($page)) {
-            $url .= match ($page) {
-                'login', 'index' => '',
-            };
+            $pageUrl = $this->url($page);
+            if ($pageUrl !== '') {
+                $url .= $pageUrl;
+            } else {
+                $url .= match ($page) {
+                    'login', 'index' => '',
+                    default => ''
+                };
+            }
         } else if (is_object($page)) {
-            $url .= '/'.$page->url;
+            $pageUrl = $this->url($page->url);
+            if ($pageUrl !== '') {
+                $url .= $pageUrl;
+            } else {
+                $url .= $page->url;
+            }
+        }
+
+        if (is_int($index)) {
+            $url = str_replace('{index}', $index, $url);
         }
 
         return $url;

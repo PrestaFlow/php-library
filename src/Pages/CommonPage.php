@@ -26,24 +26,30 @@ class CommonPage
         $this->globals = $globals;
         $this->patchVersion = $patchVersion;
 
+        /*
         $this->init(
             $locale,
             $patchVersion
         );
+        */
 
         return $this;
     }
 
     public function init(string $locale, string $patchVersion) : CommonPage
     {
+        /*
         $this->initTranslations(
             $locale,
             $patchVersion
         );
+        */
 
+        /*
         $this->initUrls(
             $locale
         );
+        */
 
         return $this;
     }
@@ -95,10 +101,12 @@ class CommonPage
 
         $locale = $this->getGlobal('LOCALE');
 
+        /*
         $this->init(
             $locale,
             $this->patchVersion
         );
+        */
     }
 
     public function getGlobals() : array
@@ -113,10 +121,12 @@ class CommonPage
         if ($global === 'LOCALE') {
             $this->setLocale($value);
 
+            /*
             $this->init(
                 $value,
                 $this->patchVersion
             );
+            */
         }
     }
 
