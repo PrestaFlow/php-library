@@ -184,7 +184,28 @@ class CommonPage
                 $this->getPage()->waitUntilContainsElement($selector, $timeout);
             }
             $element = $this->getPage()->dom()->querySelector($selector);
-            return trim($element->getText());
+            $value = $element->getText();
+            if ($value === null) {
+                return '';
+            }
+            return trim($value);
+        } catch (OperationTimedOut | Exception $e) {
+            return false;
+        }
+    }
+
+    public function getInputValue($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
+    {
+        try {
+            if ($waitForSelector) {
+                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            }
+            $element = $this->getPage()->dom()->querySelector($selector);
+            $value = $element->getAttribute('value');
+            if ($value === null) {
+                return '';
+            }
+            return trim($value);
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }
@@ -220,9 +241,17 @@ class CommonPage
     {
         $this->click($selector);
 
-        // Delete text from input before typing
-        $this->getPage()->keyboard()->typeRawKey('Del');
+        $textContent = $this->getInputValue($selector);
+        if ($textContent !== null && $textContent !== '') {
+            $element = $this->getPage()->dom()->querySelector($selector);
+            $element->setAttributeValue('value', ''); // Clear the input value
+        }
+
+        // Alternatively, you can use the keyboard to delete the text
+        // $this->getPage()->keyboard()->typeRawKey('Del'); // Delete key
         $this->getPage()->keyboard()->typeText($value);
+        // or
+        // $element->sendKeys($value);
     }
 
     public function elementIsVisible($selector, $timeout = 1000)
