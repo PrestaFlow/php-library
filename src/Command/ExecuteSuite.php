@@ -157,11 +157,15 @@ class ExecuteSuite extends Command
                     $this->io->newLine();
                     $globals = $suite->getGlobals();
                     if ($globals['DEBUG']) {
-                        $this->debug($globals, newLine: true);
+                        //$this->debug($globals, newLine: true);
                     }
 
                     if ($globals['DEBUG']) {
-                        $this->debug($className);
+                        $this->debug($className, newLine: true);
+                    }
+
+                    if ($globals['DEBUG']) {
+                        $this->debug('Locale: ' . $suite->getLocale());
                     }
 
                     $suite->run(cli: true);
