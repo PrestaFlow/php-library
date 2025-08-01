@@ -302,6 +302,12 @@ class TestsSuite
             $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = false;
         }
 
+        if (isset($_ENV['PRESTAFLOW_VERBOSE'])) {
+            $_ENV['PRESTAFLOW_VERBOSE'] = filter_var($_ENV['PRESTAFLOW_VERBOSE'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $_ENV['PRESTAFLOW_VERBOSE'] = true;
+        }
+
         $frontOfficeUrl = $_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost/';
         if (!str_ends_with($frontOfficeUrl, '/')) {
             $frontOfficeUrl .= '/';
@@ -323,10 +329,21 @@ class TestsSuite
             ],
             'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
             'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
+            'VERBOSE' => (bool) $_ENV['PRESTAFLOW_VERBOSE'] ?? true,
         ];
 
         $this->exctractVersions($_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0');
         $this->setLocale($_ENV['PRESTAFLOW_LOCALE'] ?? 'en');
+    }
+
+    public function isVerboseMode(): bool
+    {
+        return $this->getGlobals()['VERBOSE'] ?? true;
+    }
+
+    public function isDebugMode(): bool
+    {
+        return $this->getGlobals()['DEBUG'] ?? false;
     }
 
     public function getGlobals() : array

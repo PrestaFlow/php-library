@@ -40,6 +40,9 @@ class ExecuteSuite extends Command
 
     protected $debugModeDetected = null;
 
+    protected $verboseMode = true;
+    protected $debugMode = false;
+
     protected function configure(): void
     {
         $this
@@ -73,6 +76,16 @@ class ExecuteSuite extends Command
     protected function getOutputMode(): string
     {
         return $this->outputMode;
+    }
+
+    protected function isVerboseMode(): bool
+    {
+        return $this->verboseMode;
+    }
+
+    protected function isDebugMode(): bool
+    {
+        return $this->debugMode;
     }
 
     protected function error(string $message)
@@ -155,16 +168,19 @@ class ExecuteSuite extends Command
                 if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
                     && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
                     $this->io->newLine();
-                    $globals = $suite->getGlobals();
-                    if ($globals['DEBUG']) {
+
+                    $this->verboseMode = $suite->isVerboseMode();
+                    $this->debugMode = $suite->isDebugMode();
+
+                    if ($this->isDebugMode()) {
                         //$this->debug($globals, newLine: true);
                     }
 
-                    if ($globals['DEBUG']) {
+                    if ($this->isDebugMode()) {
                         $this->debug($className, newLine: true);
                     }
 
-                    if ($globals['DEBUG']) {
+                    if ($this->isDebugMode()) {
                         $this->debug('Locale: ' . $suite->getLocale());
                     }
 
@@ -189,7 +205,7 @@ class ExecuteSuite extends Command
                             self::TODO => $this->todo($test),
                         };
 
-                        if ($globals['DEBUG']) {
+                        if ($this->isDebugMode()) {
                             $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($test['time'])));
                         }
                     }
@@ -319,7 +335,9 @@ class ExecuteSuite extends Command
 
         $this->output->writeln(sprintf($baseLine . '<fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
 
-        $this->expects($test);
+        if ($this->isVerboseMode()) {
+            $this->expects($test);
+        }
     }
 
     public function warning($test, $newLine = false)
@@ -369,7 +387,9 @@ class ExecuteSuite extends Command
 
         $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
 
-        $this->expects($test);
+        if ($this->isVerboseMode()) {
+            $this->expects($test);
+        }
     }
 
     public function todo($test)
@@ -383,7 +403,9 @@ class ExecuteSuite extends Command
 
         $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
 
-        $this->expects($test);
+        if ($this->isVerboseMode()) {
+            $this->expects($test);
+        }
     }
 
     protected function getHumanString(string $message)
