@@ -12,7 +12,7 @@ class CommonPage
 {
     use Translations;
 
-    protected $globals;
+    protected $globals = [];
     public $selectors = [];
     public $messages = [];
 

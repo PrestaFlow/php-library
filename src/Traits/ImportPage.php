@@ -10,6 +10,8 @@ trait ImportPage
 
         if ($globals === null || !is_array($globals)) {
             $globals = $this->globals;
+        } else {
+            $globals = array_merge($this->globals, $globals);
         }
 
         if (isset($this->params['locale']) && is_string($this->params['locale'])) {

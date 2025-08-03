@@ -8,6 +8,8 @@ class BackOfficePage extends CommonPage
 {
     public function __construct(string $locale, string $patchVersion, array $globals)
     {
+        $this->globals = $globals;
+
         $selectors = [
         ];
 
