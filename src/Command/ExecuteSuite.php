@@ -301,12 +301,12 @@ class ExecuteSuite extends Command
     }
 
     protected function debug(string|array $message, bool $newLine = false)
+    protected function debug(string|array $message, string $baseLine = '  ', bool $newLine = false)
     {
         if (is_array($message)) {
             $message = json_encode($message, JSON_PRETTY_PRINT);
         }
 
-        $baseLine = '  ';
         if ($newLine) {
             $this->output->writeln('');
             $baseLine = '';
@@ -319,19 +319,18 @@ class ExecuteSuite extends Command
         }
     }
 
-    protected function info(string|array $message, bool $newLine = false)
+    protected function info(string|array $message, string $baseLine = '  ', bool $newLine = false)
     {
-        return $this->debug($message, $newLine);
+        return $this->debug($message, $baseLine, $newLine);
     }
 
-    public function pass($test)
+    public function pass($test, string $baseLine = '    ')
     {
         $title = $test;
         if (is_array($test)) {
             $title = $test['title'];
         }
 
-        $baseLine = '    ';
 
         $this->output->writeln(sprintf($baseLine . '<fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
 
@@ -340,14 +339,13 @@ class ExecuteSuite extends Command
         }
     }
 
-    public function warning($test, $newLine = false)
+    public function warning($test, string $baseLine = '  ', $newLine = false)
     {
         $title = $test;
         if (is_array($test)) {
             $title = $test['title'];
         }
 
-        $baseLine = '  ';
         if ($newLine) {
             $this->output->writeln('');
             $baseLine = '';
@@ -362,28 +360,24 @@ class ExecuteSuite extends Command
         $this->expects($test);
     }
 
-    public function fail($test)
+    public function fail($test, string $baseLine = '    ')
     {
         $title = $test;
         if (is_array($test)) {
             $title = $test['title'];
         }
-
-        $baseLine = '    ';
 
         $this->output->writeln(sprintf($baseLine . '<fg=red;options=bold>FAIL</> <fg=white>%s</>', $this->getHumanString($title)));
 
         $this->expects($test);
     }
 
-    public function skip($test)
+    public function skip($test, string $baseLine = '    ')
     {
         $title = $test;
         if (is_array($test)) {
             $title = $test['title'];
         }
-
-        $baseLine = '    ';
 
         $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
 
@@ -392,14 +386,12 @@ class ExecuteSuite extends Command
         }
     }
 
-    public function todo($test)
+    public function todo($test, string $baseLine = '    ')
     {
         $title = $test;
         if (is_array($test)) {
             $title = $test['title'];
         }
-
-        $baseLine = '    ';
 
         $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
 
