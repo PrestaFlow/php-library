@@ -131,6 +131,8 @@ class ExecuteSuite extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
 
+        $this->debug('PrestaFlow v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION, newLine: true );
+
         $start_time = hrtime(true);
 
         $this->defineOutputMode($input);
