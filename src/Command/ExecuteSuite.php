@@ -236,7 +236,7 @@ class ExecuteSuite extends Command
 
                     $output->writeln([
                         sprintf(
-                            '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
+                            '    <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
                             implode('<fg=gray>,</> ', $tests),
                             (int) $results['stats']['assertions']
                         ),
@@ -249,7 +249,7 @@ class ExecuteSuite extends Command
                     }
 
                     //
-                    $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
+                    $output->writeln(sprintf('    <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
                 }
             } catch (Error $e) {
                 $this->error($e->getMessage());
