@@ -134,6 +134,7 @@ class ExecuteSuite extends Command
         $folderPath = $input->getArgument('folder');
 
         if (!is_dir($folderPath) || !is_dir(ucfirst($folderPath))) {
+            $this->outputNewLine();
             $this->debug($folderPath);
             $this->error('The suites folder doesn\'t seem to exist');
             return Command::FAILURE;
@@ -142,6 +143,7 @@ class ExecuteSuite extends Command
         $testSuites = $this->getTestsSuites($folderPath);
 
         if (!count($testSuites)) {
+            $this->outputNewLine();
             $this->success('Tests folder is empty');
             return Command::SUCCESS;
         };
@@ -168,6 +170,7 @@ class ExecuteSuite extends Command
                 if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
                     && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
                     $this->io->newLine();
+                    $this->outputNewLine();
 
                     $this->verboseMode = $suite->isVerboseMode();
                     $this->debugMode = $suite->isDebugMode();
@@ -210,7 +213,7 @@ class ExecuteSuite extends Command
                         }
                     }
 
-                    $this->io->newLine();
+                    $this->outputNewLine();
 
                     $tests = [];
                     if ($results['stats']['failures']) {
@@ -248,9 +251,9 @@ class ExecuteSuite extends Command
 
                 //return Command::FAILURE;
             }
-            $this->io->newLine();
         }
 
+        $this->outputNewLine();
         return Command::SUCCESS;
     }
 
