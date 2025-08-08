@@ -35,11 +35,12 @@ class ExecuteSuite extends Command
 
     protected $io;
     protected $output;
-    protected $outputMode = 'full';
     protected $json = [];
 
     protected $debugModeDetected = null;
 
+    protected $outputMode = 'full';
+    protected $draftMode = null;
     protected $verboseMode = true;
     protected $debugMode = false;
 
@@ -48,6 +49,7 @@ class ExecuteSuite extends Command
         $this
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
+            ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests');
     }
 
@@ -133,6 +135,8 @@ class ExecuteSuite extends Command
 
         $this->defineOutputMode($input);
 
+        $this->draftMode = $input->getOption('draft') ?? null;
+
         $folderPath = $input->getArgument('folder');
 
         if (!is_dir($folderPath) || !is_dir(ucfirst($folderPath))) {
@@ -169,9 +173,8 @@ class ExecuteSuite extends Command
 
             try {
                 $suite = new $className();
-                if (is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
-                    && get_class($suite) !== 'PrestaFlow\Library\Tests\TestsSuite') {
-                    $this->io->newLine();
+                if ($this->isExecutable($suite)) {
+
                     $this->outputNewLine();
 
                     $this->verboseMode = $suite->isVerboseMode();
@@ -263,6 +266,32 @@ class ExecuteSuite extends Command
         $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($time)));
 
         return Command::SUCCESS;
+    }
+
+    protected function isExecutable($suite)
+    {
+        // Check if the suite is an instance of TestsSuite
+        if (!is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
+            && get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite') {
+                return false;
+        }
+
+        // Draft
+        if ($this->draftMode !== null) {
+            if ($this->draftMode && !$suite->isDraft()) {
+                if ($this->isDebugMode()) {
+                    $this->debug(get_class($suite), baseLine: '  ');
+                }
+                return false;
+            } elseif (!$this->draftMode && $suite->isDraft()) {
+                if ($this->isDebugMode()) {
+                    $this->debug(get_class($suite), baseLine: '  ');
+                }
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function formatSeconds($time)

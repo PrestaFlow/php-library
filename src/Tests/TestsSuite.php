@@ -49,6 +49,7 @@ class TestsSuite
 
     protected static $lines = [];
 
+    protected $draft = false;
     public function __construct()
     {
         $this->loadGlobals();
@@ -146,6 +147,11 @@ class TestsSuite
         }
 
         return false;
+    }
+
+    public function isDraft() : bool
+    {
+        return (bool) $this->draft;
     }
 
     public static function getSocketFilePath()
