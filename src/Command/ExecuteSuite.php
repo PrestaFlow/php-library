@@ -129,6 +129,8 @@ class ExecuteSuite extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
 
+        $start_time = hrtime(true);
+
         $this->defineOutputMode($input);
 
         $folderPath = $input->getArgument('folder');
@@ -254,6 +256,12 @@ class ExecuteSuite extends Command
         }
 
         $this->outputNewLine();
+
+        $end_time = hrtime(true);
+        $time = round(($end_time - $start_time) / 1e+6);
+
+        $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($time)));
+
         return Command::SUCCESS;
     }
 
