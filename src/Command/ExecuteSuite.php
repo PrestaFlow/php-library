@@ -301,6 +301,17 @@ class ExecuteSuite extends Command
     }
 
     protected function debug(string|array $message, bool $newLine = false)
+    public function getColor(string $state): string
+    {
+        return match ($state) {
+            self::PASS => 'green',
+            self::FAIL => 'red',
+            self::SKIPPED => 'yellow',
+            self::TODO => 'blue',
+            default => 'gray',
+        };
+    }
+
     public function outputNewLine()
     {
         if ($this->outputMode !== self::OUTPUT_JSON) {
