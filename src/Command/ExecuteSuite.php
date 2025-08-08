@@ -303,7 +303,6 @@ class ExecuteSuite extends Command
         }
     }
 
-    protected function debug(string|array $message, bool $newLine = false)
     public function getColor(string $state): string
     {
         return match ($state) {
