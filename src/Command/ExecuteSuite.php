@@ -301,6 +301,12 @@ class ExecuteSuite extends Command
     }
 
     protected function debug(string|array $message, bool $newLine = false)
+    public function outputNewLine()
+    {
+        if ($this->outputMode !== self::OUTPUT_JSON) {
+            $this->io->newLine();
+        }
+    }
     protected function debug(string|array $message, string $baseLine = '  ', bool $newLine = false)
     {
         if (is_array($message)) {
