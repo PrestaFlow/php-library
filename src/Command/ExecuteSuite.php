@@ -291,11 +291,11 @@ class ExecuteSuite extends Command
                 foreach ($expectMessages as $expectMessage) {
                     if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
                         match ($state) {
-                            self::PASS => $this->output->writeln(sprintf($baseLine . '<fg=green>%s</> <fg=gray>%s</>', self::makeIcon(self::PASS), $expectMessage)),
-                            self::FAIL => $this->output->writeln(sprintf($baseLine . '<fg=red>%s</> <fg=gray>%s</>', self::makeIcon(self::FAIL), $expectMessage)),
-                            self::SKIPPED => $this->output->writeln(sprintf($baseLine . '<fg=yellow>%s</> <fg=gray>%s</>', self::makeIcon(self::SKIPPED), $expectMessage)),
-                            self::TODO => $this->output->writeln(sprintf($baseLine . '<fg=blue>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage)),
-                            default => $this->output->writeln(sprintf($baseLine . '<fg=gray>%s</> <fg=gray>%s</>', self::makeIcon(self::TODO), $expectMessage))
+                            self::PASS => $this->outputText(baseLine: $baseLine, state: self::PASS, title: self::makeIcon(self::PASS), message: $expectMessage, secondaryColor: 'gray'),
+                            self::FAIL => $this->outputText(baseLine: $baseLine, state: self::FAIL, title: self::makeIcon(self::FAIL), message: $expectMessage, secondaryColor: 'gray'),
+                            self::SKIPPED => $this->outputText(baseLine: $baseLine, state: self::SKIPPED, title: self::makeIcon(self::SKIPPED), message: $expectMessage, secondaryColor: 'gray'),
+                            self::TODO => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray'),
+                            default => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray')
                         };
                     }
                 }
@@ -321,6 +321,27 @@ class ExecuteSuite extends Command
             $this->io->newLine();
         }
     }
+
+    public function outputText(string $baseLine = '', string $state = 'default', string $title = '', string $message = '', string $secondaryColor = 'white')
+    {
+        if (self::OUTPUT_FULL === $this->getOutputMode()) {
+            $output = sprintf($baseLine . '<fg=%s>%s</> <fg=%s>%s</>', $this->getColor($state), $title, $secondaryColor, $message);
+            $this->output->writeln($output);
+        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
+            $output = sprintf($baseLine . '<fg=%s>%s</>', $this->getColor($state), $title);
+            $this->output->writeln($output);
+        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->output->writeln(
+                json_encode(
+                    [
+                        'title' => $title,
+                        'message' => $message,
+                    ]
+                )
+            );
+        }
+    }
+
     protected function debug(string|array $message, string $baseLine = '  ', bool $newLine = false)
     {
         if (is_array($message)) {
