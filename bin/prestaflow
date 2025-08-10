@@ -13,9 +13,41 @@ foreach ($autoloadFiles as $autoloadFile) {
 
 use PrestaFlow\Library\Command\ExecuteSuite;
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\ConsoleEvents;
+use Symfony\Component\Console\Event\ConsoleErrorEvent;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+
+$dispatcher = new EventDispatcher();
+
+$dispatcher->addListener(ConsoleEvents::ERROR, function (ConsoleErrorEvent $event): void {
+
+    $input = $event->getInput();
+    $output = $event->getOutput();
+
+    $io = new SymfonyStyle($input, $output);
+
+    $command = $event->getCommand();
+
+    $error = $event->getError();
+
+    $io->newLine();
+
+    $io->writeln(sprintf('<fg=red;options=bold>ERROR</> <fg=white>%s</>', $error->getMessage()));
+
+    // gets the current exit code (the exception code)
+    $exitCode = $event->getExitCode();
+
+    $event->setExitCode(Command::SUCCESS);
+
+    // changes the exception to another one
+    $event->setError(new \LogicException('Caught exception', $exitCode, $event->getError()));
+});
 
 $application = new Application();
 
 $application->add(new ExecuteSuite());
+$application->setDispatcher($dispatcher);
 
 $application->run();
