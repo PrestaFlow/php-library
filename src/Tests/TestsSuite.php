@@ -15,6 +15,7 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
@@ -40,6 +41,7 @@ class TestsSuite
     protected $end_time;
 
     protected $init = false;
+    public $cli = false;
 
     public $globals = [];
     public $pages = [];
@@ -357,8 +359,17 @@ class TestsSuite
         return $this->globals;
     }
 
-    public function run($cli = false)
+    public function outputToCli(OutputInterface $output, string $message, string $color = 'white')
     {
+        if ($this->cli) {
+            $output->writeln(sprintf('<fg=%s>%s</>', $color, $message));
+        }
+    }
+
+    public function run($cli = false, OutputInterface $output = null)
+    {
+        $this->cli = $cli;
+
         if (!$this->init) {
             $this->init();
             $this->init = true;

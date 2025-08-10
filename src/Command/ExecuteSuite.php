@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Command;
 use Error;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -35,6 +36,10 @@ class ExecuteSuite extends Command
 
     protected $io;
     protected $output;
+    protected $sections = [
+        'progressBar' => null,
+        'testResults' => null,
+    ];
     protected $json = [];
 
     protected $debugModeDetected = null;
@@ -126,12 +131,25 @@ class ExecuteSuite extends Command
         }
     }
 
+    public function initSections($output)
+    {
+        $this->sections['progressBar'] = $output->section();
+        $this->sections['progressBar']->setMaxHeight(1);
+
+        $this->sections['testResults'] = $output->section();
+
+        $this->sections['progressIndicator'] = new ProgressIndicator($this->sections['progressBar'], 'verbose', 100, ['⠏', '⠛', '⠹', '⢸', '⣰', '⣤', '⣆', '⡇']);
+
+        $this->sections['progressIndicator']->start('Processing...');
+    }
+
     public function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new SymfonyStyle($input, $output);
-        $this->output = $output;
         $this->io->title('PrestaFlow v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION);
 
+        $this->initSections($output);
+        $this->output = $this->sections['testResults'];
 
         $start_time = hrtime(true);
 
@@ -157,6 +175,8 @@ class ExecuteSuite extends Command
         };
 
         foreach ($testSuites as $suitePath) {
+            $this->sections['progressIndicator']->advance();
+
             if (!str_ends_with($suitePath, '.php')) {
                 continue;
             }
@@ -194,10 +214,11 @@ class ExecuteSuite extends Command
                         $this->debug('Locale: ' . $suite->getLocale());
                     }
 
-                    $suite->run(cli: true);
+                    $suite->run(cli: true, output: $this->output);
 
                     $results = $suite->results(false);
                     $this->info($suite->getDescribe());
+                    $this->output->writeln(sprintf('  <fg=gray>Suite:</> <fg=white>%s</>', $className));
 
                     foreach ($results['tests'] as $test) {
                         if (isset($test['warning']) && !empty($test['warning'])) {
@@ -206,7 +227,7 @@ class ExecuteSuite extends Command
                                 default => $this->warning($test['warning'], newLine: true)
                             };
                         } else {
-                            $output->writeln('');
+                            $this->outputNewLine();
                         }
                         match ($test['state']) {
                             self::PASS => $this->pass($test),
@@ -216,7 +237,7 @@ class ExecuteSuite extends Command
                         };
 
                         if ($this->isDebugMode()) {
-                            $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($test['time'])));
+                            $this->output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($test['time'])));
                         }
                     }
 
@@ -236,7 +257,7 @@ class ExecuteSuite extends Command
                         $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $results['stats']['todos']);
                     }
 
-                    $output->writeln([
+                    $this->output->writeln([
                         sprintf(
                             '    <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
                             implode('<fg=gray>,</> ', $tests),
@@ -251,7 +272,7 @@ class ExecuteSuite extends Command
                     }
 
                     //
-                    $output->writeln(sprintf('    <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
+                    $this->output->writeln(sprintf('    <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
                 }
             } catch (Error $e) {
                 $this->error($e->getMessage());
@@ -265,7 +286,10 @@ class ExecuteSuite extends Command
         $end_time = hrtime(true);
         $time = round(($end_time - $start_time) / 1e+6);
 
-        $output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($time)));
+        $this->output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($time)));
+
+        $this->sections['progressIndicator']->finish('Finished');
+        $this->sections['progressBar']->clear();
 
         return Command::SUCCESS;
     }
@@ -356,7 +380,7 @@ class ExecuteSuite extends Command
     public function outputNewLine()
     {
         if ($this->outputMode !== self::OUTPUT_JSON) {
-            $this->io->newLine();
+            $this->output->writeln('');
         }
     }
 
