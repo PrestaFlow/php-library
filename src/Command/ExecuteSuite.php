@@ -133,23 +133,30 @@ class ExecuteSuite extends Command
 
     public function initSections($output)
     {
+        $this->sections['title'] = $output->section();
+        $this->sections['title']->setMaxHeight(2);
+
         $this->sections['progressBar'] = $output->section();
         $this->sections['progressBar']->setMaxHeight(1);
 
         $this->sections['testResults'] = $output->section();
+        $this->output = $this->sections['testResults'];
 
         $this->sections['progressIndicator'] = new ProgressIndicator($this->sections['progressBar'], 'verbose', 100, ['⠏', '⠛', '⠹', '⢸', '⣰', '⣤', '⣆', '⡇']);
-
         $this->sections['progressIndicator']->start('Processing...');
+    }
+
+    protected function outputTitle()
+    {
+        $this->sections['title']->write('');
+        $this->sections['title']->write(sprintf('<fg=bright-cyan>%s</>'.PHP_EOL, '𝗣𝗿𝗲𝘀𝘁𝗮𝗙𝗹𝗼𝘄 | v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION));
+        $this->sections['title']->write('');
     }
 
     public function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->io = new SymfonyStyle($input, $output);
-        $this->io->title('PrestaFlow v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION);
-
         $this->initSections($output);
-        $this->output = $this->sections['testResults'];
+        $this->outputTitle();
 
         $start_time = hrtime(true);
 
