@@ -130,8 +130,8 @@ class ExecuteSuite extends Command
     {
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
+        $this->io->title('PrestaFlow v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION);
 
-        $this->debug('PrestaFlow v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION, newLine: true );
 
         $start_time = hrtime(true);
 
