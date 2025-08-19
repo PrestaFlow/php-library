@@ -21,16 +21,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class ExecuteSuite extends Command
 {
-    public const FAIL = 'fail';
-
-    public const SKIPPED = 'skip';
-
-    public const RUNS = 'pending';
-
-    public const PASS = 'pass';
-
-    public const TODO = 'todo';
-
     protected $io;
     protected $output;
     protected $sections = [

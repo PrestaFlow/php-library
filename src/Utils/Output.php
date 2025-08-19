@@ -6,7 +6,9 @@ trait Output
 {
     public const FAIL = 'fail';
 
-    public const SKIPPED = 'skip';
+    public const SKIP = 'skip';
+
+    public const SKIPPED = 'skipped';
 
     public const RUNS = 'pending';
 
@@ -70,6 +72,7 @@ trait Output
                         match ($state) {
                             self::PASS => $this->outputText(baseLine: $baseLine, state: self::PASS, title: self::makeIcon(self::PASS), message: $expectMessage, secondaryColor: 'gray', section: $section),
                             self::FAIL => $this->outputText(baseLine: $baseLine, state: self::FAIL, title: self::makeIcon(self::FAIL), message: $expectMessage, secondaryColor: 'gray', section: $section),
+                            self::SKIP => $this->outputText(baseLine: $baseLine, state: self::SKIP, title: self::makeIcon(self::SKIP), message: $expectMessage, secondaryColor: 'gray', section: $section),
                             self::SKIPPED => $this->outputText(baseLine: $baseLine, state: self::SKIPPED, title: self::makeIcon(self::SKIPPED), message: $expectMessage, secondaryColor: 'gray', section: $section),
                             self::TODO => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section),
                             default => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section)
@@ -85,6 +88,7 @@ trait Output
         return match ($state) {
             self::PASS => 'green',
             self::FAIL => 'red',
+            self::SKIP => 'yellow',
             self::SKIPPED => 'yellow',
             self::TODO => 'blue',
             default => 'gray',
@@ -240,6 +244,29 @@ trait Output
             bold: true,
             title: 'SKIP',
             titleColor: 'yellow',
+            secondaryColor: 'white',
+            message: $this->getHumanString($title),
+            baseLine: $baseLine,
+            newLine: $newLine,
+            section: $section
+        );
+
+        if ($this->isVerboseMode()) {
+            $this->expects($test, section: $section);
+        }
+    }
+
+    public function skippedCauseItsFail($test, string $baseLine = '    ', bool $newLine = false, string $section = 'default')
+    {
+        $title = $test;
+        if (is_array($test)) {
+            $title = $test['title'];
+        }
+
+        $this->cli(
+            bold: true,
+            title: 'SKIPPED',
+            titleColor: 'gray',
             secondaryColor: 'white',
             message: $this->getHumanString($title),
             baseLine: $baseLine,

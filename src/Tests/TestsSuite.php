@@ -33,6 +33,7 @@ class TestsSuite
         'passes' => 0,
         'failures' => 0,
         'skips' => 0,
+        'skippeds' => 0,
         'todos' => 0,
         'assertions' => 0,
         'time' => 0,
@@ -47,6 +48,7 @@ class TestsSuite
     protected $end_time;
 
     protected $init = false;
+    protected $failed = false;
 
     public $globals = [];
     public $pages = [];
@@ -84,6 +86,7 @@ class TestsSuite
                 'passes' => 0,
                 'failures' => 0,
                 'skips' => 0,
+                'skippeds' => 0,
                 'todos' => 0,
                 'assertions' => 0,
                 'time' => 0,
@@ -142,6 +145,15 @@ class TestsSuite
     public function isSkippable($test)
     {
         if (isset($test['skip']) && $test['skip']) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function isSkippableCauseFailed($test)
+    {
+        if ($this->failed) {
             return true;
         }
 
@@ -402,6 +414,9 @@ class TestsSuite
                     if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
+                    } else if ($this->isSkippableCauseFailed($test) === true) {
+                        $test['state'] = 'skipped';
+                        $this->stats['skippeds']++;
                     } else if ($this->isTodoable($test) === true) {
                         $test['state'] = 'todo';
                         $this->stats['todos']++;
@@ -426,6 +441,7 @@ class TestsSuite
                     $this->attachScreen($test);
                     $this->stats['assertions'] += Expect::getNbAssertions();
                     $this->stats['failures']++;
+                    $this->failed = true;
                 } finally {
                     $test['expect'] = Expect::getExpectMessage();
                     Expect::getNbAssertions();
@@ -434,6 +450,7 @@ class TestsSuite
 
                     match ($test['state']) {
                         'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
+                        'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
                         'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
                         'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
                         'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
@@ -455,6 +472,9 @@ class TestsSuite
             if ($this->stats['skips']) {
                 $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skips</>', $this->stats['skips']);
             }
+            if ($this->stats['skippeds']) {
+                $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skippeds</>', $this->stats['skippeds']);
+            }
             if ($this->stats['todos']) {
                 $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $this->stats['todos']);
             }
@@ -475,6 +495,7 @@ class TestsSuite
             'passes' => 0,
             'failures' => 0,
             'skips' => 0,
+            'skippeds' => 0,
             'todos' => 0,
             'assertions' => 0,
             'time' => 0,
