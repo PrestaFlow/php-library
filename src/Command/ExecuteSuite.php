@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Command;
 
 use Error;
+use PrestaFlow\Library\Utils\Output;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressIndicator;
@@ -30,24 +31,21 @@ class ExecuteSuite extends Command
 
     public const TODO = 'todo';
 
-    public const OUTPUT_FULL = 'full';
-    public const OUTPUT_COMPACT = 'compact';
-    public const OUTPUT_JSON = 'json';
-
     protected $io;
     protected $output;
     protected $sections = [
+        'title' => null,
+        'progressIndicator' => null,
         'progressBar' => null,
-        'testResults' => null,
     ];
     protected $json = [];
 
     protected $debugModeDetected = null;
 
-    protected $outputMode = 'full';
     protected $draftMode = null;
-    protected $verboseMode = true;
     protected $debugMode = false;
+
+    use Output;
 
     protected function configure(): void
     {
@@ -80,55 +78,9 @@ class ExecuteSuite extends Command
         }
     }
 
-    protected function getOutputMode(): string
-    {
-        return $this->outputMode;
-    }
-
-    protected function isVerboseMode(): bool
-    {
-        return $this->verboseMode;
-    }
-
     protected function isDebugMode(): bool
     {
         return $this->debugMode;
-    }
-
-    protected function error(string $message)
-    {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
-            $this->output->writeln('<fg=red;options=bold>ERROR</> <fg=white>' . $message . '</>');
-        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
-            $this->output->writeln('<fg=red;options=bold>ERROR</>');
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeln(
-                json_encode(
-                    [
-                        'hasError' => true,
-                        'error' => $message,
-                    ]
-                )
-            );
-        }
-    }
-
-    protected function success(string $message)
-    {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
-            $this->output->writeln('<fg=green;options=bold>SUCCESS</> <fg=white>' . $message . '</>');
-        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
-            $this->output->writeln('<fg=green;options=bold>SUCCESS</>');
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeln(
-                json_encode(
-                    [
-                        'hasError' => false,
-                        'message' => $message,
-                    ]
-                )
-            );
-        }
     }
 
     public function initSections($output)
@@ -139,8 +91,7 @@ class ExecuteSuite extends Command
         $this->sections['progressBar'] = $output->section();
         $this->sections['progressBar']->setMaxHeight(1);
 
-        $this->sections['testResults'] = $output->section();
-        $this->output = $this->sections['testResults'];
+        $this->outputSections['default'] = $output->section();
 
         $this->sections['progressIndicator'] = new ProgressIndicator($this->sections['progressBar'], 'verbose', 100, ['⠏', '⠛', '⠹', '⢸', '⣰', '⣤', '⣆', '⡇']);
         $this->sections['progressIndicator']->start('Processing...');
@@ -150,11 +101,14 @@ class ExecuteSuite extends Command
     {
         $this->sections['title']->write('');
         $this->sections['title']->write(sprintf('<fg=bright-cyan>%s</>'.PHP_EOL, '𝗣𝗿𝗲𝘀𝘁𝗮𝗙𝗹𝗼𝘄 | v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION));
-        $this->sections['title']->write('');
+        //$this->sections['title']->write('');
     }
 
     public function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->cli = true;
+        $this->output = $output;
+
         $this->initSections($output);
         $this->outputTitle();
 
@@ -200,103 +154,56 @@ class ExecuteSuite extends Command
 
             $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits)-1]);
 
+            $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
+            if (!isset($this->outputSections[$sectionId])) {
+                $this->outputSections[$sectionId] = $this->output->section();
+            }
+
             try {
                 $suite = new $className();
                 if ($this->isExecutable($suite)) {
 
-                    $this->outputNewLine();
+                    $this->outputNewLine(section: $sectionId);
 
-                    $this->verboseMode = $suite->isVerboseMode();
                     $this->debugMode = $suite->isDebugMode();
 
                     if ($this->isDebugMode()) {
-                        //$this->debug($globals, newLine: true);
+                        $this->debug('Locale: ' . $suite->getLocale(), section: $sectionId);
                     }
 
-                    if ($this->isDebugMode()) {
-                        $this->debug($className, newLine: true);
-                    }
+                    $suite->run(cli: true, output: $this->output, mode: $this->outputMode);
 
-                    if ($this->isDebugMode()) {
-                        $this->debug('Locale: ' . $suite->getLocale());
-                    }
-
-                    $suite->run(cli: true, output: $this->output);
-
-                    $results = $suite->results(false);
-                    $this->info($suite->getDescribe());
-                    $this->output->writeln(sprintf('  <fg=gray>Suite:</> <fg=white>%s</>', $className));
-
-                    foreach ($results['tests'] as $test) {
-                        if (isset($test['warning']) && !empty($test['warning'])) {
-                            match ($test['warning']) {
+                    foreach ($suite->warnings as $warning) {
+                        if (!empty($warning)) {
+                            match ($warning) {
                                 'debug-mode' => $this->debugModeDetected = true,
-                                default => $this->warning($test['warning'], newLine: true)
+                                default => $this->warning($warning, newLine: true, section: $sectionId)
                             };
-                        } else {
-                            $this->outputNewLine();
-                        }
-                        match ($test['state']) {
-                            self::PASS => $this->pass($test),
-                            self::FAIL => $this->fail($test),
-                            self::SKIPPED => $this->skip($test),
-                            self::TODO => $this->todo($test),
-                        };
-
-                        if ($this->isDebugMode()) {
-                            $this->output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($test['time'])));
                         }
                     }
-
-                    $this->outputNewLine();
-
-                    $tests = [];
-                    if ($results['stats']['failures']) {
-                        $tests[] = sprintf('<fg=red;options=bold>%d failures</>', $results['stats']['failures']);
+                } else {
+                    if ($this->isDebugMode()) {
+                        // $this->debug('Not executable', section: $sectionId);
                     }
-                    if ($results['stats']['passes']) {
-                        $tests[] = sprintf('<fg=green;options=bold>%d passed</>', $results['stats']['passes']);
-                    }
-                    if ($results['stats']['skips']) {
-                        $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skips</>', $results['stats']['skips']);
-                    }
-                    if ($results['stats']['todos']) {
-                        $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $results['stats']['todos']);
-                    }
-
-                    $this->output->writeln([
-                        sprintf(
-                            '    <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
-                            implode('<fg=gray>,</> ', $tests),
-                            (int) $results['stats']['assertions']
-                        ),
-                    ]);
-
-                    if ($this->debugModeDetected) {
-                        $this->output->writeln('');
-                        $this->warning('debug-mode', newLine: false);
-                        $this->output->writeln('');
-                    }
-
-                    //
-                    $this->output->writeln(sprintf('    <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($results['stats']['time'])));
                 }
             } catch (Error $e) {
                 $this->error($e->getMessage());
-
-                //return Command::FAILURE;
+                $this->error('In ' . $e->getFile() . ' line ' . $e->getLine());
             }
         }
 
-        $this->outputNewLine();
+        $this->sections['progressIndicator']->finish('Finished');
+        $this->sections['progressBar']->clear();
 
         $end_time = hrtime(true);
         $time = round(($end_time - $start_time) / 1e+6);
 
-        $this->output->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($time)));
+        if ($this->debugModeDetected || 1) {
+            $this->cli(baseLine: '', bold: true, titleColor: 'yellow', title: 'WARNING', secondaryColor: 'white', message: 'debug-mode', newLine: true, section: 'end');
+        }
 
-        $this->sections['progressIndicator']->finish('Finished');
-        $this->sections['progressBar']->clear();
+        $message = sprintf('%ss', $this->formatSeconds($time));
+        $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'end');
 
         return Command::SUCCESS;
     }
@@ -327,11 +234,6 @@ class ExecuteSuite extends Command
         return true;
     }
 
-    protected function formatSeconds($time)
-    {
-        return number_format($time / 1000, 2, '.', '');
-    }
-
     public function getTestsSuites($folderPath)
     {
         $testSuites = [];
@@ -350,190 +252,5 @@ class ExecuteSuite extends Command
             }
         }
         return $testSuites;
-    }
-
-    public function expects($test)
-    {
-        $baseLine = str_repeat('  ', 3);
-
-        if (!empty($test['expect'])) {
-            foreach ($test['expect'] as $state => $expectMessages) {
-                foreach ($expectMessages as $expectMessage) {
-                    if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
-                        match ($state) {
-                            self::PASS => $this->outputText(baseLine: $baseLine, state: self::PASS, title: self::makeIcon(self::PASS), message: $expectMessage, secondaryColor: 'gray'),
-                            self::FAIL => $this->outputText(baseLine: $baseLine, state: self::FAIL, title: self::makeIcon(self::FAIL), message: $expectMessage, secondaryColor: 'gray'),
-                            self::SKIPPED => $this->outputText(baseLine: $baseLine, state: self::SKIPPED, title: self::makeIcon(self::SKIPPED), message: $expectMessage, secondaryColor: 'gray'),
-                            self::TODO => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray'),
-                            default => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray')
-                        };
-                    }
-                }
-            }
-        }
-    }
-
-    public function getColor(string $state): string
-    {
-        return match ($state) {
-            self::PASS => 'green',
-            self::FAIL => 'red',
-            self::SKIPPED => 'yellow',
-            self::TODO => 'blue',
-            default => 'gray',
-        };
-    }
-
-    public function outputNewLine()
-    {
-        if ($this->outputMode !== self::OUTPUT_JSON) {
-            $this->output->writeln('');
-        }
-    }
-
-    public function outputText(string $baseLine = '', string $state = 'default', string $title = '', string $message = '', string $secondaryColor = 'white')
-    {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
-            $output = sprintf($baseLine . '<fg=%s>%s</> <fg=%s>%s</>', $this->getColor($state), $title, $secondaryColor, $message);
-            $this->output->writeln($output);
-        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
-            $output = sprintf($baseLine . '<fg=%s>%s</>', $this->getColor($state), $title);
-            $this->output->writeln($output);
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeln(
-                json_encode(
-                    [
-                        'title' => $title,
-                        'message' => $message,
-                    ]
-                )
-            );
-        }
-    }
-
-    protected function debug(string|array $message, string $baseLine = '  ', bool $newLine = false)
-    {
-        if (is_array($message)) {
-            $message = json_encode($message, JSON_PRETTY_PRINT);
-        }
-
-        if ($newLine) {
-            $this->output->writeln('');
-            $baseLine = '';
-        }
-
-        $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>INFO</> <fg=white>%s</>', $this->getHumanString($message)));
-
-        if ($newLine) {
-            $this->output->writeln('');
-        }
-    }
-
-    protected function info(string|array $message, string $baseLine = '  ', bool $newLine = false)
-    {
-        return $this->debug($message, $baseLine, $newLine);
-    }
-
-    public function pass($test, string $baseLine = '    ')
-    {
-        $title = $test;
-        if (is_array($test)) {
-            $title = $test['title'];
-        }
-
-
-        $this->output->writeln(sprintf($baseLine . '<fg=green;options=bold>PASS</> <fg=white>%s</>', $this->getHumanString($title)));
-
-        if ($this->isVerboseMode()) {
-            $this->expects($test);
-        }
-    }
-
-    public function warning($test, string $baseLine = '  ', $newLine = false)
-    {
-        $title = $test;
-        if (is_array($test)) {
-            $title = $test['title'];
-        }
-
-        if ($newLine) {
-            $this->output->writeln('');
-            $baseLine = '';
-        }
-
-        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>WARNING</> <fg=white>%s</>', $this->getHumanString($title)));
-
-        if ($newLine) {
-            $this->output->writeln('');
-        }
-
-        $this->expects($test);
-    }
-
-    public function fail($test, string $baseLine = '    ')
-    {
-        $title = $test;
-        if (is_array($test)) {
-            $title = $test['title'];
-        }
-
-        $this->output->writeln(sprintf($baseLine . '<fg=red;options=bold>FAIL</> <fg=white>%s</>', $this->getHumanString($title)));
-
-        $this->expects($test);
-    }
-
-    public function skip($test, string $baseLine = '    ')
-    {
-        $title = $test;
-        if (is_array($test)) {
-            $title = $test['title'];
-        }
-
-        $this->output->writeln(sprintf($baseLine . '<fg=yellow;options=bold>SKIP</> <fg=white>%s</>', $this->getHumanString($title)));
-
-        if ($this->isVerboseMode()) {
-            $this->expects($test);
-        }
-    }
-
-    public function todo($test, string $baseLine = '    ')
-    {
-        $title = $test;
-        if (is_array($test)) {
-            $title = $test['title'];
-        }
-
-        $this->output->writeln(sprintf($baseLine . '<fg=blue;options=bold>TODO</> <fg=white>%s</>', $this->getHumanString($title)));
-
-        if ($this->isVerboseMode()) {
-            $this->expects($test);
-        }
-    }
-
-    protected function getHumanString(string $message)
-    {
-        return match ($message) {
-            'debug-mode' => 'Your shop is running in debug mode',
-            default => $message
-        };
-    }
-
-    /**
-     * Get the test case icon.
-     */
-    public static function makeIcon(string $type): string
-    {
-        switch ($type) {
-            case self::FAIL:
-                return '⨯';
-            case self::SKIPPED:
-                return '-';
-            case self::RUNS:
-                return '•';
-            case self::TODO:
-                return '↓';
-            default:
-                return '✓';
-        }
     }
 }
