@@ -118,9 +118,9 @@ class ExecuteSuite extends Command
 
         $this->draftMode = $input->getOption('draft') ?? null;
 
-        $folderPath = $input->getArgument('folder');
+        $folderPath = ucfirst($input->getArgument('folder'));
 
-        if (!is_dir($folderPath) || !is_dir(ucfirst($folderPath))) {
+        if (!is_dir($folderPath) || !is_dir($folderPath)) {
             $this->outputNewLine();
             $this->debug($folderPath);
             $this->error('The suites folder doesn\'t seem to exist');
