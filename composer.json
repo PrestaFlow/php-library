@@ -1,6 +1,8 @@
 {
     "name": "prestaflow/php-library",
+    "description": "PrestaFlow is an open-source set of prebuilt tests components, ready-to-use examples made for the PrestaShop E-commerce software.",
     "type": "library",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "PrestaFlow\\Library\\": "src/"

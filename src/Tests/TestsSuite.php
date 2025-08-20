@@ -15,6 +15,8 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
+use PrestaFlow\Library\Utils\Output;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
@@ -24,15 +26,21 @@ class TestsSuite
     use Locale;
     use Version;
     use ImportPage;
+    use Output;
 
     public array $suites = [];
     private array $stats = [
         'passes' => 0,
         'failures' => 0,
         'skips' => 0,
+        'skippeds' => 0,
         'todos' => 0,
         'assertions' => 0,
+        'time' => 0,
     ];
+
+    public $warnings = [];
+    public $screens = [];
 
     private $_runestSuite = null;
 
@@ -40,6 +48,7 @@ class TestsSuite
     protected $end_time;
 
     protected $init = false;
+    protected $failed = false;
 
     public $globals = [];
     public $pages = [];
@@ -48,6 +57,9 @@ class TestsSuite
     protected $scenarioParams = [];
 
     protected static $lines = [];
+
+    protected $draft = false;
+    protected $groups = 'all';
 
     public function __construct()
     {
@@ -76,8 +88,10 @@ class TestsSuite
                 'passes' => 0,
                 'failures' => 0,
                 'skips' => 0,
+                'skippeds' => 0,
                 'todos' => 0,
                 'assertions' => 0,
+                'time' => 0,
             ]
         ];
 
@@ -139,6 +153,15 @@ class TestsSuite
         return false;
     }
 
+    public function isSkippableCauseFailed($test)
+    {
+        if ($this->failed) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function isTodoable($test)
     {
         if (isset($test['todo']) && $test['todo']) {
@@ -146,6 +169,16 @@ class TestsSuite
         }
 
         return false;
+    }
+
+    public function isDraft() : bool
+    {
+        return (bool) $this->draft;
+    }
+
+    public function getGroups() : string|array
+    {
+        return $this->groups;
     }
 
     public static function getSocketFilePath()
@@ -251,11 +284,14 @@ class TestsSuite
 
         $this->end_time = hrtime(true);
         $this->suites[$this->_runestSuite]['stats']['time'] = round(($this->end_time - $this->start_time) / 1e+6);
-        ;
     }
 
     public function getInstructions(&$test)
     {
+        if (!$this->cli) {
+            return;
+        }
+
         $instructions = [];
         $reflection = new \ReflectionFunction($test['steps']);
 
@@ -348,26 +384,54 @@ class TestsSuite
 
     public function getGlobals() : array
     {
+        if (!is_array($this->globals)) {
+            throw new Exception('Globals are not set. Please call loadGlobals() first.');
+        }
         return $this->globals;
     }
 
-    public function run($cli = false)
+    public function run($cli = false, OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
     {
+        $this->cli = $cli;
+        $this->output = $output;
+        $this->outputMode = $mode;
+
+        if (!empty($section) && $sectionOutput !== null) {
+            $this->outputSections[$section] = $sectionOutput;
+        }
+
         if (!$this->init) {
             $this->init();
             $this->init = true;
         }
 
+        $suite = $this->suites[$this->_runestSuite];
+        $className = str_replace('\\', '/', $this->_runestSuite);
+
+        $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->_runestSuite));
+        if (!array_key_exists($sectionId, $this->outputSections)) {
+            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+                $this->outputSections[$sectionId] = $output->section();
+            } else {
+                $this->outputSections[$sectionId] = [];
+            }
+        }
+
         if (is_array($this->suites[$this->_runestSuite]['tests'])) {
-            foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
+            $this->info($suite['title'], newLine: true, section: $sectionId);
+            $this->cli(title: 'Suite:', bold: false, titleColor: 'gray', secondaryColor: 'white', message: $className, section: $sectionId);
+            foreach ($suite['tests'] as &$test) {
                 try {
                     $start_time = hrtime(true);
-                    if (!$cli) {
-                        $this->getInstructions($test);
-                    }
+
+                    $this->getInstructions($test);
+
                     if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
+                    } else if ($this->isSkippableCauseFailed($test) === true) {
+                        $test['state'] = 'skipped';
+                        $this->stats['skippeds']++;
                     } else if ($this->isTodoable($test) === true) {
                         $test['state'] = 'todo';
                         $this->stats['todos']++;
@@ -392,12 +456,57 @@ class TestsSuite
                     $this->attachScreen($test);
                     $this->stats['assertions'] += Expect::getNbAssertions();
                     $this->stats['failures']++;
+                    $this->failed = true;
                 } finally {
                     $test['expect'] = Expect::getExpectMessage();
                     Expect::getNbAssertions();
                     $end_time = hrtime(true);
                     $test['time'] = round(($end_time - $start_time) / 1e+6);
+
+                    match ($test['state']) {
+                        'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
+                        'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
+                        'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
+                        'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
+                        'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
+                        default => $this->info(test: $test, section: $sectionId, newLine: true)
+                    };
                 }
+            }
+
+            $end_time = hrtime(true);
+            $this->stats['time'] = round(($end_time - $start_time) / 1e+6);
+
+            $tests = [];
+            if ($this->stats['failures']) {
+                $tests[] = sprintf('<fg=red;options=bold>%d failures</>', $this->stats['failures']);
+            }
+            if ($this->stats['passes']) {
+                $tests[] = sprintf('<fg=green;options=bold>%d passed</>', $this->stats['passes']);
+            }
+            if ($this->stats['skips']) {
+                $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skips</>', $this->stats['skips']);
+            }
+            if ($this->stats['skippeds']) {
+                $tests[] = sprintf('<fg=bright-yellow;options=bold>%d skippeds</>', $this->stats['skippeds']);
+            }
+            if ($this->stats['todos']) {
+                $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $this->stats['todos']);
+            }
+
+            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+                $this->outputSections[$sectionId]->writeln('');
+                $this->outputSections[$sectionId]->writeln([
+                        sprintf(
+                            '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
+                            implode('<fg=gray>,</> ', $tests),
+                        (int) $this->stats['assertions']
+                    ),
+                ]);
+                $this->outputSections[$sectionId]->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($this->stats['time'])));
+            } else {
+                $this->outputSections[$sectionId]['stats'] = $this->stats;
+                $this->outputSections[$sectionId]['duration'] = $this->formatSeconds($this->stats['time']).'s';
             }
         }
 
@@ -406,21 +515,29 @@ class TestsSuite
             'passes' => 0,
             'failures' => 0,
             'skips' => 0,
+            'skippeds' => 0,
             'todos' => 0,
             'assertions' => 0,
+            'time' => 0,
         ];
 
         $this->after();
+
+        if (!empty($section)) {
+            return $this->outputSections[$section];
+        }
     }
 
     public function attachWarning(&$test)
     {
         $test['warning'] = Expect::$latestWarning;
+        $this->warnings[] = $test['warning'];
     }
 
     public function attachScreen(&$test)
     {
         $test['screen'] = Expect::$latestError;
+        $this->screens[] = $test['screen'];
     }
 
     public function results($json = true)

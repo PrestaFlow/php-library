@@ -12,7 +12,7 @@ class CommonPage
 {
     use Translations;
 
-    protected $globals;
+    protected $globals = [];
     public $selectors = [];
     public $messages = [];
 
@@ -242,9 +242,13 @@ class CommonPage
         $this->click($selector);
 
         $textContent = $this->getInputValue($selector);
+
         if ($textContent !== null && $textContent !== '') {
             $element = $this->getPage()->dom()->querySelector($selector);
-            $element->setAttributeValue('value', ''); // Clear the input value
+            if ($element !== null) {
+                // Clear the input value
+                $element->setAttributeValue('value', '');
+            }
         }
 
         // Alternatively, you can use the keyboard to delete the text
