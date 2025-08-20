@@ -56,7 +56,7 @@ class ExecuteSuite extends Command
 
     protected function defineOutputMode(InputInterface $input)
     {
-        $optionValue = $input->getOption('output');
+        $optionValue = strtolower($input->getOption('output'));
         if (false === $optionValue) {
             // in this case, the option was not passed when running the command
             $this->outputMode = self::OUTPUT_FULL;
