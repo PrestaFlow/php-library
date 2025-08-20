@@ -83,13 +83,15 @@ class ExecuteSuite extends Command
 
     public function initSections($output)
     {
-        $this->sections['title'] = $output->section();
-        $this->sections['title']->setMaxHeight(2);
+        if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+            $this->sections['title'] = $output->section();
+            $this->sections['title']->setMaxHeight(2);
+
+            $this->outputTitle();
+        }
 
         $this->sections['progressBar'] = $output->section();
         $this->sections['progressBar']->setMaxHeight(1);
-
-        $this->outputSections['default'] = $output->section();
 
         $this->sections['progressIndicator'] = new ProgressIndicator($this->sections['progressBar'], 'verbose', 100, ['⠏', '⠛', '⠹', '⢸', '⣰', '⣤', '⣆', '⡇']);
         $this->sections['progressIndicator']->start('Processing...');
@@ -99,7 +101,6 @@ class ExecuteSuite extends Command
     {
         $this->sections['title']->write('');
         $this->sections['title']->write(sprintf('<fg=bright-cyan>%s</>' . PHP_EOL, '𝗣𝗿𝗲𝘀𝘁𝗮𝗙𝗹𝗼𝘄 | v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION));
-        //$this->sections['title']->write('');
     }
 
     public function execute(InputInterface $input, OutputInterface $output): int
@@ -107,12 +108,11 @@ class ExecuteSuite extends Command
         $this->cli = true;
         $this->output = $output;
 
+        $this->defineOutputMode($input);
+
         $this->initSections($output);
-        $this->outputTitle();
 
         $start_time = hrtime(true);
-
-        $this->defineOutputMode($input);
 
         $this->draftMode = $input->getOption('draft') ?? null;
 
@@ -154,14 +154,19 @@ class ExecuteSuite extends Command
 
             $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits) - 1]);
 
-            $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
-            if (!isset($this->outputSections[$sectionId])) {
-                $this->outputSections[$sectionId] = $this->output->section();
-            }
-
             try {
                 $suite = new $className();
                 if ($this->isExecutable($suite)) {
+                    // Create a new section
+                    $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
+                    if (!array_key_exists($sectionId, $this->outputSections)) {
+                        if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+                            $this->outputSections[$sectionId] = $this->output->section();
+                        } else {
+                            $this->outputSections[$sectionId] = [];
+                        }
+                    }
+                    // -End
 
                     $this->outputNewLine(section: $sectionId);
 
@@ -171,7 +176,13 @@ class ExecuteSuite extends Command
                         $this->debug('Locale: ' . $suite->getLocale(), section: $sectionId);
                     }
 
-                    $suite->run(cli: true, output: $this->output, mode: $this->outputMode);
+                    $this->outputSections[$sectionId] = $suite->run(
+                        cli: true,
+                        output: $this->output,
+                        mode: $this->outputMode,
+                        section: $sectionId,
+                        sectionOutput: $this->outputSections[$sectionId]
+                    );
 
                     foreach ($suite->warnings as $warning) {
                         if (!empty($warning)) {
@@ -199,11 +210,15 @@ class ExecuteSuite extends Command
         $time = round(($end_time - $start_time) / 1e+6);
 
         if ($this->debugModeDetected || 1) {
-            $this->cli(baseLine: '', bold: true, titleColor: 'yellow', title: 'WARNING', secondaryColor: 'white', message: 'debug-mode', newLine: true, section: 'end');
+            $this->cli(baseLine: '', bold: true, titleColor: 'yellow', title: 'WARNING', secondaryColor: 'white', message: 'debug-mode', newLine: true, section: 'warnings');
         }
 
         $message = sprintf('%ss', $this->formatSeconds($time));
-        $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'end');
+        $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
+
+        if (self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->output->writeLn(json_encode($this->outputSections, JSON_PRETTY_PRINT));
+        }
 
         return Command::SUCCESS;
     }

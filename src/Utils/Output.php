@@ -26,7 +26,7 @@ trait Output
      * @var OutputInterface
      */
     protected $output;
-    protected $outputSections = [];
+    public $outputSections = [];
     protected $outputMode = 'full';
 
     protected function getOutputMode(): string
@@ -37,20 +37,31 @@ trait Output
     public function cli(string $baseLine = '  ', bool $bold = true, bool $newLine = false, string $titleColor = '', string $title = '', string $secondaryColor = 'white', string $message = '', string $section = 'default')
     {
         if ($this->cli) {
-            if (!isset($this->outputSections[$section])) {
-                $this->outputSections[$section] = $this->output->section();
-            }
+            if ($this->getOutputMode() !== self::OUTPUT_JSON) {
+                if (!array_key_exists($section, $this->outputSections)) {
+                    $this->outputSections[$section] = $this->output->section();
+                }
 
-            if ($newLine) {
-                $this->outputSections[$section]->writeln('');
-            }
+                if ($newLine) {
+                    $this->outputSections[$section]->writeln('');
+                }
 
-            if ($bold) {
-                $titleColor .= ';options=bold';
-            }
+                if ($bold) {
+                    $titleColor .= ';options=bold';
+                }
 
-            $message = sprintf($baseLine . '<fg=%s>%s</> <fg=%s>%s</>', $titleColor, $title, $secondaryColor, $this->getHumanString($message));
-            $this->outputSections[$section]->writeln($message);
+                $message = sprintf($baseLine . '<fg=%s>%s</> <fg=%s>%s</>', $titleColor, $title, $secondaryColor, $this->getHumanString($message));
+                $this->outputSections[$section]->writeln($message);
+            } else {
+                if (!array_key_exists($section, $this->outputSections)) {
+                    $this->outputSections[$section] = [];
+                }
+
+                $this->outputSections[$section][] = [
+                    'title' => $title,
+                    'message' => $this->getHumanString($message),
+                ];
+            }
         }
     }
 
@@ -104,7 +115,7 @@ trait Output
 
     public function outputText(string $baseLine = '', string $state = 'default', string $title = '', string $message = '', string $secondaryColor = 'white', string $section = 'default')
     {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
+        if (in_array($this->getOutputMode(), [self::OUTPUT_FULL, self::OUTPUT_JSON])) {
             $this->cli(
                 bold: false,
                 title: $title,
@@ -115,7 +126,6 @@ trait Output
                 newLine: false,
                 section: $section
             );
-
         } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
             $this->cli(
                 bold: false,
@@ -123,15 +133,6 @@ trait Output
                 titleColor: $this->getColor($state),
                 baseLine: $baseLine,
                 section: $section
-            );
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln(
-                json_encode(
-                    [
-                        'title' => $title,
-                        'message' => $message,
-                    ]
-                )
             );
         }
     }
@@ -309,14 +310,10 @@ trait Output
         } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
             $this->outputSections[$section]->writeln('<fg=red;options=bold>ERROR</>');
         } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln(
-                json_encode(
-                    [
-                        'hasError' => true,
-                        'error' => $message,
-                    ]
-                )
-            );
+            $this->outputSections[$section][] = [
+                'hasError' => true,
+                'error' => $message,
+            ];
         }
     }
 
@@ -327,14 +324,10 @@ trait Output
         } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
             $this->outputSections[$section]->writeln('<fg=green;options=bold>SUCCESS</>');
         } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln(
-                json_encode(
-                    [
-                        'hasError' => false,
-                        'message' => $message,
-                    ]
-                )
-            );
+            $this->outputSections[$section][] = [
+                'hasError' => false,
+                'error' => $message,
+            ];
         }
     }
 

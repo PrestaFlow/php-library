@@ -390,11 +390,15 @@ class TestsSuite
         return $this->globals;
     }
 
-    public function run($cli = false, OutputInterface $output = null, string $mode = 'full')
+    public function run($cli = false, OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
     {
         $this->cli = $cli;
         $this->output = $output;
         $this->outputMode = $mode;
+
+        if (!empty($section) && $sectionOutput !== null) {
+            $this->outputSections[$section] = $sectionOutput;
+        }
 
         if (!$this->init) {
             $this->init();
@@ -405,8 +409,12 @@ class TestsSuite
         $className = str_replace('\\', '/', $this->_runestSuite);
 
         $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->_runestSuite));
-        if (!isset($this->outputSections[$sectionId])) {
-            $this->outputSections[$sectionId] = $output->section();
+        if (!array_key_exists($sectionId, $this->outputSections)) {
+            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+                $this->outputSections[$sectionId] = $output->section();
+            } else {
+                $this->outputSections[$sectionId] = [];
+            }
         }
 
         if (is_array($this->suites[$this->_runestSuite]['tests'])) {
@@ -486,15 +494,20 @@ class TestsSuite
                 $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $this->stats['todos']);
             }
 
-            $this->outputSections[$sectionId]->writeln('');
-            $this->outputSections[$sectionId]->writeln([
-                    sprintf(
-                        '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
-                        implode('<fg=gray>,</> ', $tests),
-                    (int) $this->stats['assertions']
-                ),
-            ]);
-            $this->outputSections[$sectionId]->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($this->stats['time'])));
+            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+                $this->outputSections[$sectionId]->writeln('');
+                $this->outputSections[$sectionId]->writeln([
+                        sprintf(
+                            '  <fg=gray>Tests:</>    <fg=default>%s</><fg=gray> (%s assertions)</>',
+                            implode('<fg=gray>,</> ', $tests),
+                        (int) $this->stats['assertions']
+                    ),
+                ]);
+                $this->outputSections[$sectionId]->writeln(sprintf('  <fg=gray>Duration:</> <fg=white>%ss</>', $this->formatSeconds($this->stats['time'])));
+            } else {
+                $this->outputSections[$sectionId]['stats'] = $this->stats;
+                $this->outputSections[$sectionId]['duration'] = $this->formatSeconds($this->stats['time']).'s';
+            }
         }
 
         $this->suites[$this->_runestSuite]['stats'] = $this->stats;
@@ -509,6 +522,10 @@ class TestsSuite
         ];
 
         $this->after();
+
+        if (!empty($section)) {
+            return $this->outputSections[$section];
+        }
     }
 
     public function attachWarning(&$test)
