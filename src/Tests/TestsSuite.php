@@ -59,6 +59,8 @@ class TestsSuite
     protected static $lines = [];
 
     protected $draft = false;
+    protected $groups = 'all';
+
     public function __construct()
     {
         $this->loadGlobals();
@@ -172,6 +174,11 @@ class TestsSuite
     public function isDraft() : bool
     {
         return (bool) $this->draft;
+    }
+
+    public function getGroups() : string|array
+    {
+        return $this->groups;
     }
 
     public static function getSocketFilePath()

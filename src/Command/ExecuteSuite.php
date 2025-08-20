@@ -33,6 +33,7 @@ class ExecuteSuite extends Command
     protected $debugModeDetected = null;
 
     protected $draftMode = null;
+    protected $groups = ['all'];
     protected $debugMode = false;
 
     use Output;
@@ -43,7 +44,15 @@ class ExecuteSuite extends Command
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
-            ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests');
+            ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
+            ->addOption(
+                'group',
+                'g',
+                InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY,
+                'Execute tests on specific group ?',
+                ['all']
+            )
+        ;
     }
 
     protected function defineOutputMode(InputInterface $input)
@@ -90,7 +99,7 @@ class ExecuteSuite extends Command
     protected function outputTitle()
     {
         $this->sections['title']->write('');
-        $this->sections['title']->write(sprintf('<fg=bright-cyan>%s</>'.PHP_EOL, '𝗣𝗿𝗲𝘀𝘁𝗮𝗙𝗹𝗼𝘄 | v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION));
+        $this->sections['title']->write(sprintf('<fg=bright-cyan>%s</>' . PHP_EOL, '𝗣𝗿𝗲𝘀𝘁𝗮𝗙𝗹𝗼𝘄 | v' . \PrestaFlow\Library\Traits\AppVersion::APP_VERSION));
         //$this->sections['title']->write('');
     }
 
@@ -107,6 +116,8 @@ class ExecuteSuite extends Command
         $this->defineOutputMode($input);
 
         $this->draftMode = $input->getOption('draft') ?? null;
+
+        $this->groups = $input->getOption('group') ?? ['all'];
 
         $folderPath = ucfirst($input->getArgument('folder'));
 
@@ -142,7 +153,7 @@ class ExecuteSuite extends Command
 
             $pathSplits = explode('/', $suitePath);
 
-            $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits)-1]);
+            $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits) - 1]);
 
             $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
             if (!isset($this->outputSections[$sectionId])) {
@@ -201,27 +212,43 @@ class ExecuteSuite extends Command
     protected function isExecutable($suite)
     {
         // Check if the suite is an instance of TestsSuite
-        if (!is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
-            && get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite') {
-                return false;
+        if (
+            !is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
+            && get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite'
+        ) {
+            return false;
         }
 
-        // Draft
+        // Drafts
+        $matchDraft = false;
         if ($this->draftMode !== null) {
-            if ($this->draftMode && !$suite->isDraft()) {
-                if ($this->isDebugMode()) {
-                    $this->debug(get_class($suite), baseLine: '  ');
+            if ($this->draftMode && $suite->isDraft()) {
+                $matchDraft = true;
+            } elseif (!$this->draftMode && !$suite->isDraft()) {
+                $matchDraft = true;
+            }
+        } else {
+            $matchDraft = true;
+        }
+
+        // Groups
+        $matchGroups = true;
+        if (count($this->groups)) {
+            $matchGroups = false;
+            if (is_array($suite->getGroups())) {
+                foreach ($suite->getGroups() as $group) {
+                    if (in_array($group, $this->groups)) {
+                        $matchGroups = true;
+                    }
                 }
-                return false;
-            } elseif (!$this->draftMode && $suite->isDraft()) {
-                if ($this->isDebugMode()) {
-                    $this->debug(get_class($suite), baseLine: '  ');
+            } else {
+                if (in_array($suite->getGroups(), $this->groups)) {
+                    $matchGroups = true;
                 }
-                return false;
             }
         }
 
-        return true;
+        return $matchDraft && $matchGroups;
     }
 
     public function getTestsSuites($folderPath)
@@ -231,12 +258,12 @@ class ExecuteSuite extends Command
         if (is_array($folderFiles)) {
             foreach ($folderFiles as $folderFile) {
                 if ($folderFile != '.' && $folderFile != '..') {
-                    if (is_dir($folderPath.'/'.$folderFile)) {
-                        foreach ($this->getTestsSuites($folderPath.'/'.$folderFile) as $childFolderFile) {
+                    if (is_dir($folderPath . '/' . $folderFile)) {
+                        foreach ($this->getTestsSuites($folderPath . '/' . $folderFile) as $childFolderFile) {
                             $testSuites[] = $childFolderFile;
                         }
                     } else {
-                        $testSuites[] = $folderPath.'/'.$folderFile;
+                        $testSuites[] = $folderPath . '/' . $folderFile;
                     }
                 }
             }
