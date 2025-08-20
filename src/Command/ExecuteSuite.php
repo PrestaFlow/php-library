@@ -247,17 +247,19 @@ class ExecuteSuite extends Command
 
         // Groups
         $matchGroups = true;
-        if (count($this->groups)) {
-            $matchGroups = false;
-            if (is_array($suite->getGroups())) {
-                foreach ($suite->getGroups() as $group) {
-                    if (in_array($group, $this->groups)) {
+        if (!in_array('all', $this->groups)) {
+            if (count($this->groups)) {
+                $matchGroups = false;
+                if (is_array($suite->getGroups())) {
+                    foreach ($suite->getGroups() as $group) {
+                        if (in_array($group, $this->groups)) {
+                            $matchGroups = true;
+                        }
+                    }
+                } else {
+                    if (in_array($suite->getGroups(), $this->groups)) {
                         $matchGroups = true;
                     }
-                }
-            } else {
-                if (in_array($suite->getGroups(), $this->groups)) {
-                    $matchGroups = true;
                 }
             }
         }
