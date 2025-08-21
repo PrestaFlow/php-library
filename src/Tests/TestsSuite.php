@@ -260,7 +260,7 @@ class TestsSuite
             }
         }
 
-        TestsSuite::getBrowser($headless);
+        TestsSuite::getBrowser(headless: $headless, force: true);
 
         try {
             $cookies = TestsSuite::getPage()?->getCookies();
