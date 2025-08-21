@@ -121,17 +121,18 @@ class ExecuteSuite extends Command
         $folderPath = ucfirst($input->getArgument('folder'));
 
         if (!is_dir($folderPath) || !is_dir($folderPath)) {
-            $this->outputNewLine();
-            $this->debug($folderPath);
-            $this->error('The suites folder doesn\'t seem to exist');
-            return Command::FAILURE;
+            $this->sections['progressIndicator']->finish('Finished');
+            $this->sections['progressBar']->clear();
+            throw new Error(sprintf('The suites folder [%s] doesn\'t seem to exist', $folderPath));
         }
 
         $testSuites = $this->getTestsSuites($folderPath);
 
         if (!count($testSuites)) {
-            $this->outputNewLine();
-            $this->success('Tests folder is empty');
+            $this->sections['progressIndicator']->finish('Finished');
+            $this->sections['progressBar']->clear();
+
+            $this->success('Tests folder is empty', newLine: true);
             return Command::SUCCESS;
         };
 
@@ -198,8 +199,7 @@ class ExecuteSuite extends Command
                     }
                 }
             } catch (Error $e) {
-                $this->error($e->getMessage());
-                $this->error('In ' . $e->getFile() . ' line ' . $e->getLine());
+                throw $e;
             }
         }
 
