@@ -209,7 +209,7 @@ class ExecuteSuite extends Command
         $end_time = hrtime(true);
         $time = round(($end_time - $start_time) / 1e+6);
 
-        if ($this->debugModeDetected || 1) {
+        if ($this->debugModeDetected) {
             $this->cli(baseLine: '', bold: true, titleColor: 'yellow', title: 'WARNING', secondaryColor: 'white', message: 'debug-mode', newLine: true, section: 'warnings');
         }
 
