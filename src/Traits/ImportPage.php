@@ -6,7 +6,7 @@ trait ImportPage
 {
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null, $domain = '\\PrestaFlow\\Library')
     {
-        $pageClass = $domain.'\\Pages\\v'.$this->getMajorVersion().'\\'.$pageName.'\\Page';
+        $pageClass = $domain.'\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\'.$pageName.'\\Page';
 
         if ($globals === null || !is_array($globals)) {
             $globals = $this->globals;

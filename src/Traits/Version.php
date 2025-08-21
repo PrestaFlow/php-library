@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Traits;
 trait Version
 {
     const SUPPORTED_VERSIONS = [
+        '1.7',
         '8',
         '9'
     ];
@@ -59,9 +60,13 @@ trait Version
         self::$versions['majorVersion']  = $majorVersion;
     }
 
-    public function getMajorVersion()
+    public function getMajorVersion(bool $namespace = false)
     {
         if (!empty(self::$versions['majorVersion'])) {
+            if ($namespace && str_starts_with(self::$versions['majorVersion'], 1.7)) {
+                return substr(self::$versions['majorVersion'], strlen('1.'));
+            }
+
             return self::$versions['majorVersion'];
         }
 
@@ -74,9 +79,19 @@ trait Version
                 return '8';
             } else if (version_compare($this->globals['PS_VERSION'], '1.7.0', '>=')) {
                 $this->setMajorVersion('1.7');
+
+                if ($namespace) {
+                    return '7';
+                }
+
                 return '1.7';
             } else if (version_compare($this->globals['PS_VERSION'], '1.6.0', '>=')) {
                 $this->setMajorVersion('1.6');
+
+                if ($namespace) {
+                    return '6';
+                }
+
                 return '1.6';
             }
         }
