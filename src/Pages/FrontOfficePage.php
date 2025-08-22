@@ -9,16 +9,19 @@ use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Traits\Locale;
 use SapientPro\ImageComparator\ImageComparator;
 
 class FrontOfficePage extends CommonPage
 {
     use Translations;
     use Urls;
+    use Locale;
 
     public function __construct(string $locale, string $patchVersion, array $globals)
     {
         $this->globals = $globals;
+        $this->initLocale(locale: $locale);
 
         $selectors = [
             'pageTitle' => 'h1',

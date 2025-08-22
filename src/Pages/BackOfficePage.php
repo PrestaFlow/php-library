@@ -3,12 +3,16 @@
 namespace PrestaFlow\Library\Pages;
 
 use PrestaFlow\Library\Pages\CommonPage;
+use PrestaFlow\Library\Traits\Locale;
 
 class BackOfficePage extends CommonPage
 {
+    use Locale;
+
     public function __construct(string $locale, string $patchVersion, array $globals)
     {
         $this->globals = $globals;
+        $this->initLocale(locale: $locale);
 
         $selectors = [
         ];
