@@ -33,7 +33,39 @@ class FrontOfficePage extends CommonPage
             $pageSelectors = $this->defineSelectors();
         }
 
-        $this->selectors = [...$selectors, ...$pageSelectors];
+        $baseSelectors = [...$selectors, ...$pageSelectors];
+
+        $customPath = __DIR__.'/../../../../../Tests/Selectors/';
+
+        $fileName = $this->getLocale().'.json';
+
+        $customSelectors = [];
+        $pathToCatalog = $customPath.$fileName;
+        if (file_exists($pathToCatalog)) {
+            $customSelectors = json_decode(file_get_contents($pathToCatalog), true);
+
+            if (count($customSelectors)) {
+                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+                $pageNames = explode('\\', $pageName);
+
+                foreach ($pageNames as $pageName) {
+                    if ($pageName !== 'Page') {
+                        if (isset($customSelectors[$pageName])) {
+                            $customSelectors = $customSelectors[$pageName];
+                        } else {
+                            $customSelectors = [];
+                        }
+                    }
+                }
+            }
+        }
+
+        $mergedSelectors = [
+            ...$baseSelectors,
+            ...$customSelectors,
+        ];
+
+        $this->selectors = $mergedSelectors;
 
         $messages = [];
 
@@ -42,7 +74,38 @@ class FrontOfficePage extends CommonPage
             $pageMessages = $this->defineMessages();
         }
 
-        $this->messages = [...$messages, ...$pageMessages];
+        $baseMessages = [...$messages, ...$pageMessages];
+
+        $customPath = __DIR__.'/../../../../../Tests/Messages/';
+        $fileName = $this->getLocale().'.json';
+
+        $customMessages = [];
+        $pathToCatalog = $customPath.$fileName;
+        if (file_exists($pathToCatalog)) {
+            $customMessages = json_decode(file_get_contents($pathToCatalog), true);
+
+            if (count($customMessages)) {
+                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+                $pageNames = explode('\\', $pageName);
+
+                foreach ($pageNames as $pageName) {
+                    if ($pageName !== 'Page') {
+                        if (isset($customMessages[$pageName])) {
+                            $customMessages = $customMessages[$pageName];
+                        } else {
+                            $customMessages = [];
+                        }
+                    }
+                }
+            }
+        }
+
+        $mergedMessages = [
+            ...$baseMessages,
+            ...$customMessages,
+        ];
+
+        $this->messages = $mergedMessages;
 
         parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals);
     }
