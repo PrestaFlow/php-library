@@ -51,7 +51,7 @@ class BackOfficePage extends CommonPage
 
         if (is_string($page)) {
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '') {
+            if ($pageUrl !== '' && $pageUrl !== null) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {
@@ -61,7 +61,7 @@ class BackOfficePage extends CommonPage
             }
         } else if (is_object($page)) {
             $pageUrl = $this->url($page->url);
-            if ($pageUrl !== '') {
+            if ($pageUrl !== '' && $pageUrl !== null) {
                 $url .= $pageUrl;
             } else {
                 $url .= $page->url;

@@ -6,14 +6,20 @@ use PrestaFlow\Library\Pages\v8\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
 {
+    public string $url = '{index}-product.html';
+
     public function defineSelectors()
     {
-        return [
+        $selectors = parent::defineSelectors();
+
+        $pageSelectors = [
             'quantityWantedInput' => '#quantity_wanted',
             'currentProductPrice' => '.product-price',
             'addToCartButton' => '.add-to-cart',
             'modalTitle' => '#myModalLabel',
         ];
+
+        return [...$selectors, ...$pageSelectors];
     }
 
     public function defineMessages()
@@ -21,6 +27,13 @@ class Page extends BasePage
         return [
             'addedToCart' => $this->translate('Product successfully added to your shopping cart'),
         ];
+    }
+
+    public function goToProduct(int $productId = 0)
+    {
+        $this->goToPage('product', $productId);
+
+        $this->waitForNavigation();
     }
 
     public function getPrice()

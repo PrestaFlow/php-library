@@ -3,7 +3,6 @@
 namespace PrestaFlow\Library\Resolvers;
 
 use PrestaFlow\Library\Traits\Locale;
-use PrestaFlow\Library\Traits\Version;
 
 trait Urls
 {
@@ -26,7 +25,7 @@ trait Urls
             return $this->urls[$page];
         }
 
-        return $page;
+        return null;
     }
 
     public function getUrls()

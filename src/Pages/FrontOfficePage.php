@@ -82,7 +82,7 @@ class FrontOfficePage extends CommonPage
         }
         if (is_string($page)) {
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '') {
+            if ($pageUrl !== '' && $pageUrl !== null) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {
@@ -90,12 +90,13 @@ class FrontOfficePage extends CommonPage
                     'login', 'authentification' => 'login',
                     'prices-drop' => 'prices-drop',
                     'category' => '{index}-category',
+                    'product' => '{index}-product.html',
                     default => ''
                 };
             }
         } else if (is_object($page)) {
             $pageUrl = $this->url($page->url);
-            if ($pageUrl !== '') {
+            if ($pageUrl !== '' && $pageUrl !== null) {
                 $url .= $pageUrl;
             } else {
                 $url .= $page->url;
