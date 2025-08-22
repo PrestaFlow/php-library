@@ -188,7 +188,7 @@ class CommonPage
             if ($value === null) {
                 return '';
             }
-            return trim($value);
+            return trim(str_replace(['&nbsp;'], '', $value));
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }
@@ -205,7 +205,7 @@ class CommonPage
             if ($value === null) {
                 return '';
             }
-            return trim($value);
+            return trim(str_replace(['&nbsp;'], '', $value));
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }
