@@ -428,7 +428,7 @@ class TestsSuite
 
         $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->_runestSuite));
         if (!array_key_exists($sectionId, $this->outputSections)) {
-            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+            if (self::OUTPUT_JSON !== $this->getOutputMode() && $this->cli) {
                 $this->outputSections[$sectionId] = $output->section();
             } else {
                 $this->outputSections[$sectionId] = [];
@@ -526,7 +526,7 @@ class TestsSuite
                 $tests[] = sprintf('<fg=blue;options=bold>%d todos</>', $this->stats['todos']);
             }
 
-            if (self::OUTPUT_JSON !== $this->getOutputMode()) {
+            if (self::OUTPUT_JSON !== $this->getOutputMode() && $this->cli) {
                 $this->outputSections[$sectionId]->writeln('');
                 $this->outputSections[$sectionId]->writeln([
                         sprintf(
