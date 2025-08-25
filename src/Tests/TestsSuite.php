@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Tests;
 
+use Closure;
 use Dotenv\Dotenv;
 use Error;
 use Exception;
@@ -53,6 +54,9 @@ class TestsSuite
     public $globals = [];
     public $pages = [];
 
+    protected $dataset = [];
+    protected $datasets = [];
+
     protected $scenarioName = '';
     protected $scenarioParams = [];
 
@@ -75,7 +79,7 @@ class TestsSuite
 
     public function getParam($paramName)
     {
-        return $this->scenarioParams[$this->scenarioName][$paramName] ?? null;
+        return $this->scenarioParams[$this->scenarioName][$paramName] ?? $this->dataset[$paramName] ?? null;
     }
 
     public function describe(string $description)
@@ -83,6 +87,7 @@ class TestsSuite
         $this->suites[$this->getSuite()] = [
             'suite' => '',
             'title' => $description,
+            'datasets' => $datasets,
             'tests' => [],
             'stats' => [
                 'passes' => 0,
@@ -98,9 +103,22 @@ class TestsSuite
         return $this;
     }
 
-    public function getDescribe()
+    public function getDescribe() : string
     {
         return $this->suites[$this->getSuite()]['title'];
+    }
+
+    public function with(array $datasets = [])
+    {
+        $this->datasets = $datasets;
+        $this->suites[$this->getSuite()]['datasets'] = $datasets;
+
+        return $this;
+    }
+
+    public function getDatasets() : array
+    {
+        return $this->datasets;
     }
 
     public function scenario($class, array $params = [])
@@ -112,17 +130,18 @@ class TestsSuite
         return $this;
     }
 
-    public function it(string $description, $steps)
+    public function it(string $description, Closure $steps)
     {
         $this->suites[$this->getSuite()]['tests'][] = [
             'title' => $description,
-            'steps' => $steps
+            'steps' => $steps,
+            'datasets' => $this->datasets,
         ];
 
         return $this;
     }
 
-    public function skip(string $description, $steps)
+    public function skip(string $description, Closure $steps)
     {
         $this->suites[$this->getSuite()]['tests'][] = [
             'title' => $description,
@@ -133,7 +152,7 @@ class TestsSuite
         return $this;
     }
 
-    public function todo(string $description, $steps)
+    public function todo(string $description, Closure $steps)
     {
         $this->suites[$this->getSuite()]['tests'][] = [
             'title' => $description,
@@ -420,57 +439,71 @@ class TestsSuite
         if (is_array($this->suites[$this->_runestSuite]['tests'])) {
             $this->info($suite['title'], newLine: true, section: $sectionId);
             $this->cli(title: 'Suite:', bold: false, titleColor: 'gray', secondaryColor: 'white', message: $className, section: $sectionId);
-            foreach ($suite['tests'] as &$test) {
-                try {
-                    $start_time = hrtime(true);
 
-                    $this->getInstructions($test);
 
-                    if ($this->isSkippable($test) === true) {
-                        $test['state'] = 'skip';
-                        $this->stats['skips']++;
-                    } else if ($this->isSkippableCauseFailed($test) === true) {
-                        $test['state'] = 'skipped';
-                        $this->stats['skippeds']++;
-                    } else if ($this->isTodoable($test) === true) {
-                        $test['state'] = 'todo';
-                        $this->stats['todos']++;
-                    } else {
-                        $this->scenarioName = null;
+            // Get DataSets
+            $datasets = $this->getDatasets();
+            if (count($datasets) === 0) {
+                // Trick to get at least one execution of tests
+                $datasets[] = [];
+            }
 
-                        $reflection = new \ReflectionFunction($test['steps']);
-                        $this->scenarioName = $reflection->getClosureCalledClass()->name;
+            foreach ($datasets as $dataset) {
+                foreach ($suite['tests'] as &$test) {
+                    try {
+                        $start_time = hrtime(true);
 
-                        $test['steps']->call($this);
-                        $this->stats['assertions'] += Expect::getNbAssertions();
+                        $test['datasets'] = $dataset;
+                        $this->dataset = $dataset;
 
+                        $this->getInstructions($test);
+
+                        if ($this->isSkippable($test) === true) {
+                            $test['state'] = 'skip';
+                            $this->stats['skips']++;
+                        } else if ($this->isSkippableCauseFailed($test) === true) {
+                            $test['state'] = 'skipped';
+                            $this->stats['skippeds']++;
+                        } else if ($this->isTodoable($test) === true) {
+                            $test['state'] = 'todo';
+                            $this->stats['todos']++;
+                        } else {
+                            $this->scenarioName = null;
+
+                            $reflection = new \ReflectionFunction($test['steps']);
+                            $this->scenarioName = $reflection->getClosureCalledClass()->name;
+
+                            $test['steps']->call($this);
+                            $this->stats['assertions'] += Expect::getNbAssertions();
+
+                            $this->attachWarning($test);
+
+                            $test['state'] = 'pass';
+                            $this->stats['passes']++;
+                        }
+                    } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
+                        $test['state'] = 'fail';
+                        Expect::$expectMessage['fail'] = [$e->getMessage()];
                         $this->attachWarning($test);
+                        $this->attachScreen($test);
+                        $this->stats['assertions'] += Expect::getNbAssertions();
+                        $this->stats['failures']++;
+                        $this->failed = true;
+                    } finally {
+                        $test['expect'] = Expect::getExpectMessage();
+                        Expect::getNbAssertions();
+                        $end_time = hrtime(true);
+                        $test['time'] = round(($end_time - $start_time) / 1e+6);
 
-                        $test['state'] = 'pass';
-                        $this->stats['passes']++;
+                        match ($test['state']) {
+                            'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
+                            'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
+                            'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
+                            'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
+                            'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
+                            default => $this->info(test: $test, section: $sectionId, newLine: true)
+                        };
                     }
-                } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
-                    $test['state'] = 'fail';
-                    Expect::$expectMessage['fail'] = [$e->getMessage()];
-                    $this->attachWarning($test);
-                    $this->attachScreen($test);
-                    $this->stats['assertions'] += Expect::getNbAssertions();
-                    $this->stats['failures']++;
-                    $this->failed = true;
-                } finally {
-                    $test['expect'] = Expect::getExpectMessage();
-                    Expect::getNbAssertions();
-                    $end_time = hrtime(true);
-                    $test['time'] = round(($end_time - $start_time) / 1e+6);
-
-                    match ($test['state']) {
-                        'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
-                        'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
-                        'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
-                        'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
-                        'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
-                        default => $this->info(test: $test, section: $sectionId, newLine: true)
-                    };
                 }
             }
 
