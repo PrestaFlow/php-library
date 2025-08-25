@@ -87,7 +87,6 @@ class TestsSuite
         $this->suites[$this->getSuite()] = [
             'suite' => '',
             'title' => $description,
-            'datasets' => $datasets,
             'tests' => [],
             'stats' => [
                 'passes' => 0,
