@@ -72,7 +72,7 @@ trait Output
         }
     }
 
-    public function expects($test, string $section = 'default')
+    public function expects($test, string $section = 'default', bool $force = false)
     {
         $baseLine = str_repeat('  ', 3);
 
@@ -81,12 +81,12 @@ trait Output
                 foreach ($expectMessages as $expectMessage) {
                     if (is_string($expectMessage) && !str_contains($expectMessage, '[Debug] This page has moved')) {
                         match ($state) {
-                            self::PASS => $this->outputText(baseLine: $baseLine, state: self::PASS, title: self::makeIcon(self::PASS), message: $expectMessage, secondaryColor: 'gray', section: $section),
-                            self::FAIL => $this->outputText(baseLine: $baseLine, state: self::FAIL, title: self::makeIcon(self::FAIL), message: $expectMessage, secondaryColor: 'gray', section: $section),
-                            self::SKIP => $this->outputText(baseLine: $baseLine, state: self::SKIP, title: self::makeIcon(self::SKIP), message: $expectMessage, secondaryColor: 'gray', section: $section),
-                            self::SKIPPED => $this->outputText(baseLine: $baseLine, state: self::SKIPPED, title: self::makeIcon(self::SKIPPED), message: $expectMessage, secondaryColor: 'gray', section: $section),
-                            self::TODO => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section),
-                            default => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section)
+                            self::PASS => $this->outputText(baseLine: $baseLine, state: self::PASS, title: self::makeIcon(self::PASS), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force),
+                            self::FAIL => $this->outputText(baseLine: $baseLine, state: self::FAIL, title: self::makeIcon(self::FAIL), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force),
+                            self::SKIP => $this->outputText(baseLine: $baseLine, state: self::SKIP, title: self::makeIcon(self::SKIP), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force),
+                            self::SKIPPED => $this->outputText(baseLine: $baseLine, state: self::SKIPPED, title: self::makeIcon(self::SKIPPED), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force),
+                            self::TODO => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force),
+                            default => $this->outputText(baseLine: $baseLine, state: self::TODO, title: self::makeIcon(self::TODO), message: $expectMessage, secondaryColor: 'gray', section: $section, force: $force)
                         };
                     }
                 }
@@ -113,9 +113,9 @@ trait Output
         }
     }
 
-    public function outputText(string $baseLine = '', string $state = 'default', string $title = '', string $message = '', string $secondaryColor = 'white', string $section = 'default')
+    public function outputText(string $baseLine = '', string $state = 'default', string $title = '', string $message = '', string $secondaryColor = 'white', string $section = 'default', bool $force = false)
     {
-        if (in_array($this->getOutputMode(), [self::OUTPUT_FULL, self::OUTPUT_JSON])) {
+        if (in_array($this->getOutputMode(), [self::OUTPUT_FULL, self::OUTPUT_JSON]) || $force) {
             $this->cli(
                 bold: false,
                 title: $title,
@@ -187,7 +187,7 @@ trait Output
             section: $section
         );
 
-        if ($this->isVerboseMode()) {
+        if ($this->isVerboseMode() && self::OUTPUT_COMPACT !== $this->getOutputMode()) {
             $this->expects($test, section: $section);
         }
     }
@@ -231,7 +231,7 @@ trait Output
             section: $section
         );
 
-        $this->expects($test, section: $section);
+        $this->expects($test, section: $section, force: true);
     }
 
     public function skipped($test, string $baseLine = '    ', bool $newLine = false, string $section = 'default')
@@ -252,7 +252,7 @@ trait Output
             section: $section
         );
 
-        if ($this->isVerboseMode()) {
+        if ($this->isVerboseMode() && self::OUTPUT_COMPACT !== $this->getOutputMode()) {
             $this->expects($test, section: $section);
         }
     }
@@ -275,7 +275,7 @@ trait Output
             section: $section
         );
 
-        if ($this->isVerboseMode()) {
+        if ($this->isVerboseMode() && self::OUTPUT_COMPACT !== $this->getOutputMode()) {
             $this->expects($test, section: $section);
         }
     }
@@ -298,7 +298,7 @@ trait Output
             section: $section
         );
 
-        if ($this->isVerboseMode()) {
+        if ($this->isVerboseMode() && self::OUTPUT_COMPACT !== $this->getOutputMode()) {
             $this->expects($test, section: $section);
         }
     }
