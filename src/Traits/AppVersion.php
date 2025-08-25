@@ -4,5 +4,5 @@ namespace PrestaFlow\Library\Traits;
 
 class AppVersion
 {
-    const APP_VERSION = '1.1.2';
+    const APP_VERSION = '1.2.0';
 }

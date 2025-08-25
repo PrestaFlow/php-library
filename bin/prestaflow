@@ -35,6 +35,11 @@ $dispatcher->addListener(ConsoleEvents::ERROR, function (ConsoleErrorEvent $even
     $io->newLine();
 
     $io->writeln(sprintf('<fg=red;options=bold>ERROR</> <fg=white>%s</>', $error->getMessage()));
+    $io->writeln(sprintf('<fg=gray;options=bold>TRACE</> <fg=white>%s</>', $error->getFile() . ':' . $error->getLine()));
+
+    foreach ($error->getTrace() as $trace) {
+        $io->writeln(sprintf('<fg=gray;options=bold>TRACE</> <fg=white>%s</>', $trace['file'] . ':' . $trace['line']));
+    }
 
     // gets the current exit code (the exception code)
     $exitCode = $event->getExitCode();

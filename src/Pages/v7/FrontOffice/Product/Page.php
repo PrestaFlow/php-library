@@ -1,8 +1,8 @@
 <?php
 
-namespace PrestaFlow\Library\Pages\v8\FrontOffice\Product;
+namespace PrestaFlow\Library\Pages\v7\FrontOffice\Product;
 
-use PrestaFlow\Library\Pages\v8\FrontOffice\Page as BasePage;
+use PrestaFlow\Library\Pages\v7\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
 {
@@ -11,6 +11,10 @@ class Page extends BasePage
     public function defineSelectors()
     {
         $selectors = parent::defineSelectors();
+
+        if (!is_array($selectors)) {
+            $selectors = [];
+        }
 
         $pageSelectors = [
             'quantityWantedInput' => '#quantity_wanted',

@@ -7,10 +7,12 @@ use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Traits\Locale;
 
 class CommonPage
 {
     use Translations;
+    use Locale;
 
     protected $globals = [];
     public $selectors = [];
@@ -25,6 +27,7 @@ class CommonPage
     {
         $this->globals = $globals;
         $this->patchVersion = $patchVersion;
+        $this->initLocale(locale: $locale);
 
         /*
         $this->init(
@@ -188,7 +191,7 @@ class CommonPage
             if ($value === null) {
                 return '';
             }
-            return trim($value);
+            return trim(str_replace(['&nbsp;'], '', $value));
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }
@@ -205,7 +208,7 @@ class CommonPage
             if ($value === null) {
                 return '';
             }
-            return trim($value);
+            return trim(str_replace(['&nbsp;'], '', $value));
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }

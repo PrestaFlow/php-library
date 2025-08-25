@@ -303,32 +303,18 @@ trait Output
         }
     }
 
-    protected function error(string $message, string $section = 'default')
+    protected function success(string $message, bool $newLine = false, string $section = 'default')
     {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln('<fg=red;options=bold>ERROR</> <fg=white>' . $message . '</>');
-        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln('<fg=red;options=bold>ERROR</>');
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->outputSections[$section][] = [
-                'hasError' => true,
-                'error' => $message,
-            ];
-        }
-    }
-
-    protected function success(string $message, string $section = 'default')
-    {
-        if (self::OUTPUT_FULL === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln('<fg=green;options=bold>SUCCESS</> <fg=white>' . $message . '</>');
-        } else if (self::OUTPUT_COMPACT === $this->getOutputMode()) {
-            $this->outputSections[$section]->writeln('<fg=green;options=bold>SUCCESS</>');
-        } else if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->outputSections[$section][] = [
-                'hasError' => false,
-                'error' => $message,
-            ];
-        }
+        $this->cli(
+            bold: true,
+            title: 'SUCCESS',
+            titleColor: 'green',
+            secondaryColor: 'white',
+            message: $this->getHumanString($message),
+            baseLine: '',
+            newLine: $newLine,
+            section: $section
+        );
     }
 
     protected function getHumanString(string $message)
