@@ -439,7 +439,6 @@ class TestsSuite
             $this->info($suite['title'], newLine: true, section: $sectionId);
             $this->cli(title: 'Suite:', bold: false, titleColor: 'gray', secondaryColor: 'white', message: $className, section: $sectionId);
 
-
             // Get DataSets
             $datasets = $this->getDatasets();
             if (count($datasets) === 0) {
@@ -448,7 +447,7 @@ class TestsSuite
             }
 
             foreach ($datasets as $dataset) {
-                foreach ($suite['tests'] as &$test) {
+                foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
                     try {
                         $start_time = hrtime(true);
 
