@@ -306,8 +306,7 @@ class TestsSuite
 
     public function getInstructions(&$test)
     {
-        $needToCheck = true;
-        if (!$this->cli || !$needToCheck) {
+        if ($this->cli) {
             return;
         }
 
