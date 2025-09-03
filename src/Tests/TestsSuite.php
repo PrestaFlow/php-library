@@ -184,6 +184,7 @@ class TestsSuite
     public function skipWhenFailed(bool $skipWhenFailed = true)
     {
         $this->skipWhenFailed = $skipWhenFailed;
+        return $this;
     }
 
     public function isTodoable($test)
