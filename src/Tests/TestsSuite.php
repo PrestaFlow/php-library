@@ -85,7 +85,7 @@ class TestsSuite
     public function describe(string $description)
     {
         $this->suites[$this->getSuite()] = [
-            'suite' => '',
+            'suite' => $this->getSuite(),
             'title' => $description,
             'tests' => [],
             'stats' => [
