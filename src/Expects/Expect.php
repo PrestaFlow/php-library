@@ -109,7 +109,7 @@ class Expect extends ExpectLibrary
             $page = TestsSuite::getPage();
             if ($page instanceof HeadlessChromiumPage) {
                 sleep(3);
-                $fileName = 'error_'.$page->getSession()->getTargetId().'.png';
+                $fileName = 'error_'.$page->getSession()->getTargetId().'-'.time().'.png';
                 self::$latestError = $fileName;
                 $screenshot = $page->screenshot();
                 if (function_exists('storage_path')) {
