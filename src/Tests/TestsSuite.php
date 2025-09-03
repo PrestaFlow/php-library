@@ -50,6 +50,7 @@ class TestsSuite
 
     protected $init = false;
     protected $failed = false;
+    protected $skipWhenFailed = true;
 
     public $globals = [];
     public $pages = [];
@@ -173,11 +174,16 @@ class TestsSuite
 
     public function isSkippableCauseFailed($test)
     {
-        if ($this->failed) {
+        if ($this->failed && $this->skipWhenFailed) {
             return true;
         }
 
         return false;
+    }
+
+    public function skipWhenFailed(bool $skipWhenFailed = true)
+    {
+        $this->skipWhenFailed = $skipWhenFailed;
     }
 
     public function isTodoable($test)
