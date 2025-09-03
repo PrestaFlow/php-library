@@ -377,15 +377,21 @@ class Expect extends ExpectLibrary
         return $this;
     }
 
-    public function isTheSameAs($other, ?string $expectedMessage = null)
+    public function isTheSameAs($expected, ?string $expectedMessage = null)
     {
         if ($expectedMessage === null) {
-            $expectedMessage = "";
+            $expectedMessage = "{value} must be the same as {expected}";
         }
 
-        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $other, "value" => $this->getValue()));
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $expected, "value" => $this->getValue()));
 
-        return parent::isTheSameAs($other);
+        $this->isDefined();
+        if ($this->getValue() !== $expected)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $expected, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function samePriceAs($price, ?string $expectedMessage = null)
@@ -394,7 +400,7 @@ class Expect extends ExpectLibrary
             $expectedMessage = "{value} must be the same price as {expected}";
         }
 
-        return $this->contains($price, expectedMessage: $expectedMessage);
+        return $this->isTheSameAs(expected: $price, expectedMessage: $expectedMessage);
     }
 
     public function equals($other, ?string $expectedMessage = null)
