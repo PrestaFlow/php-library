@@ -71,6 +71,11 @@ class CommonPage
         return null;
     }
 
+    public function defineSelectors()
+    {
+        return [];
+    }
+
     public function selector($selector, $replacements = [])
     {
         return $this->getSelector($selector, $replacements);
