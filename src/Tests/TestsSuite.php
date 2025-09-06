@@ -317,6 +317,17 @@ class TestsSuite
 
     public function init()
     {
+        $this->stats = [
+            'passes' => 0,
+            'failures' => 0,
+            'skips' => 0,
+            'skippeds' => 0,
+            'todos' => 0,
+            'assertions' => 0,
+            'time' => 0,
+        ];
+
+        return $this;
     }
 
     public function loadGlobals()
@@ -529,16 +540,6 @@ class TestsSuite
             }
         }
 
-        $this->stats = [
-            'passes' => 0,
-            'failures' => 0,
-            'skips' => 0,
-            'skippeds' => 0,
-            'todos' => 0,
-            'assertions' => 0,
-            'time' => 0,
-        ];
-
         $this->after();
 
         if (!empty($section)) {
@@ -564,6 +565,7 @@ class TestsSuite
             'suite' => $this->suite,
             'title' => $this->title,
             'stats' => $this->stats,
+            'tests' => $this->tests,
             'warnings' => $this->warnings,
             'screens' => $this->screens,
         ];
