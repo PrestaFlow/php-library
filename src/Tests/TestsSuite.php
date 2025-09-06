@@ -29,7 +29,8 @@ class TestsSuite
     use ImportPage;
     use Output;
 
-    public array $suites = [];
+    public string $title = '';
+    public array $tests = [];
     private array $stats = [
         'passes' => 0,
         'failures' => 0,
@@ -73,11 +74,6 @@ class TestsSuite
         $this->before();
     }
 
-    protected function getSuite()
-    {
-        return get_class($this);
-    }
-
     public function getParam($paramName)
     {
         return $this->scenarioParams[$this->scenarioName][$paramName] ?? $this->dataset[$paramName] ?? null;
@@ -85,33 +81,19 @@ class TestsSuite
 
     public function describe(string $description)
     {
-        $this->suites[$this->getSuite()] = [
-            'suite' => $this->getSuite(),
-            'title' => $description,
-            'tests' => [],
-            'stats' => [
-                'passes' => 0,
-                'failures' => 0,
-                'skips' => 0,
-                'skippeds' => 0,
-                'todos' => 0,
-                'assertions' => 0,
-                'time' => 0,
-            ]
-        ];
+        $this->title = $description;
 
         return $this;
     }
 
     public function getDescribe() : string
     {
-        return $this->suites[$this->getSuite()]['title'];
+        return $this->title;
     }
 
     public function with(array $datasets = [])
     {
         $this->datasets = $datasets;
-        $this->suites[$this->getSuite()]['datasets'] = $datasets;
 
         return $this;
     }
@@ -132,7 +114,7 @@ class TestsSuite
 
     public function it(string $description, Closure $steps)
     {
-        $this->suites[$this->getSuite()]['tests'][] = [
+        $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'datasets' => $this->datasets,
@@ -143,7 +125,7 @@ class TestsSuite
 
     public function skip(string $description, Closure $steps)
     {
-        $this->suites[$this->getSuite()]['tests'][] = [
+        $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'skip' => true,
@@ -154,7 +136,7 @@ class TestsSuite
 
     public function todo(string $description, Closure $steps)
     {
-        $this->suites[$this->getSuite()]['tests'][] = [
+        $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'todo' => true,
@@ -271,7 +253,7 @@ class TestsSuite
     public function before($headless = null)
     {
         $this->_runestSuite = get_class($this);
-        $this->suites[$this->_runestSuite]['suite'] = str_replace('\\', '/', $this->_runestSuite);
+        $this->suite = str_replace('\\', '/', $this->_runestSuite);
         $this->start_time = hrtime(true);
 
         if (!$this->isVersionSupported()) {
@@ -308,7 +290,7 @@ class TestsSuite
         TestsSuite::getBrowser(force: false)?->close();
 
         $this->end_time = hrtime(true);
-        $this->suites[$this->_runestSuite]['stats']['time'] = round(($this->end_time - $this->start_time) / 1e+6);
+        $this->stats['time'] = round(($this->end_time - $this->start_time) / 1e+6);
     }
 
     public function getInstructions(&$test)
@@ -430,7 +412,6 @@ class TestsSuite
             $this->init = true;
         }
 
-        $suite = $this->suites[$this->_runestSuite];
         $className = str_replace('\\', '/', $this->_runestSuite);
 
         $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->_runestSuite));
@@ -442,8 +423,8 @@ class TestsSuite
             }
         }
 
-        if (isset($this->suites[$this->_runestSuite]['tests']) && is_array($this->suites[$this->_runestSuite]['tests'])) {
-            $this->info($suite['title'], newLine: true, section: $sectionId);
+        if (isset($this->tests) && is_array($this->tests)) {
+            $this->info($this->title, newLine: true, section: $sectionId);
             $this->cli(title: 'Suite:', bold: false, titleColor: 'gray', secondaryColor: 'white', message: $className, section: $sectionId);
 
             // Get DataSets
@@ -454,7 +435,7 @@ class TestsSuite
             }
 
             foreach ($datasets as $dataset) {
-                foreach ($this->suites[$this->_runestSuite]['tests'] as &$test) {
+                foreach ($this->tests as &$test) {
                     try {
                         $start_time = hrtime(true);
 
@@ -548,7 +529,6 @@ class TestsSuite
             }
         }
 
-        $this->suites[$this->_runestSuite]['stats'] = $this->stats;
         $this->stats = [
             'passes' => 0,
             'failures' => 0,
@@ -580,10 +560,18 @@ class TestsSuite
 
     public function results($json = true)
     {
+        $results = [
+            'suite' => $this->suite,
+            'title' => $this->title,
+            'stats' => $this->stats,
+            'warnings' => $this->warnings,
+            'screens' => $this->screens,
+        ];
+
         if (true === $json) {
-            return json_encode($this->suites[$this->_runestSuite]);
+            return json_encode($results);
         }
 
-        return $this->suites[$this->_runestSuite];
+        return $results;
     }
 }
