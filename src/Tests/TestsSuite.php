@@ -67,9 +67,11 @@ class TestsSuite
     protected $draft = false;
     protected $groups = 'all';
 
-    public function __construct()
+    public function __construct(bool $loadGlobals = true)
     {
-        $this->loadGlobals();
+        if ($loadGlobals) {
+            $this->loadGlobals();
+        }
 
         $this->before();
     }
