@@ -262,10 +262,7 @@ class TestsSuite
         }
 
         if ($headless === null) {
-            $headless = true;
-            if ($this->globals['HEADLESS'] === 'false' || !$this->globals['HEADLESS']) {
-                $headless = false;
-            }
+            $headless = $this->isHeadlessMode();
         }
 
         TestsSuite::getBrowser(headless: $headless, force: true);
@@ -327,6 +324,13 @@ class TestsSuite
             'assertions' => 0,
             'time' => 0,
         ];
+
+        return $this;
+    }
+
+    public function setGlobals(array $globals = [])
+    {
+        $this->globals = array_merge($this->globals, $globals);
 
         return $this;
     }
@@ -394,6 +398,11 @@ class TestsSuite
     public function isVerboseMode(): bool
     {
         return $this->getGlobals()['VERBOSE'] ?? true;
+    }
+
+    public function isHeadlessMode(): bool
+    {
+        return $this->getGlobals()['HEADLESS'] ?? true;
     }
 
     public function isDebugMode(): bool
