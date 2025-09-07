@@ -31,7 +31,7 @@ class TestsSuite
 
     public string $title = '';
     public array $tests = [];
-    private array $stats = [
+    protected array $stats = [
         'passes' => 0,
         'failures' => 0,
         'skips' => 0,
@@ -44,7 +44,7 @@ class TestsSuite
     public $warnings = [];
     public $screens = [];
 
-    private $suite = null;
+    protected $suite = null;
 
     protected $start_time;
     protected $end_time;
@@ -86,6 +86,16 @@ class TestsSuite
         $this->title = $description;
 
         return $this;
+    }
+
+    public function getStats() : array
+    {
+        return $this->stats;
+    }
+
+    public function getSuite() : string
+    {
+        return $this->suite;
     }
 
     public function getDescribe() : string
@@ -331,6 +341,9 @@ class TestsSuite
     public function setGlobals(array $globals = [])
     {
         $this->globals = array_merge($this->globals, $globals);
+
+        $this->exctractVersions($this->globals['PS_VERSION'] ?? '8.1.0');
+        $this->setLocale($this->globals['LOCALE'] ?? 'en');
 
         return $this;
     }
