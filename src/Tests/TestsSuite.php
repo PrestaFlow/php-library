@@ -44,7 +44,7 @@ class TestsSuite
     public $warnings = [];
     public $screens = [];
 
-    private $_runestSuite = null;
+    private $suite = null;
 
     protected $start_time;
     protected $end_time;
@@ -252,8 +252,7 @@ class TestsSuite
 
     public function before($headless = null)
     {
-        $this->_runestSuite = get_class($this);
-        $this->suite = str_replace('\\', '/', $this->_runestSuite);
+        $this->suite = get_class($this);
         $this->start_time = hrtime(true);
 
         if (!$this->isVersionSupported()) {
@@ -423,9 +422,9 @@ class TestsSuite
             $this->init = true;
         }
 
-        $className = str_replace('\\', '/', $this->_runestSuite);
+        $className = str_replace('\\', '/', $this->suite);
 
-        $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->_runestSuite));
+        $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $this->suite));
         if (!array_key_exists($sectionId, $this->outputSections)) {
             if ($this->cli && self::OUTPUT_JSON !== $this->getOutputMode()) {
                 $this->outputSections[$sectionId] = $output->section();
@@ -445,62 +444,68 @@ class TestsSuite
                 $datasets[] = [];
             }
 
-            foreach ($datasets as $dataset) {
+            $tests = [];
+            foreach ($datasets as $key => $dataset) {
                 foreach ($this->tests as &$test) {
-                    try {
-                        $start_time = hrtime(true);
+                    $test['datasets'] = $dataset;
+                    $tests[] = $test;
+                }
+            }
+            $this->tests = $tests;
 
-                        $test['datasets'] = $dataset;
-                        $this->dataset = $dataset;
+            foreach ($this->tests as &$test) {
+                try {
+                    $start_time = hrtime(true);
 
-                        $this->getInstructions($test);
+                    $this->dataset = $test['datasets'];
 
-                        if ($this->isSkippable($test) === true) {
-                            $test['state'] = 'skip';
-                            $this->stats['skips']++;
-                        } else if ($this->isSkippableCauseFailed($test) === true) {
-                            $test['state'] = 'skipped';
-                            $this->stats['skippeds']++;
-                        } else if ($this->isTodoable($test) === true) {
-                            $test['state'] = 'todo';
-                            $this->stats['todos']++;
-                        } else {
-                            $this->scenarioName = null;
+                    $this->getInstructions($test);
 
-                            $reflection = new \ReflectionFunction($test['steps']);
-                            $this->scenarioName = $reflection->getClosureCalledClass()->name;
+                    if ($this->isSkippable($test) === true) {
+                        $test['state'] = 'skip';
+                        $this->stats['skips']++;
+                    } else if ($this->isSkippableCauseFailed($test) === true) {
+                        $test['state'] = 'skipped';
+                        $this->stats['skippeds']++;
+                    } else if ($this->isTodoable($test) === true) {
+                        $test['state'] = 'todo';
+                        $this->stats['todos']++;
+                    } else {
+                        $this->scenarioName = null;
 
-                            $test['steps']->call($this);
-                            $this->stats['assertions'] += Expect::getNbAssertions();
+                        $reflection = new \ReflectionFunction($test['steps']);
+                        $this->scenarioName = $reflection->getClosureCalledClass()->name;
 
-                            $this->attachWarning($test);
-
-                            $test['state'] = 'pass';
-                            $this->stats['passes']++;
-                        }
-                    } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
-                        $test['state'] = 'fail';
-                        Expect::$expectMessage['fail'] = [$e->getMessage()];
-                        $this->attachWarning($test);
-                        $this->attachScreen($test);
+                        $test['steps']->call($this);
                         $this->stats['assertions'] += Expect::getNbAssertions();
-                        $this->stats['failures']++;
-                        $this->failed = true;
-                    } finally {
-                        $test['expect'] = Expect::getExpectMessage();
-                        Expect::getNbAssertions();
-                        $end_time = hrtime(true);
-                        $test['time'] = round(($end_time - $start_time) / 1e+6);
 
-                        match ($test['state']) {
-                            'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
-                            'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
-                            'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
-                            'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
-                            'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
-                            default => $this->info(test: $test, section: $sectionId, newLine: true)
-                        };
+                        $this->attachWarning($test);
+
+                        $test['state'] = 'pass';
+                        $this->stats['passes']++;
                     }
+                } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
+                    $test['state'] = 'fail';
+                    Expect::$expectMessage['fail'] = [$e->getMessage()];
+                    $this->attachWarning($test);
+                    $this->attachScreen($test);
+                    $this->stats['assertions'] += Expect::getNbAssertions();
+                    $this->stats['failures']++;
+                    $this->failed = true;
+                } finally {
+                    $test['expect'] = Expect::getExpectMessage();
+                    Expect::getNbAssertions();
+                    $end_time = hrtime(true);
+                    $test['time'] = round(($end_time - $start_time) / 1e+6);
+
+                    match ($test['state']) {
+                        'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
+                        'skipped' => $this->skippedCauseItsFail(test: $test, section: $sectionId, newLine: true),
+                        'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
+                        'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
+                        'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
+                        default => $this->info(test: $test, section: $sectionId, newLine: true)
+                    };
                 }
             }
 
