@@ -507,7 +507,7 @@ class TestsSuite
 
             foreach ($this->tests as &$test) {
                 try {
-                    $start_time = hrtime(true);
+                    $startTime = hrtime(true);
 
                     $this->dataset = $test['datasets'];
 
@@ -547,8 +547,8 @@ class TestsSuite
                 } finally {
                     $test['expect'] = Expect::getExpectMessage();
                     Expect::getNbAssertions();
-                    $end_time = hrtime(true);
-                    $test['time'] = round(($end_time - $start_time) / 1e+6);
+                    $endTime = hrtime(true);
+                    $test['time'] = round(($endTime - $startTime) / 1e+6);
 
                     match ($test['state']) {
                         'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
@@ -561,8 +561,8 @@ class TestsSuite
                 }
             }
 
-            $end_time = hrtime(true);
-            $this->stats['time'] = round(($end_time - $start_time) / 1e+6);
+            $endTime = hrtime(true);
+            $this->stats['time'] = round(($endTime - $this->startTime) / 1e+6);
 
             $tests = [];
             if ($this->stats['failures']) {
