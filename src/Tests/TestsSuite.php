@@ -500,6 +500,7 @@ class TestsSuite
             foreach ($datasets as $key => $dataset) {
                 foreach ($this->tests as &$test) {
                     $test['datasets'] = $dataset;
+                    $test['dataset'] = $key + 1;
                     $tests[] = $test;
                 }
             }
