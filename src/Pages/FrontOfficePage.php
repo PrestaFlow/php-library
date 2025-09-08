@@ -18,9 +18,10 @@ class FrontOfficePage extends CommonPage
     use Urls;
     use Locale;
 
-    public function __construct(string $locale, string $patchVersion, array $globals)
+    public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
         $this->globals = $globals;
+        $this->customs = array_merge($this->customs, $customs);
         $this->initLocale(locale: $locale);
 
         $selectors = [

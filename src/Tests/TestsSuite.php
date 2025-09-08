@@ -56,6 +56,12 @@ class TestsSuite
     public $globals = [];
     public $pages = [];
 
+    public $customs = [
+        'selectors' => [],
+        'messages' => [],
+        'urls' => [],
+    ];
+
     protected $dataset = [];
     protected $datasets = [];
 
@@ -344,6 +350,27 @@ class TestsSuite
 
         $this->exctractVersions($this->globals['PS_VERSION'] ?? '8.1.0');
         $this->setLocale($this->globals['LOCALE'] ?? 'en');
+
+        return $this;
+    }
+
+    public function setSelectors(array $selectors = [])
+    {
+        $this->customs['selectors'] = $selectors;
+
+        return $this;
+    }
+
+    public function setMessages(array $messages = [])
+    {
+        $this->customs['messages'] = $messages;
+
+        return $this;
+    }
+
+    public function setUrls(array $urls = [])
+    {
+        $this->customs['urls'] = $urls;
 
         return $this;
     }

@@ -14,6 +14,12 @@ class CommonPage
     use Translations;
     use Locale;
 
+    protected $customs = [
+        'selectors' => [],
+        'messages' => [],
+        'urls' => [],
+    ];
+
     protected $globals = [];
     public $selectors = [];
     public $messages = [];
@@ -23,9 +29,10 @@ class CommonPage
 
     protected $patchVersion = null;
 
-    public function __construct(string $locale, string $patchVersion, array $globals)
+    public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
         $this->globals = $globals;
+        $this->customs = array_merge($this->customs, $customs);
         $this->patchVersion = $patchVersion;
         $this->initLocale(locale: $locale);
 
@@ -35,6 +42,17 @@ class CommonPage
             $patchVersion
         );
         */
+
+        return $this;
+    }
+
+    public function setCustoms(string $type, array $data = [])
+    {
+        if (isset($this->customs[$type]) && is_array($this->customs[$type])) {
+            $this->customs[$type] = array_merge($this->customs[$type], $data);
+        } else {
+            $this->customs[$type] = $data;
+        }
 
         return $this;
     }
@@ -286,12 +304,19 @@ class CommonPage
         return $dir . '/../../../..';
     }
 
+    public function getPageName(): string
+    {
+        return str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+    }
+
     public function getSelectors(array $selectors = []): array
     {
         $pageSelectors = [];
         if (method_exists($this, 'defineSelectors')) {
             $pageSelectors = $this->defineSelectors();
         }
+
+        $pageNames = explode('\\', $this->getPageName());
 
         $baseSelectors = [...$selectors, ...$pageSelectors];
 
@@ -305,9 +330,6 @@ class CommonPage
             $customSelectors = json_decode(file_get_contents($pathToCatalog), true);
 
             if (count($customSelectors)) {
-                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
-                $pageNames = explode('\\', $pageName);
-
                 foreach ($pageNames as $pageName) {
                     if ($pageName !== 'Page') {
                         if (isset($customSelectors[$pageName])) {
@@ -320,9 +342,24 @@ class CommonPage
             }
         }
 
+        $specificSelectors = [];
+        if (is_array($this->customs['selectors'])) {
+            $specificSelectors = $this->customs['selectors'];
+            foreach ($pageNames as $pageName) {
+                if ($pageName !== 'Page') {
+                    if (isset($specificSelectors[$pageName])) {
+                        $specificSelectors = $specificSelectors[$pageName];
+                    } else {
+                        $specificSelectors = [];
+                    }
+                }
+            }
+        }
+
         $mergedSelectors = [
             ...$baseSelectors,
             ...$customSelectors,
+            ...$specificSelectors,
         ];
 
         return $mergedSelectors;
@@ -336,6 +373,8 @@ class CommonPage
         if (method_exists($this, 'defineMessages')) {
             $pageMessages = $this->defineMessages();
         }
+
+        $pageNames = explode('\\', $this->getPageName());
 
         $baseMessages = [...$messages, ...$pageMessages];
 
@@ -362,9 +401,24 @@ class CommonPage
             }
         }
 
+        $specificMessages = [];
+        if (is_array($this->customs['messages'])) {
+            $specificMessages = $this->customs['messages'];
+            foreach ($pageNames as $pageName) {
+                if ($pageName !== 'Page') {
+                    if (isset($specificMessages[$pageName])) {
+                        $specificMessages = $specificMessages[$pageName];
+                    } else {
+                        $specificMessages = [];
+                    }
+                }
+            }
+        }
+
         $mergedMessages = [
             ...$baseMessages,
             ...$customMessages,
+            ...$specificMessages,
         ];
 
         return $mergedMessages;
