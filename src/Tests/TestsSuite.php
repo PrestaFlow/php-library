@@ -251,6 +251,7 @@ class TestsSuite
             $browser = $browserFactory->createBrowser([
                 'userAgent' => 'PrestaFlow',
                 'keepAlive' => true,
+                'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
             ]);
             \file_put_contents($socketFile, $browser->getSocketUri());
