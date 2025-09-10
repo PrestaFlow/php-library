@@ -172,9 +172,14 @@ class TestsSuite
         return false;
     }
 
+    public function isSkipWhenFailed() : bool
+    {
+        return $this->skipWhenFailed;
+    }
+
     public function isSkippableCauseFailed($test)
     {
-        if ($this->failed && $this->skipWhenFailed) {
+        if ($this->failed && $this->isSkipWhenFailed()) {
             return true;
         }
 
