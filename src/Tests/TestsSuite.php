@@ -568,7 +568,7 @@ class TestsSuite
             }
 
             $endTime = hrtime(true);
-            $this->stats['time'] = round(($endTime - $this->startTime) / 1e+6);
+            $this->stats['time'] = round(($endTime - $this->start_time) / 1e+6);
 
             $tests = [];
             if ($this->stats['failures']) {
