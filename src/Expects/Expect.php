@@ -33,7 +33,7 @@ class Expect extends ExpectLibrary
         self::$latestWarning = $message;
     }
 
-    public static function getExpectMessage() : array
+    public static function getExpectMessage(): array
     {
         $expectMessage = self::$expectMessage;
         self::$expectMessage = [];
@@ -86,21 +86,22 @@ class Expect extends ExpectLibrary
             $arguments["actual"] = $arguments["actual"] ? 'true' : 'false';
         }
 
-        return preg_replace_callback('/\\{(?<parameterName>.*?)(\\:(?<formatOptions>.*))?\\}/',
-                function ($match) use ($arguments)
-        {
-            $parameterName = $match["parameterName"];
-            if (isset($arguments[$parameterName]))
-            {
-                $result = $arguments[$parameterName];
-                if (is_object($result) || is_array($result)) {
-                    $result = print_r($result, true);
-                } else if (is_bool($result)) {
-                    $result = $result ? 'true' : 'false';
+        return preg_replace_callback(
+            '/\\{(?<parameterName>.*?)(\\:(?<formatOptions>.*))?\\}/',
+            function ($match) use ($arguments) {
+                $parameterName = $match["parameterName"];
+                if (isset($arguments[$parameterName])) {
+                    $result = $arguments[$parameterName];
+                    if (is_object($result) || is_array($result)) {
+                        $result = print_r($result, true);
+                    } else if (is_bool($result)) {
+                        $result = $result ? 'true' : 'false';
+                    }
+                    return $result;
                 }
-                return $result;
-            }
-        }, $expectedMessage);
+            },
+            $expectedMessage
+        );
     }
 
     protected function getExceptionConstructor($explanation, $arguments = array())
@@ -109,13 +110,17 @@ class Expect extends ExpectLibrary
             $page = TestsSuite::getPage();
             if ($page instanceof HeadlessChromiumPage) {
                 sleep(3);
-                $fileName = 'error_'.$page->getSession()->getTargetId().'.png';
+                $fileName = 'error_' . $page->getSession()->getTargetId() . '-' . time() . '.png';
                 self::$latestError = $fileName;
-                $screenshot = $page->screenshot();
+                $screenshot = $page->screenshot([
+                    'captureBeyondViewport' => true,
+                    //'clip' => $page->getFullPageClip(),
+                    //'format' => 'jpeg',
+                ]);
                 if (function_exists('storage_path')) {
-                    $screenshot->saveToFile(storage_path().'/screens/errors/'.$fileName);
+                    $screenshot->saveToFile(storage_path() . '/screens/errors/' . $fileName);
                 } else {
-                    $screenshot->saveToFile('../../screens/errors/'.$fileName);
+                    $screenshot->saveToFile('../../screens/errors/' . $fileName);
                 }
             }
         } catch (OperationTimedOut $e) {
@@ -126,13 +131,15 @@ class Expect extends ExpectLibrary
             $explanation = self::$overrideMessage;
         }
 
-        if (isset(self::$expectMessage['pass'][(count(self::$expectMessage['pass'])-1)])) {
-            self::$expectMessage['fail'][] = self::$expectMessage['pass'][(count(self::$expectMessage['pass'])-1)];
-            unset(self::$expectMessage['pass'][(count(self::$expectMessage['pass'])-1)]);
+        if (isset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)])) {
+            self::$expectMessage['fail'][] = self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)];
+            unset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)]);
         }
 
         return $this->getConditionViolationExceptionConstructor(
-            $this->format($explanation, $arguments), $arguments);
+            $this->format($explanation, $arguments),
+            $arguments
+        );
     }
 
     protected function getUnexpectedValueExceptionConstructor($explanation, $arguments = array())
@@ -245,8 +252,7 @@ class Expect extends ExpectLibrary
         if ($selector === null) {
             $selector = 'Element';
         }
-        if ($this->getValue() != true)
-        {
+        if ($this->getValue() != true) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("selector" => $selector));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -267,8 +273,7 @@ class Expect extends ExpectLibrary
         if ($selector === null) {
             $selector = 'Element';
         }
-        if ($this->getValue() != false)
-        {
+        if ($this->getValue() != false) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("selector" => $selector));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -311,8 +316,7 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
 
-        if (str_contains($this->getValue(), $needle) === false)
-        {
+        if (str_contains($this->getValue(), $needle) === false) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $needle, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -330,8 +334,7 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
 
-        if (!str_contains($this->getValue(), $needle) === false)
-        {
+        if (!str_contains($this->getValue(), $needle) === false) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $needle, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -349,8 +352,7 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
 
-        if (str_starts_with($this->getValue(), $needle) === false)
-        {
+        if (str_starts_with($this->getValue(), $needle) === false) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $needle));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -368,8 +370,7 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
 
-        if (str_ends_with($this->getValue(), $needle) === false)
-        {
+        if (str_ends_with($this->getValue(), $needle) === false) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $needle));
             throw call_user_func_array($e[0], $e[1]);
         }
@@ -377,15 +378,20 @@ class Expect extends ExpectLibrary
         return $this;
     }
 
-    public function isTheSameAs($other, ?string $expectedMessage = null)
+    public function isTheSameAs($expected, ?string $expectedMessage = null)
     {
         if ($expectedMessage === null) {
-            $expectedMessage = "";
+            $expectedMessage = "{value} must be the same as {expected}";
         }
 
-        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $other, "value" => $this->getValue()));
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $expected, "value" => $this->getValue()));
 
-        return parent::isTheSameAs($other);
+        $this->isDefined();
+        if ($this->getValue() !== $expected) {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $expected, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function samePriceAs($price, ?string $expectedMessage = null)
@@ -394,7 +400,7 @@ class Expect extends ExpectLibrary
             $expectedMessage = "{value} must be the same price as {expected}";
         }
 
-        return $this->contains($price, expectedMessage: $expectedMessage);
+        return $this->isTheSameAs(expected: $price, expectedMessage: $expectedMessage);
     }
 
     public function equals($other, ?string $expectedMessage = null)
@@ -408,8 +414,7 @@ class Expect extends ExpectLibrary
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $other, "value" => $this->getValue()));
 
         $this->isDefined();
-        if ($this->getValue() != $other)
-        {
+        if ($this->getValue() != $other) {
             $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other));
             throw call_user_func_array($e[0], $e[1]);
         }
