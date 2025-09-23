@@ -24,7 +24,7 @@ trait ImportPage
         $locale = $globals['LOCALE'] ?? $this->getLocale();
         $patchVersion = $globals['PATCH_VERSION'] ?? $this->getPatchVersion();
 
-        $pageInstance = new $pageClass(locale: $locale, patchVersion: $patchVersion, globals: $globals);
+        $pageInstance = new $pageClass(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $this->customs);
         $pageInstance->setGlobals($globals);
         $pageInstance->setUserAgent($userAgent);
         $pageInstance->setLocale(locale: $locale);

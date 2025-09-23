@@ -51,9 +51,15 @@ trait Urls
             $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
+        $specificUrls = [];
+        if (is_array($this->customs['urls'])) {
+            $specificUrls = $this->customs['urls'];
+        }
+
         $mergedCatalog = [
             ...$defaultCatalog,
             ...$customCatalog,
+            ...$specificUrls,
         ];
 
         return $mergedCatalog;

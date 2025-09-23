@@ -12,10 +12,6 @@ class Page extends BasePage
     {
         $selectors = parent::defineSelectors();
 
-        if (!is_array($selectors)) {
-            $selectors = [];
-        }
-
         $pageSelectors = [
             'quantityWantedInput' => '#quantity_wanted',
             'currentProductPrice' => '.product-price',
