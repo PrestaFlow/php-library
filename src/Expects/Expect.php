@@ -114,8 +114,8 @@ class Expect extends ExpectLibrary
                 self::$latestError = $fileName;
                 $screenshot = $page->screenshot([
                     'captureBeyondViewport' => true,
-                    //'clip' => $page->getFullPageClip(),
-                    //'format' => 'jpeg',
+                    'clip' => $page->getFullPageClip(),
+                    'format' => 'png',
                 ]);
                 if (function_exists('storage_path')) {
                     $screenshot->saveToFile(storage_path() . '/screens/errors/' . $fileName);
