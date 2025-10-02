@@ -307,6 +307,8 @@ class TestsSuite
         } catch (Exception $e) {
             //
         }
+
+        $this->start_time = hrtime(true);
     }
 
     public function after()
