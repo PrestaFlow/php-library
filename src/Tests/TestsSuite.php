@@ -566,7 +566,7 @@ class TestsSuite
                         'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
                         'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
                         'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
-                        default => $this->info(test: $test, section: $sectionId, newLine: true)
+                        default => $this->info(message: $test, section: $sectionId, newLine: true)
                     };
                 }
             }
