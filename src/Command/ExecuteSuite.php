@@ -237,8 +237,9 @@ class ExecuteSuite extends Command
         array_pop($parts);
         $dir = implode('/', $parts);
 
-        if (!is_dir($dir))
+        if (!is_dir($dir)) {
             mkdir($dir, 0777, true);
+        }
 
         file_put_contents($fullPath, $contents, $flags);
     }
