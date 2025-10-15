@@ -95,6 +95,13 @@ trait Translations
             }
         }
 
+        if (is_array($this->customs['messages'])) {
+            $customCatalog = [
+                ...$customCatalog,
+                ...$this->customs['messages'],
+            ];
+        }
+
         $mergedCatalog = [
             ...$defaultCatalog,
             ...$majorCatalog,

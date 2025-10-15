@@ -42,6 +42,7 @@ class ExecuteSuite extends Command
         $this
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
+            ->addOption('file', 'f', InputOption::VALUE_OPTIONAL, 'Output to file')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -217,10 +218,30 @@ class ExecuteSuite extends Command
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
 
         if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeLn(json_encode($this->outputSections, JSON_PRETTY_PRINT));
+            if ($input->getOption('file')) {
+                $file = $input->getOption('file');
+
+                $this->filePutContents($file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                $this->success('Results saved to ' . $input->getOption('file'), newLine: true, force: true);
+            } else {
+                $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
+            }
         }
 
         return Command::SUCCESS;
+    }
+
+    protected function filePutContents($fullPath, $contents, $flags = 0)
+    {
+        $parts = explode('/', $fullPath);
+        array_pop($parts);
+        $dir = implode('/', $parts);
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        file_put_contents($fullPath, $contents, $flags);
     }
 
     protected function isExecutable($suite)

@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Expects;
 
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
+use HeadlessChromium\Exception\FilesystemException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as HeadlessChromiumPage;
 use Nunzion\Expect as ExpectLibrary;
@@ -114,16 +115,20 @@ class Expect extends ExpectLibrary
                 self::$latestError = $fileName;
                 $screenshot = $page->screenshot([
                     'captureBeyondViewport' => true,
-                    //'clip' => $page->getFullPageClip(),
-                    //'format' => 'jpeg',
+                    'clip' => $page->getFullPageClip(),
+                    'format' => 'png',
                 ]);
                 if (function_exists('storage_path')) {
                     $screenshot->saveToFile(storage_path() . '/screens/errors/' . $fileName);
                 } else {
-                    $screenshot->saveToFile('../../screens/errors/' . $fileName);
+                    $screenshot->saveToFile('./prestaflow/screens/errors/' . $fileName);
                 }
             }
         } catch (OperationTimedOut $e) {
+            self::$latestError = null;
+        } catch (FilesystemException $e) {
+            self::$latestError = null;
+        } catch (Exception $e) {
             self::$latestError = null;
         }
 
