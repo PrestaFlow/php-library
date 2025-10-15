@@ -219,7 +219,9 @@ class ExecuteSuite extends Command
 
         if (self::OUTPUT_JSON === $this->getOutputMode()) {
             if ($input->getOption('file')) {
-                file_put_contents($input->getOption('file'), json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                $file = $input->getOption('file');
+
+                $this->filePutContents($file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
                 $this->success('Results saved to ' . $input->getOption('file'), newLine: true, force: true);
             } else {
                 $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
@@ -227,6 +229,18 @@ class ExecuteSuite extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    protected function filePutContents($fullPath, $contents, $flags = 0)
+    {
+        $parts = explode('/', $fullPath);
+        array_pop($parts);
+        $dir = implode('/', $parts);
+
+        if (!is_dir($dir))
+            mkdir($dir, 0777, true);
+
+        file_put_contents($fullPath, $contents, $flags);
     }
 
     protected function isExecutable($suite)
