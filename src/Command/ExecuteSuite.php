@@ -42,6 +42,7 @@ class ExecuteSuite extends Command
         $this
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
+            ->addOption('file', 'f', InputOption::VALUE_OPTIONAL, 'Output to file')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -217,7 +218,11 @@ class ExecuteSuite extends Command
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
 
         if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeLn(json_encode($this->outputSections, JSON_PRETTY_PRINT));
+            $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
+
+            if ($input->getOption('file')) {
+                file_put_contents($input->getOption('file'), json_encode($suite->results(false), JSON_PRETTY_PRINT));
+            }
         }
 
         return Command::SUCCESS;
