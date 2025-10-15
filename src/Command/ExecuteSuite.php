@@ -218,10 +218,11 @@ class ExecuteSuite extends Command
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
 
         if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
-
             if ($input->getOption('file')) {
                 file_put_contents($input->getOption('file'), json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                $this->success('Results saved to ' . $input->getOption('file'), newLine: true, force: true);
+            } else {
+                $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
             }
         }
 
