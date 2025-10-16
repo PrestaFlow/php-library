@@ -36,7 +36,7 @@ class FrontOfficePage extends CommonPage
 
         $this->messages = $this->getMessages();
 
-        parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals);
+        parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $customs);
     }
 
     public function goToPage($page = null, $index = null)
