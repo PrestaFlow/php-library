@@ -73,13 +73,13 @@ class TestsSuite
     protected $draft = false;
     protected $groups = 'all';
 
-    public function __construct(bool $loadGlobals = true)
+    public function __construct(bool $loadGlobals = true, bool $getBrowser = true)
     {
         if ($loadGlobals) {
             $this->loadGlobals();
         }
 
-        $this->before();
+        $this->before(getBrowser: $getBrowser);
     }
 
     public function getParam($paramName)
@@ -274,7 +274,7 @@ class TestsSuite
         return TestsSuite::getBrowser()?->getPages()[0];
     }
 
-    public function before($headless = null)
+    public function before($headless = null, bool $getBrowser = true)
     {
         $this->suite = get_class($this);
         $this->start_time = hrtime(true);
@@ -285,6 +285,10 @@ class TestsSuite
 
         if ($headless === null) {
             $headless = $this->isHeadlessMode();
+        }
+
+        if ($getBrowser === false) {
+            return;
         }
 
         TestsSuite::getBrowser(headless: $headless, force: true);
@@ -303,6 +307,8 @@ class TestsSuite
         } catch (Exception $e) {
             //
         }
+
+        $this->start_time = hrtime(true);
     }
 
     public function after()
@@ -562,7 +568,7 @@ class TestsSuite
                         'todo' => $this->toBeDone(test: $test, section: $sectionId, newLine: true),
                         'pass' => $this->pass(test: $test, section: $sectionId, newLine: true),
                         'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
-                        default => $this->info(test: $test, section: $sectionId, newLine: true)
+                        default => $this->info(message: $test, section: $sectionId, newLine: true)
                     };
                 }
             }

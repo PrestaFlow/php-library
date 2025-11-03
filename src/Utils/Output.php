@@ -34,10 +34,10 @@ trait Output
         return $this->outputMode;
     }
 
-    public function cli(string $baseLine = '  ', bool $bold = true, bool $newLine = false, string $titleColor = '', string $title = '', string $secondaryColor = 'white', string $message = '', string $section = 'default')
+    public function cli(string $baseLine = '  ', bool $bold = true, bool $newLine = false, string $titleColor = '', string $title = '', string $secondaryColor = 'white', string $message = '', string $section = 'default', bool $force = false)
     {
         if ($this->cli) {
-            if ($this->getOutputMode() !== self::OUTPUT_JSON) {
+            if ($this->getOutputMode() !== self::OUTPUT_JSON || $force === true) {
                 if (!array_key_exists($section, $this->outputSections)) {
                     $this->outputSections[$section] = $this->output->section();
                 }
@@ -303,7 +303,7 @@ trait Output
         }
     }
 
-    protected function success(string $message, bool $newLine = false, string $section = 'default')
+    protected function success(string $message, bool $newLine = false, string $section = 'default', bool $force = false)
     {
         $this->cli(
             bold: true,
@@ -313,7 +313,8 @@ trait Output
             message: $this->getHumanString($message),
             baseLine: '',
             newLine: $newLine,
-            section: $section
+            section: $section,
+            force: $force
         );
     }
 

@@ -6,11 +6,11 @@ use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as BasePage;
 
 class Page extends BasePage
 {
-    public function __construct(string $locale, string $patchVersion, array $globals)
+    public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
         $this->url = '{index}-category';
 
-        parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals);
+        parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $customs);
     }
 
     public function defineSelectors()

@@ -35,6 +35,8 @@ class ExecuteSuite extends Command
     protected $groups = ['all'];
     protected $debugMode = false;
 
+    protected $file = 'prestaflow/results.json';
+
     use Output;
 
     protected function configure(): void
@@ -42,6 +44,7 @@ class ExecuteSuite extends Command
         $this
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
+            ->addOption('file', 'f', InputOption::VALUE_NONE, 'Output to file')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -105,6 +108,7 @@ class ExecuteSuite extends Command
 
     public function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->handleDir(dirname($this->file));
         $this->cli = true;
         $this->output = $output;
 
@@ -217,10 +221,79 @@ class ExecuteSuite extends Command
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
 
         if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->output->writeLn(json_encode($this->outputSections, JSON_PRETTY_PRINT));
+            if ($input->getOption('file')) {
+                $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+            } else {
+                $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
+            }
         }
 
         return Command::SUCCESS;
+    }
+
+    protected function handleDir($path)
+    {
+        if (is_dir($path)) {
+            $this->emptyDir($path);
+        }
+
+        mkdir($path, 0777, true);
+    }
+
+    protected function emptyDir($path)
+    {
+        $dir = new \DirectoryIterator($path);
+
+        // Iterate through the subdirectories / files of the provided directory
+        foreach ($dir as $dir_info) {
+
+            // Exclude the . (current directory) and .. (parent directory) paths
+            // from the directory iteration
+            if (! $dir_info->isDot()) {
+
+                // Get the full currently iterated path
+                $iterated_path = $dir_info->getPathname();
+
+                // If the currently iterated path is a directory
+                if ($dir_info->isDir()) {
+
+                    // which is not empty (in which case scandir returns an array of not 2 (. and ..) elements)
+                    if (count(scandir($iterated_path)) !== 2) {
+
+                        // Call the function recursively
+                        $this->emptyDir($iterated_path);
+                    } else {
+
+                        // if the currently iterated path is an empty directory, remove it
+                        rmdir($iterated_path);
+                    }
+                } elseif ($dir_info->isFile()) {
+
+                    // If the currently iterated path describes a file, we need to
+                    // delete that file
+                    unlink($iterated_path);
+                }
+            } // loop which opens if the currently iterated directory is neither . nor ..
+
+        } // end of iteration through directories / files of provided path
+
+        // After iterating through the subpaths of the provided path, remove the
+        // concerned path
+        rmdir($path);
+    }
+
+    protected function filePutContents($fullPath, $contents, $flags = 0)
+    {
+        $parts = explode('/', $fullPath);
+        array_pop($parts);
+        $dir = implode('/', $parts);
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        file_put_contents($fullPath, $contents, $flags);
     }
 
     protected function isExecutable($suite)
