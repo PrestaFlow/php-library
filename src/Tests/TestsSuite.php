@@ -275,7 +275,7 @@ class TestsSuite
             $browserFactory = new BrowserFactory();
             $browser = $browserFactory->createBrowser($browserOptions);
 
-            \file_put_contents($browserOptionsFile, \json_encode($broswerOptions));
+            \file_put_contents($browserOptionsFile, \json_encode($browserOptions));
             \file_put_contents($socketFile, $browser->getSocketUri());
         }
 
