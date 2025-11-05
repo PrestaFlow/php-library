@@ -222,14 +222,17 @@ class TestsSuite
         return $filePath;
     }
 
-    public static function getBrowser(bool $headless = true, bool $force = true)
+    public static function getBrowser(bool $headless = true, bool $force = true, array $globals = [])
     {
         $browser = null;
 
+        $windowWidth = (int)$globals['BROWSER']['WINDOW_SIZE_WIDTH'] ?? 1920;
+        $windowHeight = (int) $globals['BROWSER']['WINDOW_SIZE_HEIGHT'] ?? 1000;
+
         $browserOptions = [
-            'userAgent' => 'PrestaFlow',
+            'userAgent' => $globals['BROWSER']['USER_AGENT'] ?? 'PrestaFlow',
             'keepAlive' => true,
-            'windowSize' => [1920, 1000],
+            'windowSize' => [$windowWidth, $windowHeight],
             'headless' => (bool) $headless,
         ];
 
@@ -308,7 +311,7 @@ class TestsSuite
             return;
         }
 
-        TestsSuite::getBrowser(headless: $headless, force: true);
+        TestsSuite::getBrowser(headless: $headless, force: true, globals: $this->globals);
 
         try {
             $cookies = TestsSuite::getPage()?->getCookies();
@@ -455,9 +458,14 @@ class TestsSuite
                 'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
             ],
-            'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
             'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
             'VERBOSE' => (bool) $_ENV['PRESTAFLOW_VERBOSE'] ?? true,
+            'BROWSER' => [
+                'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
+                'WINDOW_SIZE_HEIGHT' => $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? 1920,
+                'WINDOW_SIZE_WIDTH' => $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'] ?? 1000,
+                'USER_AGENT' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
+            ],
         ];
 
         $this->exctractVersions($_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0');
@@ -471,7 +479,7 @@ class TestsSuite
 
     public function isHeadlessMode(): bool
     {
-        return $this->getGlobals()['HEADLESS'] ?? true;
+        return $this->getGlobals()['BROWSER']['HEADLESS'] ?? true;
     }
 
     public function isDebugMode(): bool
