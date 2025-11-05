@@ -211,29 +211,51 @@ class TestsSuite
         return $this->groups;
     }
 
-    public static function getSocketFilePath()
+    public static function getFilePath($filename = '.broswer')
     {
         if (function_exists('storage_path')) {
-            $socketFilePath = storage_path().'/datas/.broswer';
+            $filePath = storage_path().'/datas/'.$filename;
         } else {
-            $socketFilePath = __DIR__.'/../../datas/.broswer';
+            $filePath = __DIR__.'/../../datas/'.$filename;
         }
 
-        return $socketFilePath;
+        return $filePath;
     }
 
     public static function getBrowser(bool $headless = true, bool $force = true)
     {
         $browser = null;
 
-        $socketFile = TestsSuite::getSocketFilePath();
+        $browserOptions = [
+            'userAgent' => 'PrestaFlow',
+            'keepAlive' => true,
+            'windowSize' => [1920, 1000],
+            'headless' => (bool) $headless,
+        ];
+
+        $browserOptionsFile = TestsSuite::getFilePath('.broswer-options');
+        $socketFile = TestsSuite::getFilePath('.broswer');
 
         $socket = null;
-        if (file_exists($socketFile)) {
-            $socket = \file_get_contents($socketFile);
+        if (file_exists($browserOptionsFile)) {
+            $browserOptionsDatas = \file_get_contents($browserOptionsFile);
+            $savedBrowserOptions = \json_decode($browserOptionsDatas, true);
 
-            if (!strlen($socket)) {
-                $socket = null;
+            if (is_array($savedBrowserOptions)
+                && count($browserOptions) == count($savedBrowserOptions)
+                && array_diff($browserOptions, $savedBrowserOptions) === array_diff($savedBrowserOptions, $browserOptions)) {
+                if (file_exists($socketFile)) {
+                    $socket = \file_get_contents($socketFile);
+
+                    if (!strlen($socket)) {
+                        $socket = null;
+                    }
+                }
+            } else {
+                // options have changed, remove socket file to force new browser creation
+                if (file_exists($socketFile)) {
+                    unlink($socketFile);
+                }
             }
         }
 
@@ -249,16 +271,11 @@ class TestsSuite
             if (!$force) {
                 return null;
             }
+
             $browserFactory = new BrowserFactory();
+            $browser = $browserFactory->createBrowser($browserOptions);
 
-            //$browserFactory->addOptions(['headless' => (bool) $headless]);
-
-            $browser = $browserFactory->createBrowser([
-                'userAgent' => 'PrestaFlow',
-                'keepAlive' => true,
-                'windowSize' => [1920, 1000],
-                'headless' => (bool) $headless,
-            ]);
+            \file_put_contents($browserOptionsFile, \json_encode($broswerOptions));
             \file_put_contents($socketFile, $browser->getSocketUri());
         }
 
