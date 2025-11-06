@@ -160,10 +160,6 @@ class Expect extends ExpectLibrary
 
     public function elementIsVisible($selector = null, $timeout = 30000, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "";
-        }
-
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
         Expect::that($isVisible, true)->visible($selector, $avoidExpectMessage, expectedMessage: $expectedMessage);
@@ -171,10 +167,6 @@ class Expect extends ExpectLibrary
 
     public function elementIsNotVisible($selector = null, $timeout = 30000, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "";
-        }
-
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
         Expect::that($isVisible, true)->notVisible($selector, $avoidExpectMessage, expectedMessage: $expectedMessage);
