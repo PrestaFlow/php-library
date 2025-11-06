@@ -229,6 +229,13 @@ class TestsSuite
         $windowWidth = (int)$globals['BROWSER']['WINDOW_SIZE_WIDTH'] ?? 1920;
         $windowHeight = (int) $globals['BROWSER']['WINDOW_SIZE_HEIGHT'] ?? 1000;
 
+        if ($windowWidth <= 0) {
+            $windowWidth = 1920;
+        }
+        if ($windowHeight <= 0) {
+            $windowHeight = 1000;
+        }
+
         $browserOptions = [
             'userAgent' => $globals['BROWSER']['USER_AGENT'] ?? 'PrestaFlow',
             'keepAlive' => true,
