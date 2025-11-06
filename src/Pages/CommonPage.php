@@ -57,7 +57,7 @@ class CommonPage
         return $this;
     }
 
-    public function init(string $locale, string $patchVersion) : CommonPage
+    public function init(string $locale, string $patchVersion): CommonPage
     {
         /*
         $this->initTranslations(
@@ -105,7 +105,7 @@ class CommonPage
             $selector = $this->selectors[$selector];
             if (is_array($replacements)) {
                 foreach ($replacements as $key => $value) {
-                    $selector = str_replace('${'.$key.'}', $value, $selector);
+                    $selector = str_replace('${' . $key . '}', $value, $selector);
                 }
             }
             return $selector;
@@ -135,7 +135,7 @@ class CommonPage
         */
     }
 
-    public function getGlobals() : array
+    public function getGlobals(): array
     {
         return $this->globals;
     }
@@ -260,6 +260,31 @@ class CommonPage
         $this->getPage()->evaluate('some js that will reload the page')->waitForPageReload();
     }
 
+    public function selectOption($selector, $value)
+    {
+        if (str_starts_with($selector, '#')) {
+            $selector = str_replace('#', '', $selector);
+            $selector = 'select[@id="' . $selector . '"]';
+        } elseif (str_starts_with($selector, '.')) {
+            $selector = str_replace('.', '', $selector);
+            $selector = 'select[@class="' . $selector . '"]';
+        }
+
+        file_put_contents('temp.log', json_encode($this->getPage()));
+        $element = $this->getPage()->dom()->search('//'.$selector.'/option[contains(text(), "' . $value . '")]');
+        if ($element !== null && count($element)) {
+            dump($element);
+            dump('Element found');
+        } else {
+            throw new Exception('Option "' . $value . '" not found for selector "' . $selector . '"');
+        }
+    }
+
+    public function selectValue($selector, $value)
+    {
+        $this->selectOption($selector, $value);
+    }
+
     /**
      * Delete the existing text then type new value on input
      */
@@ -306,7 +331,7 @@ class CommonPage
 
     public function getPageName(): string
     {
-        return str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+        return str_replace('PrestaFlow\\Library\\Pages\\v' . $this->getMajorVersion(namespace: true) . '\\', '', get_class($this));
     }
 
     public function getSelectors(array $selectors = []): array
@@ -320,12 +345,12 @@ class CommonPage
 
         $baseSelectors = [...$selectors, ...$pageSelectors];
 
-        $customPath = __DIR__.'/../../../../../Tests/Selectors/';
+        $customPath = __DIR__ . '/../../../../../Tests/Selectors/';
 
-        $fileName = $this->getLocale().'.json';
+        $fileName = $this->getLocale() . '.json';
 
         $customSelectors = [];
-        $pathToCatalog = $customPath.$fileName;
+        $pathToCatalog = $customPath . $fileName;
         if (file_exists($pathToCatalog)) {
             $customSelectors = json_decode(file_get_contents($pathToCatalog), true);
 
@@ -378,15 +403,15 @@ class CommonPage
 
         $baseMessages = [...$messages, ...$pageMessages];
 
-        $customPath = __DIR__.'/../../../../../Tests/Messages/';
-        $fileName = $this->getLocale().'.json';
+        $customPath = __DIR__ . '/../../../../../Tests/Messages/';
+        $fileName = $this->getLocale() . '.json';
         $customMessages = [];
-        $pathToCatalog = $customPath.$fileName;
+        $pathToCatalog = $customPath . $fileName;
         if (file_exists($pathToCatalog)) {
             $customMessages = json_decode(file_get_contents($pathToCatalog), true);
 
             if (count($customMessages)) {
-                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v' . $this->getMajorVersion(namespace: true) . '\\', '', get_class($this));
                 $pageNames = explode('\\', $pageName);
 
                 foreach ($pageNames as $pageName) {
