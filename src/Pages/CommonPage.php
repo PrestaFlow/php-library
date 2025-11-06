@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
@@ -262,6 +263,8 @@ class CommonPage
 
     public function selectOption($selector, $value)
     {
+        $originalSelector = $selector;
+
         if (str_starts_with($selector, '#')) {
             $selector = str_replace('#', '', $selector);
             $selector = 'select[@id="' . $selector . '"]';
@@ -273,10 +276,9 @@ class CommonPage
         file_put_contents('temp.log', json_encode($this->getPage()));
         $element = $this->getPage()->dom()->search('//'.$selector.'/option[contains(text(), "' . $value . '")]');
         if ($element !== null && count($element)) {
-            dump($element);
-            dump('Element found');
+            $element[0]->setAttributeValue('selected', 'selected');
         } else {
-            throw new Exception('Option "' . $value . '" not found for selector "' . $selector . '"');
+            Expect::that(count($element))->isGreaterThan(0, 'Option "' . $value . '" not found for selector "' . $originalSelector . '"');
         }
     }
 
