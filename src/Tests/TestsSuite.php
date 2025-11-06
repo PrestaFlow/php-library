@@ -222,7 +222,8 @@ class TestsSuite
         return $filePath;
     }
 
-    public static function getBrowser(bool $headless = true, bool $force = true, array $globals = [])
+
+    public static function _getBrowser(bool $headless = true, bool $force = true, array $globals = [])
     {
         $browser = null;
 
@@ -292,6 +293,60 @@ class TestsSuite
         return $browser;
     }
 
+    public static function getSocketFilePath()
+    {
+        if (function_exists('storage_path')) {
+            $socketFilePath = storage_path().'/datas/.broswer';
+        } else {
+            $socketFilePath = __DIR__.'/../../datas/.broswer';
+        }
+
+        return $socketFilePath;
+    }
+
+    public static function getBrowser(bool $headless = true, bool $force = true)
+    {
+        $browser = null;
+
+        $socketFile = TestsSuite::getFilePath('.broswer');
+
+        $socket = null;
+        if (file_exists($socketFile)) {
+            $socket = \file_get_contents($socketFile);
+
+            if (!strlen($socket)) {
+                $socket = null;
+            }
+        }
+
+        try {
+            if ($socket === null) {
+                if (!$force) {
+                    return null;
+                }
+                throw new BrowserConnectionFailed('');
+            }
+            $browser = BrowserFactory::connectToBrowser($socket);
+        } catch (BrowserConnectionFailed | OperationTimedOut $e) {
+            if (!$force) {
+                return null;
+            }
+            $browserFactory = new BrowserFactory();
+
+            //$browserFactory->addOptions(['headless' => (bool) $headless]);
+
+            $browser = $browserFactory->createBrowser([
+                'userAgent' => 'PrestaFlow',
+                'keepAlive' => true,
+                'windowSize' => [1920, 1000],
+                'headless' => (bool) $headless,
+            ]);
+            \file_put_contents($socketFile, $browser->getSocketUri());
+        }
+
+        return $browser;
+    }
+
     public static function getPage()
     {
         $pages = TestsSuite::getBrowser()?->getPages();
@@ -318,7 +373,7 @@ class TestsSuite
             return;
         }
 
-        TestsSuite::getBrowser(headless: $headless, force: true, globals: $this->globals);
+        TestsSuite::getBrowser(headless: $headless, force: true);
 
         try {
             $cookies = TestsSuite::getPage()?->getCookies();
