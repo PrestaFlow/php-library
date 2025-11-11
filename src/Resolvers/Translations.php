@@ -72,12 +72,18 @@ trait Translations
         $pathToCatalog = $customPath.$fileName;
         if (file_exists($pathToCatalog)) {
             $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            if (!is_array($customCatalog)) {
+                $customCatalog = [];
+            }
         }
 
         if ($this->getMajorVersion() !== null) {
             $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
             if (file_exists($pathToCatalog)) {
                 $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+                if (!is_array($majorCatalog)) {
+                    $majorCatalog = [];
+                }
             }
         }
 
@@ -85,6 +91,9 @@ trait Translations
             $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$fileName;
             if (file_exists($pathToCatalog)) {
                 $minorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+                if (!is_array($minorCatalog)) {
+                    $minorCatalog = [];
+                }
             }
         }
 
@@ -92,6 +101,9 @@ trait Translations
             $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$this->getMinorVersion().'/'.$this->getPatchVersion().'/'.$fileName;
             if (file_exists($pathToCatalog)) {
                 $patchCatalog = json_decode(file_get_contents($pathToCatalog), true);
+                if (!is_array($patchCatalog)) {
+                    $patchCatalog = [];
+                }
             }
         }
 
