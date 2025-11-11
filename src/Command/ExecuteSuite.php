@@ -140,6 +140,7 @@ class ExecuteSuite extends Command
             return Command::SUCCESS;
         };
 
+        $nbSuites = 0;
         foreach ($testSuites as $suitePath) {
             $this->sections['progressIndicator']->advance();
 
@@ -172,6 +173,7 @@ class ExecuteSuite extends Command
 
             try {
                 if ($this->isExecutable($suite)) {
+                    $nbSuites++;
                     // Create a new section
                     $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
                     if (!array_key_exists($sectionId, $this->outputSections)) {
@@ -216,6 +218,14 @@ class ExecuteSuite extends Command
                 throw $e;
             }
         }
+
+        if (!$nbSuites) {
+            $this->sections['progressIndicator']->finish('Finished');
+            $this->sections['progressBar']->clear();
+
+            $this->success('Tests folder is empty', newLine: true);
+            return Command::SUCCESS;
+        };
 
         $this->sections['progressIndicator']->finish('Finished');
         $this->sections['progressBar']->clear();
