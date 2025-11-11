@@ -159,8 +159,18 @@ class ExecuteSuite extends Command
 
             $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits) - 1]);
 
+            $continue = true;
             try {
                 $suite = new $className();
+            } catch (Error $e) {
+                $continue = false;
+            }
+
+            if (!$continue) {
+                continue;
+            }
+
+            try {
                 if ($this->isExecutable($suite)) {
                     // Create a new section
                     $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
@@ -301,7 +311,7 @@ class ExecuteSuite extends Command
         // Check if the suite is an instance of TestsSuite
         if (
             !is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
-            && get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite'
+            || get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite'
         ) {
             return false;
         }
