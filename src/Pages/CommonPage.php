@@ -327,6 +327,11 @@ class CommonPage
         return true;
     }
 
+    public function isVisible($selector, $timeout = 1000)
+    {
+        return $this->elementIsVisible($selector, $timeout);
+    }
+
     public function getStoragePath($dir)
     {
         if (function_exists('storage_path')) {
