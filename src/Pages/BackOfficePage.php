@@ -28,7 +28,7 @@ class BackOfficePage extends CommonPage
     public function goToPage($page = null)
     {
         if ($page === null) {
-            $page = 'login';
+            $page = $this;
         }
 
         $url = $this->getPageURL($page);

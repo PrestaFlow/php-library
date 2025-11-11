@@ -42,7 +42,7 @@ class FrontOfficePage extends CommonPage
     public function goToPage($page = null, $index = null)
     {
         if ($page === null) {
-            $page = 'index';
+            $page = $this;
         }
 
         $url = $this->getPageURL($page, $index);
