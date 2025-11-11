@@ -199,6 +199,11 @@ class CommonPage
         return $this->getPage()->evaluate('document.title')->getReturnValue();
     }
 
+    public function getMetaTitle()
+    {
+        return $this->getPage()->evaluate('document.title')->getReturnValue();
+    }
+
     public function goToUrl(string $url)
     {
         $this->getPage()->navigate($url)->waitForNavigation();
