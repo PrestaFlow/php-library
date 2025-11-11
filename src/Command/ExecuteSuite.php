@@ -209,6 +209,15 @@ class ExecuteSuite extends Command
                             };
                         }
                     }
+
+                    if (self::OUTPUT_JSON === $this->getOutputMode()) {
+                        if ($input->getOption('file')) {
+                            $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+                        } else {
+                            $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                        }
+                    }
                 } else {
                     if ($this->isDebugMode()) {
                         // $this->debug('Not executable', section: $sectionId);
@@ -219,16 +228,13 @@ class ExecuteSuite extends Command
             }
         }
 
-        if (!$nbSuites) {
-            $this->sections['progressIndicator']->finish('Finished');
-            $this->sections['progressBar']->clear();
+        $this->sections['progressIndicator']->finish('Finished');
+        $this->sections['progressBar']->clear();
 
+        if (!$nbSuites) {
             $this->success('Tests folder is empty', newLine: true);
             return Command::SUCCESS;
         };
-
-        $this->sections['progressIndicator']->finish('Finished');
-        $this->sections['progressBar']->clear();
 
         $end_time = hrtime(true);
         $time = round(($end_time - $start_time) / 1e+6);
@@ -239,15 +245,6 @@ class ExecuteSuite extends Command
 
         $message = sprintf('%ss', $this->formatSeconds($time));
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
-
-        if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            if ($input->getOption('file')) {
-                $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
-                $this->success('Results saved to ' . $this->file, newLine: true, force: true);
-            } else {
-                $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
-            }
-        }
 
         return Command::SUCCESS;
     }
