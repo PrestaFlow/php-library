@@ -16,6 +16,8 @@ trait Output
 
     public const TODO = 'todo';
 
+    public const DEBUG = 'debug';
+
     public const OUTPUT_FULL = 'full';
     public const OUTPUT_COMPACT = 'compact';
     public const OUTPUT_JSON = 'json';
@@ -76,6 +78,14 @@ trait Output
     {
         $baseLine = str_repeat('  ', 3);
 
+        if (!empty($test['debug'])) {
+            foreach ($test['debug'] as $debugMessage) {
+                if (is_string($debugMessage)) {
+                    $this->debug($debugMessage, $baseLine, false, $section);
+                }
+            }
+        }
+
         if (!empty($test['expect'])) {
             foreach ($test['expect'] as $state => $expectMessages) {
                 foreach ($expectMessages as $expectMessage) {
@@ -90,6 +100,12 @@ trait Output
                         };
                     }
                 }
+            }
+        }
+
+        if (!empty($test['screen'])) {
+            if (is_string($test['screen'])) {
+                $this->outputText(baseLine: $baseLine, state: self::DEBUG, title: self::makeIcon(self::DEBUG), message: $test['screen'], secondaryColor: 'gray', section: $section, force: $force);
             }
         }
     }
@@ -340,6 +356,8 @@ trait Output
                 return '•';
             case self::TODO:
                 return '↓';
+            case self::DEBUG:
+                return '↪';
             default:
                 return '✓';
         }
