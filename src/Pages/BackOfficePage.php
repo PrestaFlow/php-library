@@ -3,11 +3,13 @@
 namespace PrestaFlow\Library\Pages;
 
 use PrestaFlow\Library\Pages\CommonPage;
+use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Traits\Locale;
 
 class BackOfficePage extends CommonPage
 {
     use Locale;
+    use Urls;
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
