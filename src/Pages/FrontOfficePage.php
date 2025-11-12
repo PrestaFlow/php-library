@@ -78,8 +78,9 @@ class FrontOfficePage extends CommonPage
             $url .= $this->getLocale() . '/';
         }
         if (is_string($page)) {
+            $pages = ['home', 'index', 'login', 'authentification', 'prices-drop', 'category', 'product'];
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null) {
+            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, $pages)) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {

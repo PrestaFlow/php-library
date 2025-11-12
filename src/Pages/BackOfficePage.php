@@ -46,7 +46,7 @@ class BackOfficePage extends CommonPage
 
         if (is_string($page)) {
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null) {
+            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, ['login', 'index'])) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {
