@@ -25,17 +25,17 @@ class BackOfficePage extends CommonPage
         parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $customs);
     }
 
-    public function goToPage($page = null)
+    public function goToPage($page = null, $params = null)
     {
         if ($page === null) {
             $page = $this;
         }
 
-        $url = $this->getPageURL($page);
+        $url = $this->getPageURL($page, $params);
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
-    public function getPageURL($page, $index = null): string
+    public function getPageURL($page, $params = null): string
     {
         $url = $this->getGlobals()['BO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -61,8 +61,10 @@ class BackOfficePage extends CommonPage
             }
         }
 
-        if (is_int($index)) {
-            $url = str_replace('{index}', $index, $url);
+        if (is_array($params) && count($params) > 0) {
+            foreach ($params as $key => $value) {
+                $url = str_replace('{' . $key . '}', $value, $url);
+            }
         }
 
         return $url;
