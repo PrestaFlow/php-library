@@ -258,7 +258,10 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
-        return $this->getPage()->mouse()->find($selector, $nth)->click();
+        $element = $this->getPage()->dom()->querySelector($selector);
+        return $element->click();
+
+        //return $this->getPage()->mouse()->find($selector, $nth)->click();
     }
 
     public function waitForPageReload()
