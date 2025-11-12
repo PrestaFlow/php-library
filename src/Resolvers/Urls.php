@@ -25,7 +25,7 @@ trait Urls
             return $this->urls[$page];
         }
 
-        return null;
+        return $page;
     }
 
     public function getUrls()
