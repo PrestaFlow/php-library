@@ -319,7 +319,10 @@ class CommonPage
     public function elementIsVisible($selector, $timeout = 1000)
     {
         try {
-            $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            $elem = $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            if (get_class($elem->dom()) instanceof \HeadlessChromium\Dom) {
+                return true;
+            }
         } catch (ElementNotFoundException | OperationTimedOut | Exception $e) {
             return false;
         }
