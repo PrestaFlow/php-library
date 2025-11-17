@@ -25,7 +25,7 @@ trait Urls
             return $this->urls[$page];
         }
 
-        return null;
+        return $page;
     }
 
     public function getUrls()
@@ -34,21 +34,27 @@ trait Urls
             $this->initLocale($this->getGlobal('LOCALE'));
         }
 
-        $customPath = __DIR__.'/../../../../../Tests/Urls/';
-        $basePath = __DIR__.'/../Urls/';
-        $fileName = $this->getLocale().'.json';
+        $customPath = __DIR__ . '/../../../../../Tests/Urls/';
+        $basePath = __DIR__ . '/../Urls/';
+        $fileName = $this->getLocale() . '.json';
         $defaultCatalog = [];
         $customCatalog = [];
         $mergedCatalog = [];
 
-        $pathToCatalog = $basePath.$fileName;
+        $pathToCatalog = $basePath . $fileName;
         if (file_exists($pathToCatalog)) {
             $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            if (!is_array($defaultCatalog)) {
+                $defaultCatalog = [];
+            }
         }
 
-        $pathToCatalog = $customPath.$fileName;
+        $pathToCatalog = $customPath . $fileName;
         if (file_exists($pathToCatalog)) {
             $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            if (!is_array($defaultCatalog)) {
+                $defaultCatalog = [];
+            }
         }
 
         $specificUrls = [];

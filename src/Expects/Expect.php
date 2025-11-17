@@ -160,10 +160,6 @@ class Expect extends ExpectLibrary
 
     public function elementIsVisible($selector = null, $timeout = 30000, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "";
-        }
-
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
         Expect::that($isVisible, true)->visible($selector, $avoidExpectMessage, expectedMessage: $expectedMessage);
@@ -171,10 +167,6 @@ class Expect extends ExpectLibrary
 
     public function elementIsNotVisible($selector = null, $timeout = 30000, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "";
-        }
-
         $isVisible = $this->_elementIsVisible($selector, $timeout);
 
         Expect::that($isVisible, true)->notVisible($selector, $avoidExpectMessage, expectedMessage: $expectedMessage);
@@ -434,7 +426,13 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        return parent::isNull();
+        $this->isDefined();
+        if ($this->getValue() !== null)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => null));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isNotNull(?string $expectedMessage = null)
@@ -445,7 +443,12 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        return parent::isNotNull();
+        if ($this->getValue() === null)
+        {
+            $e = $this->getExceptionConstructor($expectedMessage);
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isEmpty(?string $expectedMessage = null)
@@ -456,7 +459,13 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        return parent::isEmpty();
+        $this->isDefined();
+        if (!empty($this->getValue()))
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage);
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isNotEmpty(?string $expectedMessage = null)
@@ -467,7 +476,12 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        return parent::isNotEmpty();
+        if (empty($this->getValue()))
+        {
+            $e = $this->getExceptionConstructor($expectedMessage);
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isBetween($min, $max, ?string $expectedMessage = null)
@@ -477,8 +491,13 @@ class Expect extends ExpectLibrary
         }
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("min" => $min, "max" => $max));
-
-        return parent::isBetween($min, $max);
+        $this->isNumber();
+        if ($this->getValue() < $min || $this->getValue() > $max)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("min" => $min, "max" => $max));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isGreaterThan($other, ?string $expectedMessage = null)
@@ -489,7 +508,13 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
-        return parent::isGreaterThan($other);
+        $this->isNumber();
+        if ($this->getValue() <= $other)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("other" => $other));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isLessThan($other, ?string $expectedMessage = null)
@@ -500,7 +525,13 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
-        return parent::isLessThan($other);
+        $this->isNumber();
+        if ($this->getValue() >= $other)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("other" => $other));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isGreaterThanOrEqualTo($other, ?string $expectedMessage = null)
@@ -511,7 +542,13 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
-        return parent::isGreaterThanOrEqualTo($other);
+        $this->isNumber();
+        if ($this->getValue()< $other)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("other" => $other));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 
     public function isLessThanOrEqualTo($other, ?string $expectedMessage = null)
@@ -522,6 +559,12 @@ class Expect extends ExpectLibrary
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
-        return parent::isLessThanOrEqualTo($other);
+        $this->isNumber();
+        if ($this->getValue() > $other)
+        {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("other" => $other));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
     }
 }

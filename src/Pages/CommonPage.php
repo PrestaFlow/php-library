@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
@@ -57,7 +58,7 @@ class CommonPage
         return $this;
     }
 
-    public function init(string $locale, string $patchVersion) : CommonPage
+    public function init(string $locale, string $patchVersion): CommonPage
     {
         /*
         $this->initTranslations(
@@ -105,7 +106,7 @@ class CommonPage
             $selector = $this->selectors[$selector];
             if (is_array($replacements)) {
                 foreach ($replacements as $key => $value) {
-                    $selector = str_replace('${'.$key.'}', $value, $selector);
+                    $selector = str_replace('${' . $key . '}', $value, $selector);
                 }
             }
             return $selector;
@@ -135,7 +136,7 @@ class CommonPage
         */
     }
 
-    public function getGlobals() : array
+    public function getGlobals(): array
     {
         return $this->globals;
     }
@@ -198,6 +199,11 @@ class CommonPage
         return $this->getPage()->evaluate('document.title')->getReturnValue();
     }
 
+    public function getMetaTitle()
+    {
+        return $this->getPage()->evaluate('document.title')->getReturnValue();
+    }
+
     public function goToUrl(string $url)
     {
         $this->getPage()->navigate($url)->waitForNavigation();
@@ -252,12 +258,44 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
+        $element = $this->getPage()->dom()->querySelector($selector);
+        return $element->click();
+    }
+
+    public function leftClick($selector, $nth = 1)
+    {
         return $this->getPage()->mouse()->find($selector, $nth)->click();
     }
 
     public function waitForPageReload()
     {
         $this->getPage()->evaluate('some js that will reload the page')->waitForPageReload();
+    }
+
+    public function selectOption($selector, $value)
+    {
+        $originalSelector = $selector;
+
+        if (str_starts_with($selector, '#')) {
+            $selector = str_replace('#', '', $selector);
+            $selector = 'select[@id="' . $selector . '"]';
+        } elseif (str_starts_with($selector, '.')) {
+            $selector = str_replace('.', '', $selector);
+            $selector = 'select[@class="' . $selector . '"]';
+        }
+
+        file_put_contents('temp.log', json_encode($this->getPage()));
+        $element = $this->getPage()->dom()->search('//'.$selector.'/option[contains(text(), "' . $value . '")]');
+        if ($element !== null && count($element)) {
+            $element[0]->setAttributeValue('selected', 'selected');
+        } else {
+            Expect::that(count($element))->isGreaterThan(0, 'Option "' . $value . '" not found for selector "' . $originalSelector . '"');
+        }
+    }
+
+    public function selectValue($selector, $value)
+    {
+        $this->selectOption($selector, $value);
     }
 
     /**
@@ -287,12 +325,20 @@ class CommonPage
     public function elementIsVisible($selector, $timeout = 1000)
     {
         try {
-            $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            $elem = $this->getPage()->waitUntilContainsElement($selector, $timeout);
+            if (get_class($elem->dom()) instanceof \HeadlessChromium\Dom) {
+                return true;
+            }
         } catch (ElementNotFoundException | OperationTimedOut | Exception $e) {
             return false;
         }
 
         return true;
+    }
+
+    public function isVisible($selector, $timeout = 1000)
+    {
+        return $this->elementIsVisible($selector, $timeout);
     }
 
     public function getStoragePath($dir)
@@ -306,7 +352,7 @@ class CommonPage
 
     public function getPageName(): string
     {
-        return str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+        return str_replace('PrestaFlow\\Library\\Pages\\v' . $this->getMajorVersion(namespace: true) . '\\', '', get_class($this));
     }
 
     public function getSelectors(array $selectors = []): array
@@ -320,12 +366,12 @@ class CommonPage
 
         $baseSelectors = [...$selectors, ...$pageSelectors];
 
-        $customPath = __DIR__.'/../../../../../Tests/Selectors/';
+        $customPath = __DIR__ . '/../../../../../Tests/Selectors/';
 
-        $fileName = $this->getLocale().'.json';
+        $fileName = $this->getLocale() . '.json';
 
         $customSelectors = [];
-        $pathToCatalog = $customPath.$fileName;
+        $pathToCatalog = $customPath . $fileName;
         if (file_exists($pathToCatalog)) {
             $customSelectors = json_decode(file_get_contents($pathToCatalog), true);
 
@@ -378,15 +424,15 @@ class CommonPage
 
         $baseMessages = [...$messages, ...$pageMessages];
 
-        $customPath = __DIR__.'/../../../../../Tests/Messages/';
-        $fileName = $this->getLocale().'.json';
+        $customPath = __DIR__ . '/../../../../../Tests/Messages/';
+        $fileName = $this->getLocale() . '.json';
         $customMessages = [];
-        $pathToCatalog = $customPath.$fileName;
+        $pathToCatalog = $customPath . $fileName;
         if (file_exists($pathToCatalog)) {
             $customMessages = json_decode(file_get_contents($pathToCatalog), true);
 
             if (count($customMessages)) {
-                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\', '', get_class($this));
+                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v' . $this->getMajorVersion(namespace: true) . '\\', '', get_class($this));
                 $pageNames = explode('\\', $pageName);
 
                 foreach ($pageNames as $pageName) {
