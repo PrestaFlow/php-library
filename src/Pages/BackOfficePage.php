@@ -3,11 +3,13 @@
 namespace PrestaFlow\Library\Pages;
 
 use PrestaFlow\Library\Pages\CommonPage;
+use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Traits\Locale;
 
 class BackOfficePage extends CommonPage
 {
     use Locale;
+    use Urls;
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
@@ -25,17 +27,17 @@ class BackOfficePage extends CommonPage
         parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $customs);
     }
 
-    public function goToPage($page = null)
+    public function goToPage($page = null, $params = null)
     {
         if ($page === null) {
-            $page = 'login';
+            $page = $this;
         }
 
-        $url = $this->getPageURL($page);
+        $url = $this->getPageURL($page, $params);
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
-    public function getPageURL($page, $index = null): string
+    public function getPageURL($page, $params = null): string
     {
         $url = $this->getGlobals()['BO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -44,7 +46,7 @@ class BackOfficePage extends CommonPage
 
         if (is_string($page)) {
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null) {
+            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, ['login', 'index'])) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {
@@ -61,8 +63,10 @@ class BackOfficePage extends CommonPage
             }
         }
 
-        if (is_int($index)) {
-            $url = str_replace('{index}', $index, $url);
+        if (is_array($params) && count($params) > 0) {
+            foreach ($params as $key => $value) {
+                $url = str_replace('{' . $key . '}', $value, $url);
+            }
         }
 
         return $url;

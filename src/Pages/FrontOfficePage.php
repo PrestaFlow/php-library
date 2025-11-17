@@ -39,13 +39,18 @@ class FrontOfficePage extends CommonPage
         parent::__construct(locale: $locale, patchVersion: $patchVersion, globals: $globals, customs: $customs);
     }
 
-    public function goToPage($page = null, $index = null)
+    public function goToPage($page = null, $params = null)
     {
         if ($page === null) {
-            $page = 'index';
+            $page = $this;
         }
 
-        $url = $this->getPageURL($page, $index);
+        // Backward
+        if (is_string($index)) {
+            $params = ['index' => $index];
+        }
+
+        $url = $this->getPageURL($page, $params);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
         $this->getPage()->navigate($url)->waitForNavigation();
@@ -62,7 +67,7 @@ class FrontOfficePage extends CommonPage
         }
     }
 
-    public function getPageURL($page, $index = null): string
+    public function getPageURL($page, $params = null): string
     {
         $url = $this->getGlobals()['FO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -73,8 +78,9 @@ class FrontOfficePage extends CommonPage
             $url .= $this->getLocale() . '/';
         }
         if (is_string($page)) {
+            $pages = ['home', 'index', 'login', 'authentification', 'prices-drop', 'category', 'product'];
             $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null) {
+            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, $pages)) {
                 $url .= $pageUrl;
             } else {
                 $url .= match ($page) {
@@ -95,8 +101,10 @@ class FrontOfficePage extends CommonPage
             }
         }
 
-        if (is_int($index)) {
-            $url = str_replace('{index}', $index, $url);
+        if (is_array($params) && count($params) > 0) {
+            foreach ($params as $key => $value) {
+                $url = str_replace('{' . $key . '}', $value, $url);
+            }
         }
 
         return $url;

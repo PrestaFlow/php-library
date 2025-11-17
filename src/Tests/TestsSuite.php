@@ -211,6 +211,88 @@ class TestsSuite
         return $this->groups;
     }
 
+    public static function getFilePath($filename = '.broswer')
+    {
+        if (function_exists('storage_path')) {
+            $filePath = storage_path().'/datas/'.$filename;
+        } else {
+            $filePath = __DIR__.'/../../datas/'.$filename;
+        }
+
+        return $filePath;
+    }
+
+
+    public static function _getBrowser(bool $headless = true, bool $force = true, array $globals = [])
+    {
+        $browser = null;
+
+        $windowWidth = (int)$globals['BROWSER']['WINDOW_SIZE_WIDTH'] ?? 1920;
+        $windowHeight = (int) $globals['BROWSER']['WINDOW_SIZE_HEIGHT'] ?? 1000;
+
+        if ($windowWidth <= 0) {
+            $windowWidth = 1920;
+        }
+        if ($windowHeight <= 0) {
+            $windowHeight = 1000;
+        }
+
+        $browserOptions = [
+            'userAgent' => $globals['BROWSER']['USER_AGENT'] ?? 'PrestaFlow',
+            'keepAlive' => true,
+            'windowSize' => [$windowWidth, $windowHeight],
+            'headless' => (bool) $headless,
+        ];
+
+        $browserOptionsFile = TestsSuite::getFilePath('.broswer-options');
+        $socketFile = TestsSuite::getFilePath('.broswer');
+
+        $socket = null;
+        if (file_exists($browserOptionsFile)) {
+            $browserOptionsDatas = \file_get_contents($browserOptionsFile);
+            $savedBrowserOptions = \json_decode($browserOptionsDatas, true);
+
+            if (is_array($savedBrowserOptions)
+                && count($browserOptions) == count($savedBrowserOptions)
+                && array_diff($browserOptions, $savedBrowserOptions) === array_diff($savedBrowserOptions, $browserOptions)) {
+                if (file_exists($socketFile)) {
+                    $socket = \file_get_contents($socketFile);
+
+                    if (!strlen($socket)) {
+                        $socket = null;
+                    }
+                }
+            } else {
+                // options have changed, remove socket file to force new browser creation
+                if (file_exists($socketFile)) {
+                    unlink($socketFile);
+                }
+            }
+        }
+
+        try {
+            if ($socket === null) {
+                if (!$force) {
+                    return null;
+                }
+                throw new BrowserConnectionFailed('');
+            }
+            $browser = BrowserFactory::connectToBrowser($socket);
+        } catch (BrowserConnectionFailed | OperationTimedOut $e) {
+            if (!$force) {
+                return null;
+            }
+
+            $browserFactory = new BrowserFactory();
+            $browser = $browserFactory->createBrowser($browserOptions);
+
+            \file_put_contents($browserOptionsFile, \json_encode($browserOptions));
+            \file_put_contents($socketFile, $browser->getSocketUri());
+        }
+
+        return $browser;
+    }
+
     public static function getSocketFilePath()
     {
         if (function_exists('storage_path')) {
@@ -226,7 +308,7 @@ class TestsSuite
     {
         $browser = null;
 
-        $socketFile = TestsSuite::getSocketFilePath();
+        $socketFile = TestsSuite::getFilePath('.broswer');
 
         $socket = null;
         if (file_exists($socketFile)) {
@@ -438,9 +520,14 @@ class TestsSuite
                 'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
             ],
-            'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
             'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
             'VERBOSE' => (bool) $_ENV['PRESTAFLOW_VERBOSE'] ?? true,
+            'BROWSER' => [
+                'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
+                'WINDOW_SIZE_HEIGHT' => $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? 1920,
+                'WINDOW_SIZE_WIDTH' => $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'] ?? 1000,
+                'USER_AGENT' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
+            ],
         ];
 
         $this->exctractVersions($_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0');
@@ -454,7 +541,7 @@ class TestsSuite
 
     public function isHeadlessMode(): bool
     {
-        return $this->getGlobals()['HEADLESS'] ?? true;
+        return $this->getGlobals()['BROWSER']['HEADLESS'] ?? true;
     }
 
     public function isDebugMode(): bool

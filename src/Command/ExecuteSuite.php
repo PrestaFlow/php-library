@@ -140,6 +140,7 @@ class ExecuteSuite extends Command
             return Command::SUCCESS;
         };
 
+        $nbSuites = 0;
         foreach ($testSuites as $suitePath) {
             $this->sections['progressIndicator']->advance();
 
@@ -159,9 +160,20 @@ class ExecuteSuite extends Command
 
             $className = $namespace . '\\' . str_replace('.php', '', $pathSplits[count($pathSplits) - 1]);
 
+            $continue = true;
             try {
                 $suite = new $className();
+            } catch (Error $e) {
+                $continue = false;
+            }
+
+            if (!$continue) {
+                continue;
+            }
+
+            try {
                 if ($this->isExecutable($suite)) {
+                    $nbSuites++;
                     // Create a new section
                     $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
                     if (!array_key_exists($sectionId, $this->outputSections)) {
@@ -197,6 +209,15 @@ class ExecuteSuite extends Command
                             };
                         }
                     }
+
+                    if (self::OUTPUT_JSON === $this->getOutputMode()) {
+                        if ($input->getOption('file')) {
+                            $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+                        } else {
+                            $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
+                        }
+                    }
                 } else {
                     if ($this->isDebugMode()) {
                         // $this->debug('Not executable', section: $sectionId);
@@ -210,6 +231,11 @@ class ExecuteSuite extends Command
         $this->sections['progressIndicator']->finish('Finished');
         $this->sections['progressBar']->clear();
 
+        if (!$nbSuites) {
+            $this->success('Tests folder is empty', newLine: true);
+            return Command::SUCCESS;
+        };
+
         $end_time = hrtime(true);
         $time = round(($end_time - $start_time) / 1e+6);
 
@@ -219,15 +245,6 @@ class ExecuteSuite extends Command
 
         $message = sprintf('%ss', $this->formatSeconds($time));
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
-
-        if (self::OUTPUT_JSON === $this->getOutputMode()) {
-            if ($input->getOption('file')) {
-                $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
-                $this->success('Results saved to ' . $this->file, newLine: true, force: true);
-            } else {
-                $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
-            }
-        }
 
         return Command::SUCCESS;
     }
@@ -301,7 +318,7 @@ class ExecuteSuite extends Command
         // Check if the suite is an instance of TestsSuite
         if (
             !is_subclass_of($suite, 'PrestaFlow\Library\Tests\TestsSuite')
-            && get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite'
+            || get_class($suite) === 'PrestaFlow\Library\Tests\TestsSuite'
         ) {
             return false;
         }
