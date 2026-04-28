@@ -45,11 +45,6 @@ class FrontOfficePage extends CommonPage
             $page = $this;
         }
 
-        // Backward
-        if (is_string($index)) {
-            $params = ['index' => $index];
-        }
-
         $url = $this->getPageURL($page, $params);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
