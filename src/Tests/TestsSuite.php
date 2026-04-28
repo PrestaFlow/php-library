@@ -557,7 +557,7 @@ class TestsSuite
         return $this->globals;
     }
 
-    public function run($cli = false, OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
+    public function run($cli = false, ?OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
     {
         $this->cli = $cli;
         $this->output = $output;
