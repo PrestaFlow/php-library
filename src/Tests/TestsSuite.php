@@ -473,10 +473,10 @@ class TestsSuite
 
     public function loadGlobals()
     {
-        $dotenv = Dotenv::createImmutable(__DIR__.'/../../');
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
         // When importing the library in a project, the .env file is not in the same directory
-        $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../');
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
 
         if (isset($_ENV['PRESTAFLOW_DEBUG'])) {
