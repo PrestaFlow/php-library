@@ -70,6 +70,8 @@ class TestsSuite
 
     protected static $lines = [];
 
+    protected static array $pendingDebugMessages = [];
+
     protected $draft = false;
     protected $groups = 'all';
 
@@ -645,6 +647,7 @@ class TestsSuite
                     $this->failed = true;
                 } finally {
                     $test['expect'] = Expect::getExpectMessage();
+                    $this->attachDebugMessages($test);
                     Expect::getNbAssertions();
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
@@ -703,6 +706,20 @@ class TestsSuite
         }
     }
 
+    public function console(string|array $message): static
+    {
+        return $this->log($message);
+    }
+
+    public function log(string|array $message): static
+    {
+        self::$pendingDebugMessages[] = is_array($message)
+            ? json_encode($message, JSON_PRETTY_PRINT)
+            : $message;
+
+        return $this;
+    }
+
     public function attachWarning(&$test)
     {
         $test['warning'] = Expect::$latestWarning;
@@ -713,6 +730,12 @@ class TestsSuite
     {
         $test['screen'] = Expect::$latestError;
         $this->screens[] = $test['screen'];
+    }
+
+    public function attachDebugMessages(&$test)
+    {
+        $test['debug'] = self::$pendingDebugMessages;
+        self::$pendingDebugMessages = [];
     }
 
     public function results($json = true)
