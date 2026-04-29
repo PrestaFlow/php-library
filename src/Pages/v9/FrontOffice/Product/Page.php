@@ -38,7 +38,14 @@ class Page extends BasePage
 
     public function getPrice()
     {
-        return $this->getTextContent($this->getSelector('currentProductPrice'));
+        $price = $this->getTextContent($this->getSelector('currentProductPrice'));
+
+        if (is_string($price)) {
+            $price = trim(str_replace(['$', '€', '£'], '', $price));
+            $price = floatval(str_replace(',', '.', $price));
+        }
+
+        return $price;
     }
 
     public function addToCart(int $quantity = 1)
