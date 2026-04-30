@@ -136,9 +136,10 @@ class Expect extends ExpectLibrary
             $explanation = self::$overrideMessage;
         }
 
-        if (isset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)])) {
-            self::$expectMessage['fail'][] = self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)];
-            unset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)]);
+        if (!empty(self::$expectMessage['pass'])) {
+            $lastIndex = count(self::$expectMessage['pass']) - 1;
+            self::$expectMessage['fail'][] = self::$expectMessage['pass'][$lastIndex];
+            unset(self::$expectMessage['pass'][$lastIndex]);
         }
 
         return $this->getConditionViolationExceptionConstructor(
