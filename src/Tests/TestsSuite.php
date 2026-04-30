@@ -65,6 +65,8 @@ class TestsSuite
     protected $dataset = [];
     protected $datasets = [];
 
+    protected array $store = [];
+
     protected $scenarioName = '';
     protected $scenarioParams = [];
 
@@ -87,6 +89,18 @@ class TestsSuite
     public function getParam($paramName)
     {
         return $this->scenarioParams[$this->scenarioName][$paramName] ?? $this->dataset[$paramName] ?? null;
+    }
+
+    public function store(string $key, mixed $value): static
+    {
+        $this->store[$key] = $value;
+
+        return $this;
+    }
+
+    public function retrieve(string $key, mixed $default = null): mixed
+    {
+        return $this->store[$key] ?? $default;
     }
 
     public function describe(string $description)
