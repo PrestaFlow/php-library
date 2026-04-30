@@ -392,6 +392,22 @@ class Expect extends ExpectLibrary
         return $this;
     }
 
+    public function isNotTheSameAs($expected, ?string $expectedMessage = null)
+    {
+        if ($expectedMessage === null) {
+            $expectedMessage = "{value} must not be the same as {expected}";
+        }
+
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $expected, "value" => $this->getValue()));
+
+        $this->isDefined();
+        if ($this->getValue() === $expected) {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $expected, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
+
     public function samePriceAs($price, ?string $expectedMessage = null)
     {
         if ($expectedMessage === null) {
@@ -413,7 +429,25 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
         if ($this->getValue() != $other) {
-            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other));
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
+
+    public function notEquals($other, ?string $expectedMessage = null)
+    {
+        if ($expectedMessage === null) {
+            $expectedMessage = "{value} must not be equal to {expected}";
+        }
+
+        $other = trim($other);
+
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $other, "value" => $this->getValue()));
+
+        $this->isDefined();
+        if ($this->getValue() == $other) {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
         return $this;
@@ -430,7 +464,7 @@ class Expect extends ExpectLibrary
         $this->isDefined();
         if ($this->getValue() !== null)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => null));
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => null, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
         return $this;
