@@ -508,12 +508,20 @@ class TestsSuite
             $frontOfficeUrl .= '/';
         }
 
+        $backOfficeUrl = $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/';
+        if (!str_starts_with($backOfficeUrl, 'https://') && !str_starts_with($backOfficeUrl, 'http://')) {
+            $backOfficeUrl = $frontOfficeUrl . $backOfficeUrl;
+        }
+        if (!str_ends_with($backOfficeUrl, '/')) {
+            $backOfficeUrl .= '/';
+        }
+
         $this->globals = [
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
             'PREFIX_LOCALE' => (bool) $_ENV['PRESTAFLOW_PREFIX_LOCALE'] ?? false,
             'BO' => [
-                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/',
+                'URL' => $backOfficeUrl,
                 'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
