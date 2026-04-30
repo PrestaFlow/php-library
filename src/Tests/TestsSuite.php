@@ -454,6 +454,12 @@ class TestsSuite
         return $this;
     }
 
+    public function setLocale(string $locale)
+    {
+        self::$locale = $locale;
+        Expect::setLocale($locale);
+    }
+
     public function setGlobals(array $globals = [])
     {
         $this->globals = array_merge($this->globals, $globals);
