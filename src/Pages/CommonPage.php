@@ -322,6 +322,11 @@ class CommonPage
         // $element->sendKeys($value);
     }
 
+    public function fillQuantity($selector, int $qty): void
+    {
+        $this->setValue($selector, $qty);
+    }
+
     public function elementIsVisible($selector, $timeout = 1000)
     {
         try {
