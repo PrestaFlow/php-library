@@ -5,10 +5,12 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use HeadlessChromium\Page as DomPage;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
+
 
 class CommonPage
 {
@@ -207,6 +209,11 @@ class CommonPage
     public function goToUrl(string $url)
     {
         $this->getPage()->navigate($url)->waitForNavigation();
+    }
+
+    public function waitForPageLoaded()
+    {
+        $this->waitForNavigation(DomPage::DOM_CONTENT_LOADED, 10000);
     }
 
     public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
