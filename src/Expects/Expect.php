@@ -9,6 +9,7 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as HeadlessChromiumPage;
 use Nunzion\Expect as ExpectLibrary;
 use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Utils\Screenshots;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 
 class Expect extends ExpectLibrary
@@ -21,6 +22,7 @@ class Expect extends ExpectLibrary
 
     public static $latestWarning = '';
     public static $latestError = '';
+    public static $latestScreenshotError = null;
     public static $nbAssertions = 0;
 
     protected static string $locale = 'en';
@@ -127,10 +129,11 @@ class Expect extends ExpectLibrary
 
     protected function getExceptionConstructor($explanation, $arguments = array())
     {
+        self::$latestScreenshotError = null;
         try {
             $page = TestsSuite::getPage();
             if ($page instanceof HeadlessChromiumPage) {
-                sleep(3);
+                sleep(Screenshots::captureDelay());
                 $fileName = 'error_' . $page->getSession()->getTargetId() . '-' . time() . '.png';
                 self::$latestError = $fileName;
                 $screenshot = $page->screenshot([
@@ -138,18 +141,17 @@ class Expect extends ExpectLibrary
                     'clip' => $page->getFullPageClip(),
                     'format' => 'png',
                 ]);
-                if (function_exists('storage_path')) {
-                    $screenshot->saveToFile(storage_path() . '/screens/errors/' . $fileName);
-                } else {
-                    $screenshot->saveToFile('./prestaflow/screens/errors/' . $fileName);
-                }
+                $screenshot->saveToFile(Screenshots::errorPath($fileName, create: true));
             }
         } catch (OperationTimedOut $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         } catch (FilesystemException $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         } catch (Exception $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         }
 
         if (self::$overrideMessage !== null) {

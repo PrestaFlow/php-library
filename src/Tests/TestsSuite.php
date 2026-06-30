@@ -758,6 +758,11 @@ class TestsSuite
     {
         $test['screen'] = Expect::$latestError;
         $this->screens[] = $test['screen'];
+
+        if (!empty(Expect::$latestScreenshotError)) {
+            $this->log('Screenshot capture failed: ' . Expect::$latestScreenshotError);
+            Expect::$latestScreenshotError = null;
+        }
     }
 
     public function attachDebugMessages(&$test)

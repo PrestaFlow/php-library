@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Reports;
 
 use DOMDocument;
 use DOMElement;
+use PrestaFlow\Library\Utils\Screenshots;
 
 final class JUnitReport
 {
@@ -67,9 +68,25 @@ final class JUnitReport
         if ($state === 'fail') {
             $messages = $test['expect']['fail'] ?? [];
             $message = is_array($messages) ? implode("\n", $messages) : (string) $messages;
+
+            $screen = $test['screen'] ?? null;
+            $relative = (is_string($screen) && $screen !== '')
+                ? Screenshots::relativeErrorPath($screen)
+                : null;
+
+            if ($relative !== null) {
+                $message .= "\nScreenshot: " . $relative;
+            }
+
             $failureEl = $doc->createElement('failure');
             $failureEl->setAttribute('message', $message);
             $caseEl->appendChild($failureEl);
+
+            if ($relative !== null) {
+                $sysOut = $doc->createElement('system-out');
+                $sysOut->appendChild($doc->createTextNode('[[ATTACHMENT|' . $relative . ']]'));
+                $caseEl->appendChild($sysOut);
+            }
         } elseif (in_array($state, ['skip', 'skipped', 'todo'], true)) {
             $caseEl->appendChild($doc->createElement('skipped'));
         }

@@ -105,9 +105,7 @@ trait Output
 
         if (!empty($test['screen'])) {
             if (is_string($test['screen'])) {
-                $screenPath = function_exists('storage_path')
-                    ? storage_path() . '/screens/errors/' . $test['screen']
-                    : realpath('./prestaflow/screens/errors') . '/' . $test['screen'];
+                $screenPath = Screenshots::errorPath($test['screen']);
 
                 $this->outputText(baseLine: $baseLine, state: self::DEBUG, title: self::makeIcon(self::DEBUG), message: $test['screen'], secondaryColor: 'gray', section: $section, force: $force);
 

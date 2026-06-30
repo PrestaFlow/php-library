@@ -76,4 +76,29 @@ final class JUnitReportTest extends TestCase
         $this->assertNotFalse($xml);
         $this->assertSame('a < b & "c"', (string) $xml->testsuite[0]->testcase[0]['name']);
     }
+
+    public function testFailureWithScreenshotEmitsAttachment(): void
+    {
+        $report = new JUnitReport();
+        $report->addSuite($this->sampleSuite([
+            'tests' => [['title' => 'boom', 'state' => 'fail', 'time' => 100, 'expect' => ['fail' => ['expected true']], 'screen' => 'error_x.png']],
+        ]));
+        $xml = simplexml_load_string($report->render());
+        $this->assertNotFalse($xml);
+        $case = $xml->testsuite[0]->testcase[0];
+        $this->assertStringContainsString('Screenshot: prestaflow/screens/errors/error_x.png', (string) $case->failure['message']);
+        $this->assertSame('[[ATTACHMENT|prestaflow/screens/errors/error_x.png]]', trim((string) $case->{'system-out'}));
+    }
+
+    public function testFailureWithoutScreenshotHasNoAttachment(): void
+    {
+        $report = new JUnitReport();
+        $report->addSuite($this->sampleSuite([
+            'tests' => [['title' => 'boom', 'state' => 'fail', 'time' => 100, 'expect' => ['fail' => ['expected true']]]],
+        ]));
+        $xml = simplexml_load_string($report->render());
+        $case = $xml->testsuite[0]->testcase[0];
+        $this->assertFalse(isset($case->{'system-out'}));
+        $this->assertStringNotContainsString('Screenshot:', (string) $case->failure['message']);
+    }
 }
