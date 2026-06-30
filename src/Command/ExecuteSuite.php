@@ -4,6 +4,8 @@ namespace PrestaFlow\Library\Command;
 
 use Error;
 use PrestaFlow\Library\Utils\Output;
+use PrestaFlow\Library\Reports\JUnitReport;
+use PrestaFlow\Library\Reports\TestRunSummary;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressIndicator;
@@ -45,6 +47,7 @@ class ExecuteSuite extends Command
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output format (full, compact, json)', self::OUTPUT_FULL)
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
             ->addOption('file', 'f', InputOption::VALUE_NONE, 'Output to file')
+            ->addOption('junit', null, InputOption::VALUE_OPTIONAL, 'Write a JUnit XML report (default path: prestaflow/junit.xml)', false)
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -121,6 +124,12 @@ class ExecuteSuite extends Command
         $this->draftMode = $input->getOption('draft') ?? null;
 
         $this->groups = $input->getOption('group') ?? ['all'];
+
+        $summary = new TestRunSummary();
+        $report = new JUnitReport();
+
+        $junitOption = $input->getOption('junit');
+        $junitPath = ($junitOption === false) ? null : ($junitOption ?: 'prestaflow/junit.xml');
 
         $folderPath = ucfirst($input->getArgument('folder'));
 
@@ -210,6 +219,9 @@ class ExecuteSuite extends Command
                         }
                     }
 
+                    $summary->add($suite->getStats());
+                    $report->addSuite($suite->results(false));
+
                     if (self::OUTPUT_JSON === $this->getOutputMode()) {
                         if ($input->getOption('file')) {
                             $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
@@ -246,7 +258,12 @@ class ExecuteSuite extends Command
         $message = sprintf('%ss', $this->formatSeconds($time));
         $this->cli(baseLine: '', bold: false, titleColor: 'gray', title: 'Duration:', secondaryColor: 'white', message: $message, newLine: true, section: 'duration');
 
-        return Command::SUCCESS;
+        if ($junitPath !== null) {
+            $this->filePutContents($junitPath, $report->render());
+            $this->success('JUnit report saved to ' . $junitPath, newLine: true, force: true);
+        }
+
+        return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
     }
 
     protected function handleDir($path)

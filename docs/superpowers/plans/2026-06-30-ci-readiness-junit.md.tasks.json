@@ -1,0 +1,33 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-30-ci-readiness-junit.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: PHPUnit dev harness",
+      "status": "completed",
+      "description": "**Goal:** Add a browser-free PHPUnit setup so the new pure classes can be unit-tested.\n\n**Files:** composer.json, phpunit.xml.dist, tests/Unit/.gitkeep, .gitignore\n\n**Verify:** composer test-unit -> PHPUnit banner, exit 0 with 'No tests executed!'\n\n```json:metadata\n{\"files\": [\"composer.json\", \"phpunit.xml.dist\", \"tests/Unit/.gitkeep\", \".gitignore\"], \"verifyCommand\": \"composer test-unit\", \"acceptanceCriteria\": [\"PHPUnit ^10 installed as dev dep\", \"composer test-unit exits 0 with no tests\", \"existing tests script unchanged\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: TestRunSummary (exit-code decision)",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** A pure accumulator that answers 'did any test fail across all suites?'.\n\n**Files:** src/Reports/TestRunSummary.php, tests/Unit/Reports/TestRunSummaryTest.php\n\n**API:** add(array $stats): void ; totalFailures(): int ; hasFailures(): bool\n\n**Verify:** vendor/bin/phpunit tests/Unit/Reports/TestRunSummaryTest.php -> 4 green\n\n```json:metadata\n{\"files\": [\"src/Reports/TestRunSummary.php\", \"tests/Unit/Reports/TestRunSummaryTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Reports/TestRunSummaryTest.php\", \"acceptanceCriteria\": [\"add() accumulates failures\", \"hasFailures() true iff >0\", \"missing failures key = 0\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: JUnitReport (XML serialiser)",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Convert accumulated suite results into a well-formed JUnit XML string via DOMDocument.\n\n**Files:** src/Reports/JUnitReport.php, tests/Unit/Reports/JUnitReportTest.php\n\n**API:** addSuite(array $results): void ; render(): string\n\n**Mapping:** suite -> testsuite(name/tests/failures/errors=0/skipped=skips+skippeds+todos/time s 3dec); pass -> testcase; fail -> +failure(message=implode expect['fail']); skip/skipped/todo -> +skipped.\n\n**Verify:** vendor/bin/phpunit tests/Unit/Reports/JUnitReportTest.php -> 5 green\n\n```json:metadata\n{\"files\": [\"src/Reports/JUnitReport.php\", \"tests/Unit/Reports/JUnitReportTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Reports/JUnitReportTest.php\", \"acceptanceCriteria\": [\"well-formed JUnit XML\", \"testsuite attrs correct\", \"fail/skip/pass children correct\", \"special chars escaped\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Wire --junit and exit code into ExecuteSuite",
+      "status": "completed",
+      "blockedBy": [1, 2],
+      "description": "**Goal:** Feed each executed suite into both new classes, write the JUnit file when requested, return failing exit code when any test failed.\n\n**Files:** src/Command/ExecuteSuite.php\n\n**Changes:** import JUnitReport+TestRunSummary; configure() add --junit VALUE_OPTIONAL default false; execute() instantiate summary/report, resolve junitPath; in isExecutable block after warnings loop feed summary->add(getStats()) and report->addSuite(results(false)); at end write file if junitPath!==null and return summary->hasFailures()?FAILURE:SUCCESS; keep empty-folder early returns as SUCCESS.\n\n**Verify (integration, needs PrestaShop):** bin/prestaflow run --junit=/tmp/junit.xml src/Tests/Suites/Fails ; echo exit=$? -> exit=1, <failure present, xmllint ok. composer test-unit stays green (9 tests).\n\n```json:metadata\n{\"files\": [\"src/Command/ExecuteSuite.php\"], \"verifyCommand\": \"composer test-unit\", \"acceptanceCriteria\": [\"exit 1 on failure / 0 otherwise / empty=0\", \"--junit three-state path behaviour\", \"--junit independent of --output\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-30T00:00:00Z"
+}
