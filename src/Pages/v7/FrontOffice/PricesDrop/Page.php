@@ -2,10 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v7\FrontOffice\PricesDrop;
 
-use PrestaFlow\Library\Pages\v7\FrontOffice\Listing\Page as ListingPage;
+use PrestaFlow\Library\Pages\Common\FrontOffice\PricesDrop\Page as BasePage;
 
-class Page extends ListingPage
+class Page extends BasePage
 {
-    public string $pageTitle = 'Prices drop';
-    public string $url = 'prices-drop';
 }

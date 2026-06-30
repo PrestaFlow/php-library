@@ -1,0 +1,33 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-30-page-factorization.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: Verification harness + Common bases + pattern proof",
+      "status": "completed",
+      "description": "**Goal:** Data-driven PHPUnit test + Common base classes; migrate Cart (identical) and PricesDrop (v9 delta) to exercise every template.\n\n**Files:** tests/Unit/Pages/PageFactorizationTest.php, src/Pages/Common/FrontOffice/Page.php, src/Pages/Common/BackOffice/Page.php, src/Pages/Common/FrontOffice/Cart/Page.php, src/Pages/Common/FrontOffice/PricesDrop/Page.php, src/Pages/v{7,8,9}/FrontOffice/{Cart,PricesDrop}/Page.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/PageFactorizationTest.php → green\n\n```json:metadata\n{\"files\": [\"tests/Unit/Pages/PageFactorizationTest.php\", \"src/Pages/Common/FrontOffice/Page.php\", \"src/Pages/Common/BackOffice/Page.php\", \"src/Pages/Common/FrontOffice/Cart/Page.php\", \"src/Pages/Common/FrontOffice/PricesDrop/Page.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/PageFactorizationTest.php\", \"acceptanceCriteria\": [\"Cart+PricesDrop resolve v7/v8/v9\", \"PricesDrop delta preserved\", \"Cart selectors identical\", \"composer test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: Migrate remaining FrontOffice pages",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Apply templates to the 25 remaining FO leaves + FO area base. Recipe: git mv v7 leaf→Common, rewrite namespace+base-use, overwrite v7/v8/v9 with pure stub.\n\n**Files:** src/Pages/Common/FrontOffice/<Name>/Page.php, src/Pages/v{7,8,9}/FrontOffice/**\n\n**Verify:** composer test-unit → green\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/FrontOffice/\", \"src/Pages/v7/FrontOffice/\", \"src/Pages/v8/FrontOffice/\", \"src/Pages/v9/FrontOffice/\"], \"verifyCommand\": \"composer test-unit\", \"acceptanceCriteria\": [\"all FO leaves resolve v7/v8/v9\", \"no duplicated content in version dirs\", \"composer test-unit green\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Migrate BackOffice pages",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Factor BO pages incl. v9 deltas (Login selectors+method, Dashboard pageTitle='Tableau de bord') and v9-only Customer with @unverified v7/v8 stubs.\n\n**Files:** src/Pages/Common/BackOffice/{Login,Dashboard,Customer}/Page.php, src/Pages/v{7,8,9}/BackOffice/**, tests/Unit/Pages/PageFactorizationTest.php (add testDashboardDeltaPreserved)\n\n**Verify:** composer test-unit → green\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/\", \"src/Pages/v7/BackOffice/\", \"src/Pages/v8/BackOffice/\", \"src/Pages/v9/BackOffice/\", \"tests/Unit/Pages/PageFactorizationTest.php\"], \"verifyCommand\": \"composer test-unit\", \"acceptanceCriteria\": [\"Login/Dashboard/Customer resolve v7/v8/v9\", \"Dashboard delta preserved\", \"Login v9 override correct\", \"Customer @unverified v7/v8\", \"composer test-unit green\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Final sweep and consistency check",
+      "status": "completed",
+      "blockedBy": [1, 2],
+      "description": "**Goal:** Confirm no duplicated content remains, every Page class loads, whole suite green.\n\n**Verify:** grep sweep (only v9 Login defineSelectors remains) + PHP load-all loop (\"all Page classes load\") + composer test-unit green\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"composer test-unit\", \"acceptanceCriteria\": [\"no leftover duplicated content\", \"all Page classes load\", \"composer test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-30T00:00:00Z"
+}

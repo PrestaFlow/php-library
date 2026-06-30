@@ -2,7 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Address;
 
-use PrestaFlow\Library\Pages\v9\FrontOffice\Addresses\Page as BasePage;
+use PrestaFlow\Library\Pages\Common\FrontOffice\Address\Page as BasePage;
 
 class Page extends BasePage
 {
