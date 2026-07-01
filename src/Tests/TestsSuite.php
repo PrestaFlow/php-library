@@ -458,7 +458,7 @@ class TestsSuite
             try {
                 $page->setCookies([
                     Cookie::create($c['name'], (string) ($c['value'] ?? ''), $params),
-                ]);
+                ])->await();
             } catch (Throwable $e) {
                 // best-effort
             }
