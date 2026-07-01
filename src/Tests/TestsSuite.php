@@ -356,6 +356,7 @@ class TestsSuite
                 'keepAlive' => true,
                 'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
+                'ignoreCertificateErrors' => true,
             ]);
             \file_put_contents($socketFile, $browser->getSocketUri());
         }
