@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-01-cross-page-scenario.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Scenario Task 0: BO Products scenario-support actions",
+      "status": "completed",
+      "description": "**Goal:** Add enableProduct(), getCreatedProductId(), productOnlineToggle selector to Common/BackOffice/Products/Page.php.\n\n**Files:** src/Pages/Common/BackOffice/Products/Page.php, tests/Unit/Pages/BackOfficeProductsTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Products/Page.php\", \"tests/Unit/Pages/BackOfficeProductsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php\", \"acceptanceCriteria\": [\"productOnlineToggle key + 2 methods\", \"getCreatedProductId parses URL\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Scenario Task 1: CreateProductAndVerify scenario + suite + test",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Composed cross-page scenario + invoking suite + browser-free structural test.\n\n**Files:** src/Scenarios/CreateProductAndVerify.php, src/Tests/Suites/Scenarios/CreateProductAndVerify.php, tests/Unit/Scenarios/CreateProductAndVerifyTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Scenarios/CreateProductAndVerifyTest.php\n\n```json:metadata\n{\"files\": [\"src/Scenarios/CreateProductAndVerify.php\", \"src/Tests/Suites/Scenarios/CreateProductAndVerify.php\", \"tests/Unit/Scenarios/CreateProductAndVerifyTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Scenarios/CreateProductAndVerifyTest.php\", \"acceptanceCriteria\": [\"scenario composes 3 pages full flow\", \"suite invokes scenario\", \"test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-01T00:00:00Z"
+}

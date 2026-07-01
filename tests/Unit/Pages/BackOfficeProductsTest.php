@@ -44,4 +44,12 @@ final class BackOfficeProductsTest extends TestCase
             $this->assertTrue(method_exists($page, $method), $method);
         }
     }
+
+    public function testHasScenarioSupport(): void
+    {
+        $page = $this->make();
+        $this->assertArrayHasKey('productOnlineToggle', $page->selectors);
+        $this->assertTrue(method_exists($page, 'enableProduct'));
+        $this->assertTrue(method_exists($page, 'getCreatedProductId'));
+    }
 }

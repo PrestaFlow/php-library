@@ -33,6 +33,7 @@ class Page extends BasePage
             'formPriceInput' => '#product_pricing_price_tax_excluded',
             'formQuantityInput' => '#product_stock_quantities_delta_quantity',
             'formSaveButton' => '#product_footer_save',
+            'productOnlineToggle' => '#product_header_active_1',
             'successAlert' => '.alert-success, .growl-success',
         ];
     }
@@ -92,5 +93,19 @@ class Page extends BasePage
     public function getSuccessMessage(): string
     {
         return trim($this->getTextContent($this->getSelector('successAlert')));
+    }
+
+    public function enableProduct(): void
+    {
+        $this->click($this->getSelector('productOnlineToggle'));
+    }
+
+    public function getCreatedProductId(): int
+    {
+        if (preg_match('#/products/(\d+)#', $this->getPage()->getCurrentUrl(), $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
     }
 }
