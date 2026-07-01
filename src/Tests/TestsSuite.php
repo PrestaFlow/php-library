@@ -410,8 +410,9 @@ class TestsSuite
 
     public function after()
     {
-        TestsSuite::getBrowser(force: false)?->close();
-
+        // The keepAlive browser is intentionally left open so the next suite in
+        // the same run can reconnect to it. It is closed once at the end of the
+        // run by the command (ExecuteSuite).
         $this->end_time = hrtime(true);
         $this->stats['time'] = round(($this->end_time - $this->start_time) / 1e+6);
     }
