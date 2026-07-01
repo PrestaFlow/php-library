@@ -7,7 +7,7 @@ use PrestaFlow\Library\Pages\Common\BackOffice\Page as BasePage;
 class Page extends BasePage
 {
     public string $pageTitle = 'Modules';
-    public string $menuSelector = '#subtab-AdminModulesManage';
+    public string $menuSelector = '#subtab-AdminModulesSf';
     public string $parentMenuSelector = '#subtab-AdminParentModulesSf';
 
     public function defineSelectors()
