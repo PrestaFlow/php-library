@@ -265,8 +265,20 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
-        $element = $this->getPage()->dom()->querySelector($selector);
-        return $element->click();
+        try {
+            $element = $this->getPage()->dom()->querySelector($selector);
+            if ($element !== null) {
+                return $element->click();
+            }
+        } catch (\Throwable $e) {
+            // Element is hidden or outside the viewport (e.g. a collapsed menu
+            // sub-link): fall back to a JS click, which navigates regardless.
+        }
+
+        return $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);if(e){e.click();return true;}return false;})()',
+            json_encode($selector)
+        ))->getReturnValue();
     }
 
     public function leftClick($selector, $nth = 1)

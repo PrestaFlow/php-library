@@ -393,18 +393,16 @@ class TestsSuite
         TestsSuite::getBrowser(headless: $headless, force: true);
 
         try {
-            $cookies = TestsSuite::getPage()?->getCookies();
-            if ($cookies instanceof CookiesCollection && count($cookies)) {
-                foreach ($cookies as $cookie) {
-                    if (str_starts_with($cookie->getName(), 'PrestaShop-')) {
-                        TestsSuite::getPage()->setCookies([
-                            Cookie::create($cookie->getName(), '', ['expires'])
-                        ])->await();
-                    }
-                }
+            $page = TestsSuite::getPage();
+            if ($page !== null) {
+                // Clear all browser cookies so each suite starts from a clean,
+                // unauthenticated state (the previous per-cookie clearing set a
+                // malformed expiry and never actually removed the admin session).
+                $page->getSession()->sendMessageSync(
+                    new \HeadlessChromium\Communication\Message('Network.clearBrowserCookies')
+                );
             }
-        } catch (Exception $e) {
-            //
+        } catch (\Throwable $e) {
         }
 
         $this->start_time = hrtime(true);
