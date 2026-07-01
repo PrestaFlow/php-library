@@ -8,3 +8,4 @@ screens/errors/*
 .env
 .vscode/settings.json
 datas/.broswer
+.phpunit.cache/

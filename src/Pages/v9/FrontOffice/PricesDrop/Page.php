@@ -2,9 +2,9 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\PricesDrop;
 
-use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as ListingPage;
+use PrestaFlow\Library\Pages\Common\FrontOffice\PricesDrop\Page as BasePage;
 
-class Page extends ListingPage
+class Page extends BasePage
 {
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {

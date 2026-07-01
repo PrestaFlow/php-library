@@ -1,0 +1,26 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-30-screenshot-hardening.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "1C Task 0: Screenshots helper (path + dir + delay)",
+      "status": "completed",
+      "description": "**Goal:** Pure browser-free util: errors-dir resolution (+create), screenshot path, portable relative path, capture delay.\n\n**Files:** src/Utils/Screenshots.php, tests/Unit/Utils/ScreenshotsTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Utils/ScreenshotsTest.php → 7 green\n\n```json:metadata\n{\"files\": [\"src/Utils/Screenshots.php\", \"tests/Unit/Utils/ScreenshotsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Utils/ScreenshotsTest.php\", \"acceptanceCriteria\": [\"errorsDir create flag works\", \"relativeErrorPath stable\", \"captureDelay env+default+nonneg\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "1C Task 1: Wire helper into capture, link, diagnostics",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Reliable capture (dir created, configurable delay, recorded failures), fixed Output link, surfaced capture failures.\n\n**Files:** src/Expects/Expect.php, src/Utils/Output.php, src/Tests/TestsSuite.php\n\n**Verify:** php -l on the 3 files && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Expects/Expect.php\", \"src/Utils/Output.php\", \"src/Tests/TestsSuite.php\"], \"verifyCommand\": \"php -l src/Expects/Expect.php && php -l src/Utils/Output.php && php -l src/Tests/TestsSuite.php && composer test-unit\", \"acceptanceCriteria\": [\"capture uses helper+create\", \"delay configurable\", \"failure recorded\", \"Output link fixed\", \"attachScreen diagnostic\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "1C Task 2: Reference screenshot in JUnit report",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Failed testcase with screenshot carries reference in <failure> message (GitHub Actions) and <system-out> [[ATTACHMENT|…]] (GitLab/Jenkins).\n\n**Files:** src/Reports/JUnitReport.php, tests/Unit/Reports/JUnitReportTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Reports/JUnitReportTest.php → 7 green\n\n```json:metadata\n{\"files\": [\"src/Reports/JUnitReport.php\", \"tests/Unit/Reports/JUnitReportTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Reports/JUnitReportTest.php\", \"acceptanceCriteria\": [\"fail+screen emits message line + system-out attachment\", \"fail without screen emits neither\", \"XML well-formed\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-30T00:00:00Z"
+}

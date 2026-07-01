@@ -11,6 +11,9 @@ class BackOfficePage extends CommonPage
     use Locale;
     use Urls;
 
+    public string $menuSelector = '';
+    public string $parentMenuSelector = '';
+
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
         $this->globals = $globals;
@@ -70,5 +73,15 @@ class BackOfficePage extends CommonPage
         }
 
         return $url;
+    }
+
+    public function goToSubMenu(string $parentSelector, string $linkSelector): void
+    {
+        if ($parentSelector !== '' && $this->isVisible($parentSelector) !== false) {
+            $this->leftClick($parentSelector);
+        }
+
+        $this->leftClick($linkSelector);
+        $this->waitForPageReload();
     }
 }

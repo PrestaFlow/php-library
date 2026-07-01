@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-01-backoffice-products-crud.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Products-CRUD Task 0: page actions + structural test",
+      "status": "completed",
+      "description": "**Goal:** 8 action methods + @unverified PS9 selector set on Common/BackOffice/Products/Page.php + browser-free structural test.\n\n**Files:** src/Pages/Common/BackOffice/Products/Page.php, tests/Unit/Pages/BackOfficeProductsTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Products/Page.php\", \"tests/Unit/Pages/BackOfficeProductsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php\", \"acceptanceCriteria\": [\"16 selector keys declared\", \"8 methods exist\", \"@unverified note\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Products-CRUD Task 1: self-cleaning ProductsCrud suite",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Browser suite: login → create product → find via filter → delete (self-cleaning).\n\n**Files:** src/Tests/Suites/BackOffice/ProductsCrud.php\n\n**Verify:** php -l src/Tests/Suites/BackOffice/ProductsCrud.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/BackOffice/ProductsCrud.php\"], \"verifyCommand\": \"php -l src/Tests/Suites/BackOffice/ProductsCrud.php && composer test-unit\", \"acceptanceCriteria\": [\"create→find→delete self-cleaning suite\", \"php -l clean\", \"test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-01T00:00:00Z"
+}

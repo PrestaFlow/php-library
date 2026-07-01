@@ -65,10 +65,14 @@ class TestsSuite
     protected $dataset = [];
     protected $datasets = [];
 
+    protected array $store = [];
+
     protected $scenarioName = '';
     protected $scenarioParams = [];
 
     protected static $lines = [];
+
+    protected static array $pendingDebugMessages = [];
 
     protected $draft = false;
     protected $groups = 'all';
@@ -85,6 +89,18 @@ class TestsSuite
     public function getParam($paramName)
     {
         return $this->scenarioParams[$this->scenarioName][$paramName] ?? $this->dataset[$paramName] ?? null;
+    }
+
+    public function store(string $key, mixed $value): static
+    {
+        $this->store[$key] = $value;
+
+        return $this;
+    }
+
+    public function retrieve(string $key, mixed $default = null): mixed
+    {
+        return $this->store[$key] ?? $default;
     }
 
     public function describe(string $description)
@@ -438,6 +454,12 @@ class TestsSuite
         return $this;
     }
 
+    public function setLocale(string $locale)
+    {
+        self::$locale = $locale;
+        Expect::setLocale($locale);
+    }
+
     public function setGlobals(array $globals = [])
     {
         $this->globals = array_merge($this->globals, $globals);
@@ -471,10 +493,10 @@ class TestsSuite
 
     public function loadGlobals()
     {
-        $dotenv = Dotenv::createImmutable(__DIR__.'/../../');
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
         // When importing the library in a project, the .env file is not in the same directory
-        $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../');
+        $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
 
         if (isset($_ENV['PRESTAFLOW_DEBUG'])) {
@@ -506,12 +528,20 @@ class TestsSuite
             $frontOfficeUrl .= '/';
         }
 
+        $backOfficeUrl = $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/';
+        if (!str_starts_with($backOfficeUrl, 'https://') && !str_starts_with($backOfficeUrl, 'http://')) {
+            $backOfficeUrl = $frontOfficeUrl . $backOfficeUrl;
+        }
+        if (!str_ends_with($backOfficeUrl, '/')) {
+            $backOfficeUrl .= '/';
+        }
+
         $this->globals = [
             'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
             'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
             'PREFIX_LOCALE' => (bool) $_ENV['PRESTAFLOW_PREFIX_LOCALE'] ?? false,
             'BO' => [
-                'URL' => $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/',
+                'URL' => $backOfficeUrl,
                 'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
                 'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
             ],
@@ -557,7 +587,7 @@ class TestsSuite
         return $this->globals;
     }
 
-    public function run($cli = false, OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
+    public function run($cli = false, ?OutputInterface $output = null, string $mode = 'full', string $section = '', mixed $sectionOutput = null)
     {
         $this->cli = $cli;
         $this->output = $output;
@@ -645,6 +675,7 @@ class TestsSuite
                     $this->failed = true;
                 } finally {
                     $test['expect'] = Expect::getExpectMessage();
+                    $this->attachDebugMessages($test);
                     Expect::getNbAssertions();
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
@@ -703,6 +734,20 @@ class TestsSuite
         }
     }
 
+    public function console(string|array $message): static
+    {
+        return $this->log($message);
+    }
+
+    public function log(string|array $message): static
+    {
+        self::$pendingDebugMessages[] = is_array($message)
+            ? json_encode($message, JSON_PRETTY_PRINT)
+            : $message;
+
+        return $this;
+    }
+
     public function attachWarning(&$test)
     {
         $test['warning'] = Expect::$latestWarning;
@@ -713,6 +758,17 @@ class TestsSuite
     {
         $test['screen'] = Expect::$latestError;
         $this->screens[] = $test['screen'];
+
+        if (!empty(Expect::$latestScreenshotError)) {
+            $this->log('Screenshot capture failed: ' . Expect::$latestScreenshotError);
+            Expect::$latestScreenshotError = null;
+        }
+    }
+
+    public function attachDebugMessages(&$test)
+    {
+        $test['debug'] = self::$pendingDebugMessages;
+        self::$pendingDebugMessages = [];
     }
 
     public function results($json = true)

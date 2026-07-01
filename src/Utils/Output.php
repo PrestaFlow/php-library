@@ -105,7 +105,13 @@ trait Output
 
         if (!empty($test['screen'])) {
             if (is_string($test['screen'])) {
+                $screenPath = Screenshots::errorPath($test['screen']);
+
                 $this->outputText(baseLine: $baseLine, state: self::DEBUG, title: self::makeIcon(self::DEBUG), message: $test['screen'], secondaryColor: 'gray', section: $section, force: $force);
+
+                if ($this->cli && array_key_exists($section, $this->outputSections) && self::terminalSupportsFileHyperlinks()) {
+                    $this->outputSections[$section]->writeln($baseLine . '   <href=file://' . $screenPath . '><fg=gray>Open screenshot</></>');
+                }
             }
         }
     }
@@ -366,5 +372,11 @@ trait Output
     protected function formatSeconds($time)
     {
         return number_format($time / 1000, 2, '.', '');
+    }
+
+    private static function terminalSupportsFileHyperlinks(): bool
+    {
+        $termProgram = (string) (getenv('TERM_PROGRAM') ?: '');
+        return in_array($termProgram, ['iTerm.app', 'vscode'], true);
     }
 }

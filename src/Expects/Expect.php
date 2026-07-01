@@ -9,6 +9,7 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as HeadlessChromiumPage;
 use Nunzion\Expect as ExpectLibrary;
 use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Utils\Screenshots;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 
 class Expect extends ExpectLibrary
@@ -21,7 +22,28 @@ class Expect extends ExpectLibrary
 
     public static $latestWarning = '';
     public static $latestError = '';
+    public static $latestScreenshotError = null;
     public static $nbAssertions = 0;
+
+    protected static string $locale = 'en';
+    protected static ?array $translations = null;
+
+    public static function setLocale(string $locale): void
+    {
+        self::$locale = $locale;
+        self::$translations = null;
+    }
+
+    protected static function trans(string $key): string
+    {
+        if (self::$translations === null) {
+            self::$translations = require __DIR__ . '/translations.php';
+        }
+
+        return self::$translations[self::$locale][$key]
+            ?? self::$translations['en'][$key]
+            ?? $key;
+    }
 
     public function __call($methodName, $args = [])
     {
@@ -107,10 +129,11 @@ class Expect extends ExpectLibrary
 
     protected function getExceptionConstructor($explanation, $arguments = array())
     {
+        self::$latestScreenshotError = null;
         try {
             $page = TestsSuite::getPage();
             if ($page instanceof HeadlessChromiumPage) {
-                sleep(3);
+                sleep(Screenshots::captureDelay());
                 $fileName = 'error_' . $page->getSession()->getTargetId() . '-' . time() . '.png';
                 self::$latestError = $fileName;
                 $screenshot = $page->screenshot([
@@ -118,27 +141,27 @@ class Expect extends ExpectLibrary
                     'clip' => $page->getFullPageClip(),
                     'format' => 'png',
                 ]);
-                if (function_exists('storage_path')) {
-                    $screenshot->saveToFile(storage_path() . '/screens/errors/' . $fileName);
-                } else {
-                    $screenshot->saveToFile('./prestaflow/screens/errors/' . $fileName);
-                }
+                $screenshot->saveToFile(Screenshots::errorPath($fileName, create: true));
             }
         } catch (OperationTimedOut $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         } catch (FilesystemException $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         } catch (Exception $e) {
             self::$latestError = null;
+            self::$latestScreenshotError = $e->getMessage();
         }
 
         if (self::$overrideMessage !== null) {
             $explanation = self::$overrideMessage;
         }
 
-        if (isset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)])) {
-            self::$expectMessage['fail'][] = self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)];
-            unset(self::$expectMessage['pass'][(count(self::$expectMessage['pass']) - 1)]);
+        if (!empty(self::$expectMessage['pass'])) {
+            $lastIndex = count(self::$expectMessage['pass']) - 1;
+            self::$expectMessage['fail'][] = self::$expectMessage['pass'][$lastIndex];
+            unset(self::$expectMessage['pass'][$lastIndex]);
         }
 
         return $this->getConditionViolationExceptionConstructor(
@@ -185,61 +208,51 @@ class Expect extends ExpectLibrary
 
     public function shopIsInMaintenance($page, $timeout = 1000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "shop is in maintenance";
-        }
+        $expectedMessage ??= self::trans('shop_in_maintenance');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("shop is not in maintenance")->elementIsVisible($page->selector('maintenanceBlock'), $timeout, true);
+        Expect::that(null, true)->__(self::trans('shop_not_in_maintenance'))->elementIsVisible($page->selector('maintenanceBlock'), $timeout, true);
 
         return $this;
     }
 
     public function shopIsNotInMaintenance($page, $timeout = 1000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "shop is not in maintenance";
-        }
+        $expectedMessage ??= self::trans('shop_not_in_maintenance');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("shop is in maintenance")->elementIsNotVisible($page->selector('maintenanceBlock'), $timeout, true);
+        Expect::that(null, true)->__(self::trans('shop_in_maintenance'))->elementIsNotVisible($page->selector('maintenanceBlock'), $timeout, true);
 
         return $this;
     }
 
     public function shopIsVisible($page, $timeout = 1000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "shop is visible";
-        }
+        $expectedMessage ??= self::trans('shop_visible');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("shop is not visible")->elementIsVisible($page->selector('desktopLogo'), $timeout, true);
+        Expect::that(null, true)->__(self::trans('shop_not_visible'))->elementIsVisible($page->selector('desktopLogo'), $timeout, true);
 
         return $this;
     }
 
     public function shopIsNotVisible($page, $timeout = 1000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "shop is not visible";
-        }
+        $expectedMessage ??= self::trans('shop_not_visible');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("shop is visible")->elementIsNotVisible($page->selector('desktopLogo'), $timeout, true);
+        Expect::that(null, true)->__(self::trans('shop_visible'))->elementIsNotVisible($page->selector('desktopLogo'), $timeout, true);
 
         return $this;
     }
 
     public function visible($selector = null, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{selector} must be visible";
-        }
+        $expectedMessage ??= self::trans('element_must_be_visible');
 
         if (!$avoidExpectMessage) {
             self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("selector" => $selector));
@@ -258,9 +271,7 @@ class Expect extends ExpectLibrary
 
     public function notVisible($selector = null, $avoidExpectMessage = false, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{selector} must be not visible";
-        }
+        $expectedMessage ??= self::trans('element_must_not_be_visible');
 
         if (!$avoidExpectMessage) {
             self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("selector" => $selector));
@@ -279,35 +290,29 @@ class Expect extends ExpectLibrary
 
     public function customerIsLogged($selector, $timeout = 30000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "customer is not logged";
-        }
+        $expectedMessage ??= self::trans('customer_logged');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("customer is not logged")->elementIsVisible($selector, $timeout);
+        Expect::that(null, true)->__(self::trans('customer_not_logged'))->elementIsVisible($selector, $timeout);
 
         return $this;
     }
 
     public function customerIsNotLogged($selector, $timeout = 30000, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "customer is logged";
-        }
+        $expectedMessage ??= self::trans('customer_not_logged');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
-        Expect::that(null, true)->__("customer is logged")->elementIsNotVisible($selector, $timeout);
+        Expect::that(null, true)->__(self::trans('customer_logged'))->elementIsNotVisible($selector, $timeout);
 
         return $this;
     }
 
     public function contains($needle, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "expected '{value}' to contains '{expected}'";
-        }
+        $expectedMessage ??= self::trans('contains');
 
         self::$expectMessage['pass'][] = $this->format($expectedMessage, array("expected" => $needle, "value" => $this->getValue()));
 
@@ -323,9 +328,7 @@ class Expect extends ExpectLibrary
 
     public function notContains($needle, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "expected '{expected}' to not include '{value}'";
-        }
+        $expectedMessage ??= self::trans('not_contains');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $needle, "value" => $this->getValue()));
 
@@ -341,9 +344,7 @@ class Expect extends ExpectLibrary
 
     public function startsWith($needle, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "'{actual}' to starts with {expected}";
-        }
+        $expectedMessage ??= self::trans('starts_with');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $needle));
 
@@ -359,9 +360,7 @@ class Expect extends ExpectLibrary
 
     public function endsWith($needle, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "'{actual}' to ends with {expected}";
-        }
+        $expectedMessage ??= self::trans('ends_with');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $needle));
 
@@ -377,9 +376,7 @@ class Expect extends ExpectLibrary
 
     public function isTheSameAs($expected, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{value} must be the same as {expected}";
-        }
+        $expectedMessage ??= self::trans('is_the_same_as');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $expected, "value" => $this->getValue()));
 
@@ -391,20 +388,28 @@ class Expect extends ExpectLibrary
         return $this;
     }
 
+    public function isNotTheSameAs($expected, ?string $expectedMessage = null)
+    {
+        $expectedMessage ??= self::trans('is_not_the_same_as');
+
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $expected, "value" => $this->getValue()));
+
+        $this->isDefined();
+        if ($this->getValue() === $expected) {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $expected, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
+
     public function samePriceAs($price, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{value} must be the same price as {expected}";
-        }
-
-        return $this->isTheSameAs(expected: $price, expectedMessage: $expectedMessage);
+        return $this->isTheSameAs(expected: $price, expectedMessage: $expectedMessage ?? self::trans('same_price_as'));
     }
 
     public function equals($other, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{value} must be equal to {expected}";
-        }
+        $expectedMessage ??= self::trans('equals');
 
         $other = trim($other);
 
@@ -412,7 +417,23 @@ class Expect extends ExpectLibrary
 
         $this->isDefined();
         if ($this->getValue() != $other) {
-            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other));
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other, "value" => $this->getValue()));
+            throw call_user_func_array($e[0], $e[1]);
+        }
+        return $this;
+    }
+
+    public function notEquals($other, ?string $expectedMessage = null)
+    {
+        $expectedMessage ??= self::trans('not_equals');
+
+        $other = trim($other);
+
+        self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("expected" => $other, "value" => $this->getValue()));
+
+        $this->isDefined();
+        if ($this->getValue() == $other) {
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => $other, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
         return $this;
@@ -420,16 +441,14 @@ class Expect extends ExpectLibrary
 
     public function isNull(?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "must be null";
-        }
+        $expectedMessage ??= self::trans('is_null');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
         $this->isDefined();
         if ($this->getValue() !== null)
         {
-            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => null));
+            $e = $this->getUnexpectedValueExceptionConstructor($expectedMessage, array("expected" => null, "value" => $this->getValue()));
             throw call_user_func_array($e[0], $e[1]);
         }
         return $this;
@@ -437,9 +456,7 @@ class Expect extends ExpectLibrary
 
     public function isNotNull(?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "cannot be null";
-        }
+        $expectedMessage ??= self::trans('is_not_null');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
@@ -453,9 +470,7 @@ class Expect extends ExpectLibrary
 
     public function isEmpty(?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "must be empty";
-        }
+        $expectedMessage ??= self::trans('is_empty');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
@@ -470,9 +485,7 @@ class Expect extends ExpectLibrary
 
     public function isNotEmpty(?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "cannot be empty";
-        }
+        $expectedMessage ??= self::trans('is_not_empty');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage);
 
@@ -486,9 +499,7 @@ class Expect extends ExpectLibrary
 
     public function isBetween($min, $max, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{actual} must be between {min} and {max}";
-        }
+        $expectedMessage ??= self::trans('is_between');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("min" => $min, "max" => $max));
         $this->isNumber();
@@ -502,9 +513,7 @@ class Expect extends ExpectLibrary
 
     public function isGreaterThan($other, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{actual} must be greater than {other}";
-        }
+        $expectedMessage ??= self::trans('is_greater_than');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
@@ -519,9 +528,7 @@ class Expect extends ExpectLibrary
 
     public function isLessThan($other, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{actual} must be less than {other}";
-        }
+        $expectedMessage ??= self::trans('is_less_than');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
@@ -536,9 +543,7 @@ class Expect extends ExpectLibrary
 
     public function isGreaterThanOrEqualTo($other, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{actual} must be greater or equal than {other}";
-        }
+        $expectedMessage ??= self::trans('is_greater_than_or_equal_to');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
@@ -553,9 +558,7 @@ class Expect extends ExpectLibrary
 
     public function isLessThanOrEqualTo($other, ?string $expectedMessage = null)
     {
-        if ($expectedMessage === null) {
-            $expectedMessage = "{actual} must be less or equal than {other}";
-        }
+        $expectedMessage ??= self::trans('is_less_than_or_equal_to');
 
         self::$expectMessage['pass'][] = $this->format(expectedMessage: $expectedMessage, arguments: array("other" => $other));
 
