@@ -55,7 +55,7 @@ class Page extends BasePage
                     'eyIxIjp7ImFjdGl2ZSI6IjEiLCJtb2R1bGVzIjoiIn19',
                     ['domain' => $domain, 'path' => '/', 'secure' => true]
                 ),
-            ]);
+            ])->await();
         } catch (\Throwable $e) {
             // best-effort
         }
