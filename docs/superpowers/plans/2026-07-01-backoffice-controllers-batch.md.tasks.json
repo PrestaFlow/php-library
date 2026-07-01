@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-01-backoffice-controllers-batch.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "BO-batch Task 0: 4 pages (Categories/Customers/Modules/Carriers) + structural test",
+      "status": "completed",
+      "description": "**Goal:** Four BO pages (Common + v7/v8/v9 stubs) + extended browser-free structural test.\n\n**Files:** src/Pages/Common/BackOffice/{Categories,Customers,Modules,Carriers}/Page.php, v{7,8,9} stubs (12), tests/Unit/Pages/BackOfficeNavigationTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeNavigationTest.php\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Categories/Page.php\", \"src/Pages/Common/BackOffice/Customers/Page.php\", \"src/Pages/Common/BackOffice/Modules/Page.php\", \"src/Pages/Common/BackOffice/Carriers/Page.php\", \"tests/Unit/Pages/BackOfficeNavigationTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeNavigationTest.php\", \"acceptanceCriteria\": [\"4 pages resolve v7/v8/v9 + declare menu\", \"Customers coexists with Customer\", \"composer test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "BO-batch Task 1: 4 test suites",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** One BO suite per new controller (login → goTo → assert title).\n\n**Files:** src/Tests/Suites/BackOffice/{Categories,Customers,Modules,Carriers}.php\n\n**Verify:** php -l on the 4 suites && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/BackOffice/Categories.php\", \"src/Tests/Suites/BackOffice/Customers.php\", \"src/Tests/Suites/BackOffice/Modules.php\", \"src/Tests/Suites/BackOffice/Carriers.php\"], \"verifyCommand\": \"php -l src/Tests/Suites/BackOffice/Categories.php && php -l src/Tests/Suites/BackOffice/Customers.php && php -l src/Tests/Suites/BackOffice/Modules.php && php -l src/Tests/Suites/BackOffice/Carriers.php && composer test-unit\", \"acceptanceCriteria\": [\"4 suites login+goTo+assert\", \"php -l clean\", \"test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-01T00:00:00Z"
+}

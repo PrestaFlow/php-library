@@ -59,4 +59,36 @@ final class BackOfficeNavigationTest extends TestCase
     {
         $this->assertTrue(method_exists('PrestaFlow\\Library\\Pages\\BackOfficePage', 'goToSubMenu'));
     }
+
+    public function testBatchPagesResolveForAllVersions(): void
+    {
+        foreach (self::VERSIONS as $v) {
+            foreach (['Categories', 'Customers', 'Modules', 'Carriers'] as $name) {
+                $this->assertTrue(class_exists(self::NS . $v . '\\BackOffice\\' . $name . '\\Page'), "$v $name");
+            }
+        }
+    }
+
+    public function testBatchPagesDeclareMenu(): void
+    {
+        $expected = [
+            'Categories' => ['#subtab-AdminCategories', '#subtab-AdminCatalog'],
+            'Customers'  => ['#subtab-AdminCustomers', '#subtab-AdminParentCustomer'],
+            'Modules'    => ['#subtab-AdminModulesManage', '#subtab-AdminParentModulesSf'],
+            'Carriers'   => ['#subtab-AdminCarriers', '#subtab-AdminParentShipping'],
+        ];
+        foreach ($expected as $name => [$menu, $parent]) {
+            $page = $this->make('v9', $name);
+            $this->assertSame($menu, $page->menuSelector, $name);
+            $this->assertSame($parent, $page->parentMenuSelector, $name);
+            $this->assertNotSame('', $page->pageTitle, $name);
+            $this->assertTrue(method_exists($page, 'goTo'), $name);
+        }
+    }
+
+    public function testCustomersListCoexistsWithCustomerEdit(): void
+    {
+        $this->assertTrue(class_exists(self::NS . 'v9\\BackOffice\\Customers\\Page'));
+        $this->assertTrue(class_exists(self::NS . 'v9\\BackOffice\\Customer\\Page'));
+    }
 }
