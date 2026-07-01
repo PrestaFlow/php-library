@@ -352,7 +352,7 @@ class TestsSuite
             //$browserFactory->addOptions(['headless' => (bool) $headless]);
 
             $browser = $browserFactory->createBrowser([
-                'userAgent' => 'PrestaFlow',
+                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
                 'keepAlive' => true,
                 'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
