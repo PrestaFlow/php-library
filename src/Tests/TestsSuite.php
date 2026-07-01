@@ -391,6 +391,11 @@ class TestsSuite
 
         TestsSuite::getBrowser(headless: $headless, force: true);
 
+        // Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
+        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
+        // consentement (RGPD) sur un environnement protégé/preprod.
+        $this->presetEnvCookies();
+
         try {
             $cookies = TestsSuite::getPage()?->getCookies();
             if ($cookies instanceof CookiesCollection && count($cookies)) {
@@ -407,6 +412,57 @@ class TestsSuite
         }
 
         $this->start_time = hrtime(true);
+    }
+
+    /**
+     * Pré-règle des cookies fournis via l'environnement, avant toute navigation.
+     *
+     * PRESTAFLOW_COOKIES = tableau JSON d'objets {name, value, domain?, path?, secure?}.
+     * Exemple (neutraliser un bandeau RGPD Knowband) :
+     *   PRESTAFLOW_COOKIES=[{"name":"___kbgdcc","value":"eyIx...","domain":"preprod.example.com"}]
+     *
+     * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
+     */
+    protected function presetEnvCookies(): void
+    {
+        $raw = $_ENV['PRESTAFLOW_COOKIES'] ?? null;
+        if (!$raw) {
+            return;
+        }
+
+        $cookies = \json_decode($raw, true);
+        if (!is_array($cookies)) {
+            return;
+        }
+
+        $page = TestsSuite::getPage();
+        if (!$page) {
+            return;
+        }
+
+        foreach ($cookies as $c) {
+            if (empty($c['name'])) {
+                continue;
+            }
+
+            $params = [];
+            foreach (['domain', 'path', 'secure', 'httpOnly', 'sameSite', 'expires', 'url'] as $key) {
+                if (array_key_exists($key, $c)) {
+                    $params[$key] = $c[$key];
+                }
+            }
+            if (!isset($params['path'])) {
+                $params['path'] = '/';
+            }
+
+            try {
+                $page->setCookies([
+                    Cookie::create($c['name'], (string) ($c['value'] ?? ''), $params),
+                ]);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
     }
 
     public function after()
