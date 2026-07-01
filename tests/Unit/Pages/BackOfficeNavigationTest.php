@@ -1,0 +1,62 @@
+<?php
+
+namespace PrestaFlow\Tests\Unit\Pages;
+
+use PHPUnit\Framework\TestCase;
+
+final class BackOfficeNavigationTest extends TestCase
+{
+    private const NS = 'PrestaFlow\\Library\\Pages\\';
+    private const VERSIONS = ['v7', 'v8', 'v9'];
+
+    private function fakeGlobals(): array
+    {
+        return [
+            'PS_VERSION' => '9.0.0',
+            'LOCALE' => 'en',
+            'PREFIX_LOCALE' => false,
+            'BO' => ['URL' => 'http://localhost/admin/', 'EMAIL' => 'a@b.c', 'PASSWD' => 'x'],
+            'FO' => ['URL' => 'http://localhost/', 'EMAIL' => 'a@b.c', 'PASSWD' => 'x'],
+            'DEBUG' => false,
+            'VERBOSE' => false,
+        ];
+    }
+
+    private function make(string $version, string $name): object
+    {
+        $class = self::NS . $version . '\\BackOffice\\' . $name . '\\Page';
+        return new $class(locale: 'en', patchVersion: '9.0.0', globals: $this->fakeGlobals(), customs: []);
+    }
+
+    public function testPagesResolveForAllVersions(): void
+    {
+        foreach (self::VERSIONS as $v) {
+            foreach (['Products', 'Orders'] as $name) {
+                $this->assertTrue(class_exists(self::NS . $v . '\\BackOffice\\' . $name . '\\Page'), "$v $name");
+            }
+        }
+    }
+
+    public function testProductsDeclaresMenu(): void
+    {
+        $p = $this->make('v9', 'Products');
+        $this->assertSame('#subtab-AdminProducts', $p->menuSelector);
+        $this->assertSame('#subtab-AdminCatalog', $p->parentMenuSelector);
+        $this->assertNotSame('', $p->pageTitle);
+        $this->assertTrue(method_exists($p, 'goTo'));
+    }
+
+    public function testOrdersDeclaresMenu(): void
+    {
+        $o = $this->make('v9', 'Orders');
+        $this->assertSame('#subtab-AdminOrders', $o->menuSelector);
+        $this->assertSame('#subtab-AdminParentOrders', $o->parentMenuSelector);
+        $this->assertNotSame('', $o->pageTitle);
+        $this->assertTrue(method_exists($o, 'goTo'));
+    }
+
+    public function testHelperExists(): void
+    {
+        $this->assertTrue(method_exists('PrestaFlow\\Library\\Pages\\BackOfficePage', 'goToSubMenu'));
+    }
+}

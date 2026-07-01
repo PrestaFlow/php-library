@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-30-backoffice-navigation.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "P3 Task 0: BO nav helper + Products/Orders pages + structural test",
+      "status": "completed",
+      "description": "**Goal:** goToSubMenu helper + $menuSelector/$parentMenuSelector props on BackOfficePage; Products & Orders pages (Common + v7/v8/v9 stubs); browser-free structural test.\n\n**Files:** src/Pages/BackOfficePage.php, src/Pages/Common/BackOffice/{Products,Orders}/Page.php, v{7,8,9} stubs, tests/Unit/Pages/BackOfficeNavigationTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeNavigationTest.php && php -l src/Pages/BackOfficePage.php\n\n```json:metadata\n{\"files\": [\"src/Pages/BackOfficePage.php\", \"src/Pages/Common/BackOffice/Products/Page.php\", \"src/Pages/Common/BackOffice/Orders/Page.php\", \"tests/Unit/Pages/BackOfficeNavigationTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeNavigationTest.php && php -l src/Pages/BackOfficePage.php\", \"acceptanceCriteria\": [\"goToSubMenu + props on BackOfficePage\", \"Products/Orders resolve v7/v8/v9 + declare menu\", \"composer test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "P3 Task 1: Products & Orders test suites",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Two BackOffice suites (login → goTo via menu → assert page title) as executable docs / manual live check.\n\n**Files:** src/Tests/Suites/BackOffice/Products.php, src/Tests/Suites/BackOffice/Orders.php\n\n**Verify:** php -l on both suites && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/BackOffice/Products.php\", \"src/Tests/Suites/BackOffice/Orders.php\"], \"verifyCommand\": \"php -l src/Tests/Suites/BackOffice/Products.php && php -l src/Tests/Suites/BackOffice/Orders.php && composer test-unit\", \"acceptanceCriteria\": [\"both suites login+goTo+assert\", \"php -l clean\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-30T00:00:00Z"
+}
