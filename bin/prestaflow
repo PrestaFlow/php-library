@@ -2,13 +2,27 @@
 <?php
 
 $autoloadFiles = [
+    // Défini par le proxy de bin Composer (le plus fiable, y compris en symlink).
+    $GLOBALS['_composer_autoload_path'] ?? null,
+    // Install classique : vendor/prestaflow/php-library/bin → vendor/autoload.php
     __DIR__ . '/../../../autoload.php',
+    // Lib autonome (dev direct dans le dépôt de la lib).
     __DIR__ . '/../vendor/autoload.php',
+    // Repli : lib symlinkée (path repo) → __DIR__ pointe hors du vendor du projet,
+    // on retombe sur l'autoload du projet courant.
+    getcwd() . '/vendor/autoload.php',
 ];
+$autoloadLoaded = false;
 foreach ($autoloadFiles as $autoloadFile) {
-    if (file_exists($autoloadFile)) {
+    if ($autoloadFile && file_exists($autoloadFile)) {
         require_once $autoloadFile;
+        $autoloadLoaded = true;
+        break;
     }
+}
+if (!$autoloadLoaded) {
+    fwrite(STDERR, "PrestaFlow : autoload Composer introuvable. Lancez « composer install ».\n");
+    exit(1);
 }
 
 use PrestaFlow\Library\Command\ExecuteSuite;
