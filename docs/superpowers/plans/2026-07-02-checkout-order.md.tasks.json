@@ -1,0 +1,26 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-02-checkout-order.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Checkout Task 0: FO checkout pages (Cart/Checkout/OrderConfirmation)",
+      "status": "completed",
+      "description": "**Goal:** FrontOffice checkout surface — Cart actions, Checkout tunnel, OrderConfirmation read — as page objects with v7/v8/v9 stubs.\n\n**Files:**\n- Modify: src/Pages/Common/FrontOffice/Cart/Page.php\n- Create: src/Pages/Common/FrontOffice/Checkout/Page.php + v7/v8/v9 stubs\n- Create: src/Pages/Common/FrontOffice/OrderConfirmation/Page.php + v7/v8/v9 stubs\n- Test: tests/Unit/Pages/FrontOfficeCheckoutTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/FrontOfficeCheckoutTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/FrontOffice/Cart/Page.php\", \"src/Pages/Common/FrontOffice/Checkout/Page.php\", \"src/Pages/Common/FrontOffice/OrderConfirmation/Page.php\", \"tests/Unit/Pages/FrontOfficeCheckoutTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/FrontOfficeCheckoutTest.php && composer test-unit\", \"acceptanceCriteria\": [\"Cart proceedToCheckout\", \"Checkout tunnel methods+selectors\", \"OrderConfirmation isConfirmed/getOrderReference\", \"v9 stubs resolve\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Checkout Task 1: BackOffice Orders order lookup",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Find an order in the BackOffice orders grid by reference.\n\n**Files:**\n- Modify: src/Pages/Common/BackOffice/Orders/Page.php\n- Test: tests/Unit/Pages/BackOfficeOrdersTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeOrdersTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Orders/Page.php\", \"tests/Unit/Pages/BackOfficeOrdersTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeOrdersTest.php && composer test-unit\", \"acceptanceCriteria\": [\"order-lookup selectors declared\", \"filterByReference + getOrderReferenceInList\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Checkout Task 2: CheckoutOrder scenario + suite + tests",
+      "status": "completed",
+      "blockedBy": [0, 1],
+      "description": "**Goal:** Compose the pages into the end-to-end CheckoutOrder scenario + suite + existence/param tests.\n\n**Files:**\n- Create: src/Scenarios/CheckoutOrder.php\n- Create: src/Tests/Suites/Scenarios/CheckoutOrder.php\n- Test: tests/Unit/Scenarios/CheckoutOrderTest.php\n\n**Verify:** vendor/bin/phpunit tests/Unit/Scenarios/CheckoutOrderTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Scenarios/CheckoutOrder.php\", \"src/Tests/Suites/Scenarios/CheckoutOrder.php\", \"tests/Unit/Scenarios/CheckoutOrderTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Scenarios/CheckoutOrderTest.php && composer test-unit\", \"acceptanceCriteria\": [\"scenario extends Scenario + params\", \"suite extends TestsSuite\", \"test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-02T13:00:00Z"
+}

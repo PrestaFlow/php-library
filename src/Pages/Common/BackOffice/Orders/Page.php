@@ -15,11 +15,27 @@ class Page extends BasePage
         return [
             'pageHeading' => '.page-title',
             'newOrderButton' => '#page-header-desc-order-new_order',
+            // Best-effort PS 9 orders grid — corrected live.
+            'filterReferenceInput' => '#order_grid_table th input[name="order[reference]"]',
+            'searchButton' => '#order_grid_search_form button.grid-search-button',
+            'listRowReference' => '#order_grid_table tbody tr:nth-child(${row}) .column-reference',
         ];
     }
 
     public function goTo(): void
     {
         $this->goToSubMenu($this->parentMenuSelector, $this->menuSelector);
+    }
+
+    public function filterByReference(string $reference): void
+    {
+        $this->setValue($this->getSelector('filterReferenceInput'), $reference);
+        $this->click($this->getSelector('searchButton'));
+        $this->waitForPageReload();
+    }
+
+    public function getOrderReferenceInList(int $row = 1): string
+    {
+        return trim($this->getTextContent($this->getSelector('listRowReference', ['row' => $row])));
     }
 }
