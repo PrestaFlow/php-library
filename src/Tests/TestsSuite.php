@@ -549,6 +549,14 @@ class TestsSuite
 
     public function loadGlobals()
     {
+        // Répertoire de travail courant : le CLI `prestaflow` est lancé depuis la
+        // racine du projet qui consomme la lib, où se trouvent .env / .env.local.
+        // C'est le chemin le plus fiable, y compris quand la lib est installée en
+        // symlink (path repo Composer) — auquel cas __DIR__ pointe hors du projet.
+        // `createImmutable` : la première valeur trouvée gagne → on charge d'abord.
+        $dotenv = Dotenv::createImmutable(getcwd(), ['.env.local', '.env']);
+        $dotenv->safeLoad();
+
         $dotenv = Dotenv::createImmutable(__DIR__.'/../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
         // When importing the library in a project, the .env file is not in the same directory
