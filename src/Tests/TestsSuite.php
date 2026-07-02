@@ -7,6 +7,7 @@ use Dotenv\Dotenv;
 use Error;
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Communication\Message;
 use HeadlessChromium\Cookies\Cookie;
 use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
@@ -449,6 +450,11 @@ class TestsSuite
         }
 
         try {
+            // Le domaine Network doit être activé pour que setExtraHTTPHeaders
+            // (Network.setExtraHTTPHeaders) prenne effet. La page « about:blank »
+            // auto-créée à la connexion n'est pas passée par le flux d'activation
+            // de BrowserFactory → on l'active explicitement (idempotent).
+            $page->getSession()->sendMessageSync(new Message('Network.enable'));
             $page->setBasicAuthHeader((string) $user, (string) ($pass ?? ''));
         } catch (Throwable $e) {
             // best-effort
