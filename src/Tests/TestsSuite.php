@@ -422,19 +422,16 @@ class TestsSuite
     }
 
     /**
-     * Pré-règle des cookies fournis via l'environnement, avant toute navigation.
-     *
-     * PRESTAFLOW_COOKIES = tableau JSON d'objets {name, value, domain?, path?, secure?}.
-     * Exemple (neutraliser un bandeau RGPD Knowband) :
-     *   PRESTAFLOW_COOKIES=[{"name":"___kbgdcc","value":"eyIx...","domain":"preprod.example.com"}]
-     *
-     * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
-     */
-    /**
      * Authentification HTTP Basic via l'environnement, posée en en-tête sur toutes
      * les requêtes (utile pour un environnement protégé : preprod/staging).
      *
      * PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS. Best-effort.
+     *
+     * On pose l'en-tête au niveau de la CONNEXION du navigateur : BrowserFactory
+     * réapplique ces en-têtes à chaque nouvelle page. C'est indispensable car
+     * FrontOfficePage::goToPage() ferme la page courante et en crée une neuve —
+     * un en-tête posé uniquement sur la page initiale serait perdu. On l'applique
+     * aussi à la page courante pour couvrir la toute première navigation.
      */
     protected function presetBasicAuth(): void
     {
@@ -444,23 +441,41 @@ class TestsSuite
             return;
         }
 
-        $page = TestsSuite::getPage();
-        if (!$page) {
-            return;
+        $authHeader = 'Basic '.\base64_encode($user.':'.($pass ?? ''));
+
+        $browser = TestsSuite::getBrowser();
+        if ($browser) {
+            try {
+                // Hérité par chaque page créée ensuite (dont le createPage de goToPage).
+                $browser->getConnection()->setConnectionHttpHeaders(['Authorization' => $authHeader]);
+            } catch (Throwable $e) {
+                // best-effort
+            }
         }
 
-        try {
-            // Le domaine Network doit être activé pour que setExtraHTTPHeaders
-            // (Network.setExtraHTTPHeaders) prenne effet. La page « about:blank »
-            // auto-créée à la connexion n'est pas passée par le flux d'activation
-            // de BrowserFactory → on l'active explicitement (idempotent).
-            $page->getSession()->sendMessageSync(new Message('Network.enable'));
-            $page->setBasicAuthHeader((string) $user, (string) ($pass ?? ''));
-        } catch (Throwable $e) {
-            // best-effort
+        $page = TestsSuite::getPage();
+        if ($page) {
+            try {
+                // Network doit être activé pour que Network.setExtraHTTPHeaders prenne
+                // effet ; la page « about:blank » initiale n'est pas passée par le flux
+                // d'activation de BrowserFactory → on l'active (idempotent).
+                $page->getSession()->sendMessageSync(new Message('Network.enable'));
+                $page->setExtraHTTPHeaders(['Authorization' => $authHeader]);
+            } catch (Throwable $e) {
+                // best-effort
+            }
         }
     }
 
+    /**
+     * Pré-règle des cookies fournis via l'environnement, avant toute navigation.
+     *
+     * PRESTAFLOW_COOKIES = tableau JSON d'objets {name, value, domain?, path?, secure?}.
+     * Exemple (neutraliser un bandeau RGPD Knowband) :
+     *   PRESTAFLOW_COOKIES=[{"name":"___kbgdcc","value":"eyIx...","domain":"preprod.example.com"}]
+     *
+     * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
+     */
     protected function presetEnvCookies(): void
     {
         $raw = $_ENV['PRESTAFLOW_COOKIES'] ?? null;
