@@ -288,7 +288,13 @@ class CommonPage
 
     public function waitForPageReload()
     {
-        $this->getPage()->evaluate('some js that will reload the page')->waitForPageReload();
+        try {
+            // Wait for the navigation triggered by the preceding action, bounded and
+            // non-blocking: if it already completed (or is slow), downstream selector
+            // waits take over instead of hanging on chrome-php's 30s default.
+            $this->getPage()->waitForReload(\HeadlessChromium\Page::LOAD, 10000);
+        } catch (\Throwable $e) {
+        }
     }
 
     public function selectOption($selector, $value)
