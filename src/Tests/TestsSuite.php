@@ -75,6 +75,12 @@ class TestsSuite
 
     protected static array $pendingDebugMessages = [];
 
+    /**
+     * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
+     * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
+     */
+    public static array $extraHttpHeaders = [];
+
     protected $draft = false;
     protected $groups = 'all';
 
@@ -443,6 +449,9 @@ class TestsSuite
 
         $authHeader = 'Basic '.\base64_encode($user.':'.($pass ?? ''));
 
+        // Mémorisé pour réapplication après chaque (re)création de page (goToPage).
+        TestsSuite::$extraHttpHeaders['Authorization'] = $authHeader;
+
         $browser = TestsSuite::getBrowser();
         if ($browser) {
             try {
@@ -453,17 +462,32 @@ class TestsSuite
             }
         }
 
+        // Applique sur la page courante (première navigation).
+        TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
+     * (Ré)applique self::$extraHttpHeaders sur la page courante. À appeler après
+     * toute (re)création de page — notamment dans goToPage — car un en-tête posé
+     * sur une page fermée est perdu. Best-effort.
+     */
+    public static function applyExtraHttpHeaders(): void
+    {
+        if (empty(TestsSuite::$extraHttpHeaders)) {
+            return;
+        }
+
         $page = TestsSuite::getPage();
-        if ($page) {
-            try {
-                // Network doit être activé pour que Network.setExtraHTTPHeaders prenne
-                // effet ; la page « about:blank » initiale n'est pas passée par le flux
-                // d'activation de BrowserFactory → on l'active (idempotent).
-                $page->getSession()->sendMessageSync(new Message('Network.enable'));
-                $page->setExtraHTTPHeaders(['Authorization' => $authHeader]);
-            } catch (Throwable $e) {
-                // best-effort
-            }
+        if (!$page) {
+            return;
+        }
+
+        try {
+            // Network doit être activé pour que Network.setExtraHTTPHeaders prenne effet.
+            $page->getSession()->sendMessageSync(new Message('Network.enable'));
+            $page->setExtraHTTPHeaders(TestsSuite::$extraHttpHeaders);
+        } catch (Throwable $e) {
+            // best-effort
         }
     }
 

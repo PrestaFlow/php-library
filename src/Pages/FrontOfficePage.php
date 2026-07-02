@@ -48,6 +48,9 @@ class FrontOfficePage extends CommonPage
         $url = $this->getPageURL($page, $params);
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
+        // La page vient d'être recréée : réappliquer les en-têtes persistants
+        // (ex. Authorization Basic Auth) sinon la navigation part sans eux.
+        TestsSuite::applyExtraHttpHeaders();
         $this->getPage()->navigate($url)->waitForNavigation();
 
         try {
