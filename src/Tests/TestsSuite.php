@@ -391,6 +391,12 @@ class TestsSuite
 
         TestsSuite::getBrowser(headless: $headless, force: true);
 
+        // Authentification HTTP Basic (env) posée en header sur TOUTES les requêtes
+        // (navigation top-level, sous-ressources ET XHR), avant toute navigation.
+        // Plus fiable que des identifiants dans l'URL (https://user:pass@host/…),
+        // que Chrome n'applique pas aux requêtes XHR ni toujours aux redirections.
+        $this->presetBasicAuth();
+
         // Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
         // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
         // consentement (RGPD) sur un environnement protégé/preprod.
@@ -423,6 +429,32 @@ class TestsSuite
      *
      * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
      */
+    /**
+     * Authentification HTTP Basic via l'environnement, posée en en-tête sur toutes
+     * les requêtes (utile pour un environnement protégé : preprod/staging).
+     *
+     * PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS. Best-effort.
+     */
+    protected function presetBasicAuth(): void
+    {
+        $user = $_ENV['PRESTAFLOW_BASIC_USER'] ?? null;
+        $pass = $_ENV['PRESTAFLOW_BASIC_PASS'] ?? null;
+        if ($user === null || $user === '') {
+            return;
+        }
+
+        $page = TestsSuite::getPage();
+        if (!$page) {
+            return;
+        }
+
+        try {
+            $page->setBasicAuthHeader((string) $user, (string) ($pass ?? ''));
+        } catch (Throwable $e) {
+            // best-effort
+        }
+    }
+
     protected function presetEnvCookies(): void
     {
         $raw = $_ENV['PRESTAFLOW_COOKIES'] ?? null;
