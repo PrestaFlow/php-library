@@ -25,19 +25,19 @@ class CreateProductAndVerify extends Scenario
             $backOfficeLoginPage->goToPage('index');
             $backOfficeLoginPage->login();
         })
-        ->it('create and enable a product', function () use ($backOfficeProductsPage) {
+        ->it('create and publish a product', function () use ($backOfficeProductsPage) {
             $backOfficeProductsPage->goTo();
             $backOfficeProductsPage->createProduct(
                 $this->getParam('productName'),
                 (float) $this->getParam('productPrice'),
                 (int) $this->getParam('productQuantity')
             );
-            $backOfficeProductsPage->enableProduct();
 
             $this->store('productId', $backOfficeProductsPage->getCreatedProductId());
+            $this->store('productUrl', $backOfficeProductsPage->getCreatedProductUrl());
         })
         ->it('verify the product on the FrontOffice', function () use ($frontOfficeProductPage) {
-            $frontOfficeProductPage->goToProduct((int) $this->retrieve('productId'));
+            $frontOfficeProductPage->goToUrl((string) $this->retrieve('productUrl'));
 
             Expect::that($frontOfficeProductPage->getTitle())->contains($this->getParam('productName'));
         })

@@ -105,6 +105,17 @@ class FrontOfficePage extends CommonPage
         return $url;
     }
 
+    public function goToUrl(string $url)
+    {
+        // Intentionally overrides CommonPage::goToUrl (a plain navigate) to force
+        // a clean FrontOffice session — recreating the page like goToPage does —
+        // before hitting an absolute FO URL (e.g. a product's canonical preview
+        // URL read from the BackOffice), so BackOffice cookies don't leak in.
+        TestsSuite::getPage()->close();
+        TestsSuite::getBrowser()->createPage();
+        $this->getPage()->navigate($url)->waitForNavigation();
+    }
+
     public function getTitle()
     {
         return $this->getTextContent($this->selector('pageTitle'));
