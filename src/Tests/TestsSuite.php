@@ -354,17 +354,35 @@ class TestsSuite
             if (!$force) {
                 return null;
             }
-            $browserFactory = new BrowserFactory();
 
-            //$browserFactory->addOptions(['headless' => (bool) $headless]);
-
-            $browser = $browserFactory->createBrowser([
+            $options = [
                 'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
                 'keepAlive' => true,
                 'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
-            ]);
-            \file_put_contents($socketFile, $browser->getSocketUri());
+            ];
+
+            // Le lancement d'un navigateur « froid » échoue parfois au handshake
+            // CDP (« Message could not be sent. Reason: the connection is closed »).
+            // On réessaie quelques fois : sinon toute la suite ne tourne pas (et,
+            // sans rapport JUnit produit, le job peut passer au vert à tort).
+            $browser = null;
+            $lastError = null;
+            for ($attempt = 0; $attempt < 3; $attempt++) {
+                try {
+                    $browser = (new BrowserFactory())->createBrowser($options);
+                    \file_put_contents($socketFile, $browser->getSocketUri());
+                    $lastError = null;
+                    break;
+                } catch (\Throwable $e2) {
+                    $lastError = $e2;
+                    usleep(700000);
+                }
+            }
+
+            if ($lastError !== null) {
+                throw $lastError;
+            }
         }
 
         return $browser;
