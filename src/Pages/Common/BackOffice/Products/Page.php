@@ -27,6 +27,8 @@ class Page extends BasePage
             'resetButton' => '#product_grid_search_form .grid-reset-button',
             'listRow' => '#product_grid_table tbody tr:nth-child(${row})',
             'listRowName' => '#product_grid_table tbody tr:nth-child(${row}) .column-name',
+            // Row edit link — best-effort PS 9, corrected live.
+            'listRowLink' => '#product_grid_table tbody tr:nth-child(${row}) a[href*="/products/"][href*="/edit"]',
             'resultCount' => '.pagination-total, #product_grid_panel .card-header .badge',
             'rowActionsToggle' => '#product_grid_table tbody tr:nth-child(${row}) .dropdown-toggle',
             'rowDeleteLink' => '#product_grid_table tbody tr:nth-child(${row}) a.grid-delete-row-link',
@@ -101,9 +103,12 @@ class Page extends BasePage
     public function createProduct(string $name, float $price = 0, int $quantity = 0): void
     {
         $this->goToNewProduct();
+        // The name lives in the always-visible header; price/quantity sit on the
+        // Pricing/Stocks tabs, which are inactive by default — a click+type there
+        // can't focus the field and leaks the text into the name. Set those via JS.
         $this->setValue($this->getSelector('formNameInput'), $name);
-        $this->setValue($this->getSelector('formPriceInput'), (string) $price);
-        $this->setValue($this->getSelector('formQuantityInput'), (string) $quantity);
+        $this->jsSetValue($this->getSelector('formPriceInput'), (string) $price);
+        $this->jsSetValue($this->getSelector('formQuantityInput'), (string) $quantity);
         // Enable the product BEFORE saving so the online state persists.
         $this->enableProduct();
         $this->click($this->getSelector('formSaveButton'));
@@ -156,5 +161,45 @@ class Page extends BasePage
             '(function(){var e=document.querySelector(%s);return e&&e.href?e.href:"";})()',
             $sel
         ))->getReturnValue();
+    }
+
+    public function openProduct(int $row = 1): void
+    {
+        $this->click($this->getSelector('listRowLink', ['row' => $row]));
+        $this->waitForPageReload();
+    }
+
+    public function updatePrice(float $price): void
+    {
+        // The price field is on the (inactive) Pricing tab; set it via JS.
+        $this->jsSetValue($this->getSelector('formPriceInput'), (string) $price);
+        $this->click($this->getSelector('formSaveButton'));
+        $this->waitForPageReload();
+    }
+
+    public function getFormPrice(): string
+    {
+        $sel = json_encode($this->getSelector('formPriceInput'));
+
+        return trim((string) $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);return e?e.value:"";})()',
+            $sel
+        ))->getReturnValue());
+    }
+
+    /**
+     * Set an input's value via JS (value + input/change events). Reliable for
+     * fields on inactive tabs, where a click+type can't focus the element and
+     * would leak the text into whatever input currently has focus.
+     */
+    private function jsSetValue(string $selector, string $value): void
+    {
+        $sel = json_encode($selector);
+        $val = json_encode($value);
+        $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);if(e){e.value=%s;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));}})()',
+            $sel,
+            $val
+        ));
     }
 }

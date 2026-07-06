@@ -111,4 +111,13 @@ final class BackOfficeProductsTest extends TestCase
             'createProduct must enable the product before saving so it persists'
         );
     }
+
+    public function testHasEditActions(): void
+    {
+        $page = $this->make();
+        $this->assertArrayHasKey('listRowLink', $page->selectors);
+        foreach (['openProduct', 'updatePrice', 'getFormPrice'] as $method) {
+            $this->assertTrue(method_exists($page, $method), $method);
+        }
+    }
 }
