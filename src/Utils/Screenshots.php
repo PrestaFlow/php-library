@@ -7,7 +7,6 @@ final class Screenshots
     public const ERRORS_SUBPATH = 'screens/errors';
     public const RELATIVE_DIR = 'prestaflow/screens/errors';
 
-    public const REFERENCES_SUBPATH = 'screens/references';
     public const ACTUAL_SUBPATH = 'screens/actual';
     public const DIFF_SUBPATH = 'screens/diff';
 
@@ -18,6 +17,21 @@ final class Screenshots
         }
 
         return getcwd() . '/prestaflow';
+    }
+
+    /**
+     * Dossier PERSISTANT des références de régression visuelle. Volontairement HORS
+     * de baseDir() : au démarrage d'un run, ExecuteSuite vide baseDir (screens/) via
+     * handleDir() — les références doivent survivre entre runs (auto-baseline gelée,
+     * cache CI). actual/ et diff/ restent sous screens/ (régénérés à chaque run).
+     */
+    private static function referencesBaseDir(): string
+    {
+        if (function_exists('storage_path')) {
+            return rtrim(storage_path(), '/') . '/visual-baseline';
+        }
+
+        return getcwd() . '/visual-baseline';
     }
 
     public static function errorsDir(bool $create = false): string
@@ -43,7 +57,13 @@ final class Screenshots
 
     public static function referencePath(string $fileName, bool $create = false): string
     {
-        return self::visualPath(self::REFERENCES_SUBPATH, $fileName, $create);
+        $full = self::referencesBaseDir() . '/' . $fileName;
+
+        if ($create && !is_dir(dirname($full))) {
+            mkdir(dirname($full), 0777, true);
+        }
+
+        return $full;
     }
 
     public static function actualPath(string $fileName, bool $create = false): string

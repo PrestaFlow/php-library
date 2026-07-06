@@ -78,7 +78,7 @@ final class ScreenshotsTest extends TestCase
 
     public function testVisualPathsResolveUnderSubdirs(): void
     {
-        $this->assertStringEndsWith('/screens/references/login.png', Screenshots::referencePath('login.png'));
+        $this->assertStringEndsWith('/visual-baseline/login.png', Screenshots::referencePath('login.png'));
         $this->assertStringEndsWith('/screens/actual/login.png', Screenshots::actualPath('login.png'));
         $this->assertStringEndsWith('/screens/diff/login.png', Screenshots::diffPath('login.png'));
     }
