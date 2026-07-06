@@ -20,6 +20,11 @@ class CheckoutOrder extends Scenario
 
     public function steps($testSuite)
     {
+        // importPage() resolves friendly URLs from the SUITE's locale, so
+        // propagate this scenario's locale (fr on the demo shop) before importing
+        // pages — otherwise login/cart/order URLs fall back to English and 404.
+        $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
+
         $testSuite->importPage('FrontOffice\Login');
         $testSuite->importPage('FrontOffice\Product');
         $testSuite->importPage('FrontOffice\Cart');

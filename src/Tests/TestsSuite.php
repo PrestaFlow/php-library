@@ -55,6 +55,7 @@ class TestsSuite
 
     public $globals = [];
     public $pages = [];
+    public $params = [];
 
     public $customs = [
         'selectors' => [],

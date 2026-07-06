@@ -24,6 +24,14 @@ class Page extends BasePage
 
     public function getOrderReference(): string
     {
-        return trim($this->getTextContent($this->getSelector('orderReference')));
+        $text = trim($this->getTextContent($this->getSelector('orderReference')));
+
+        // The confirmation renders a label like "Référence de la commande : XXXX"
+        // (or "Order reference: XXXX"); keep only the reference code that follows.
+        if (str_contains($text, ':')) {
+            $text = trim(substr($text, strrpos($text, ':') + 1));
+        }
+
+        return $text;
     }
 }

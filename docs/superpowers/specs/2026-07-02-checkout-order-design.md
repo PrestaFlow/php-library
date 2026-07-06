@@ -172,6 +172,27 @@ la fois, `.env.local` configuré, `datas/` existe.
 Approbation explicite requise avant tout `git commit`. Les subagents
 implémenteurs ne committent pas ; le coordinateur regroupe après accord.
 
+## Addendum 2 — VERT complet (2026-07-06)
+
+Le scénario `CheckoutOrder` passe **5/5 en live, reproductible** : login FO →
+ajout panier → tunnel (adresses / livraison / paiement / CGV) → **commande passée**
+(confirmation) → **commande retrouvée en BackOffice** par référence.
+
+Trois derniers correctifs après l'addendum 1 :
+1. **Locale non propagée** (cause racine du login KO) : `importPage()` résout les
+   URLs friendly depuis les params de la **suite**, pas du scénario. Le scénario
+   pose donc `$testSuite->params['locale'] = $this->params['locale']` avant
+   d'importer les pages → `/connexion`, `/panier`, `/commande` corrects (sinon
+   fallback anglais → 404 → parcours en invité).
+2. **Paiement** (config boutique) : les modules étaient restreints à la **Belgique**
+   (pays de la boutique) alors que le client commande en **France** → aucune
+   option. Corrigé en base : `INSERT INTO okd6a_module_country (id_module,id_shop,
+   id_country) … id_country=8 (FR)` pour ps_checkpayment/ps_wirepayment/
+   ps_cashondelivery.
+3. **Référence** : `getOrderReference()` renvoyait « Référence de la commande :
+   XXXX » ; on ne garde que le code après le « : ».
+Aussi : `public $params = []` déclaré sur `TestsSuite` (évite la dynamic-property).
+
 ## Addendum — validation live (2026-07-02) : validé jusqu'au paiement
 
 Reverse-engineering live contre la PS 9 locale (boutique **française**, config
