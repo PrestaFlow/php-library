@@ -87,6 +87,14 @@ final class JUnitReport
                 $sysOut->appendChild($doc->createTextNode('[[ATTACHMENT|' . $relative . ']]'));
                 $caseEl->appendChild($sysOut);
             }
+
+            $attachments = $test['attachments'] ?? [];
+            if (is_array($attachments) && $attachments !== []) {
+                $sysOut = $doc->createElement('system-out');
+                $lines = array_map(static fn ($p) => '[[ATTACHMENT|' . $p . ']]', $attachments);
+                $sysOut->appendChild($doc->createTextNode(implode("\n", $lines)));
+                $caseEl->appendChild($sysOut);
+            }
         } elseif (in_array($state, ['skip', 'skipped', 'todo'], true)) {
             $caseEl->appendChild($doc->createElement('skipped'));
         }
