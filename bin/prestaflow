@@ -6,11 +6,14 @@ $autoloadFiles = [
     $GLOBALS['_composer_autoload_path'] ?? null,
     // Install classique : vendor/prestaflow/php-library/bin → vendor/autoload.php
     __DIR__ . '/../../../autoload.php',
-    // Lib autonome (dev direct dans le dépôt de la lib).
-    __DIR__ . '/../vendor/autoload.php',
-    // Repli : lib symlinkée (path repo) → __DIR__ pointe hors du vendor du projet,
-    // on retombe sur l'autoload du projet courant.
+    // Lib symlinkée (path repo) : __DIR__ pointe hors du vendor du projet → on
+    // charge l'autoload du projet courant (celui-ci inclut les classes Tests\ ET
+    // la lib). DOIT passer AVANT le vendor autonome de la lib ci-dessous : sinon,
+    // si la lib a son propre vendor/ (ex. composer install pour ses tests unitaires),
+    // on chargerait un autoload sans les classes du projet → « Class Tests\… not found ».
     getcwd() . '/vendor/autoload.php',
+    // Dernier recours : lib exécutée en autonome (dépôt de la lib, avec son vendor).
+    __DIR__ . '/../vendor/autoload.php',
 ];
 $autoloadLoaded = false;
 foreach ($autoloadFiles as $autoloadFile) {
