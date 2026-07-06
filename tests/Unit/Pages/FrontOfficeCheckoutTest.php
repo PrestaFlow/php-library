@@ -48,4 +48,14 @@ final class FrontOfficeCheckoutTest extends TestCase
         $this->assertTrue(method_exists($page, 'isConfirmed'));
         $this->assertTrue(method_exists($page, 'getOrderReference'));
     }
+
+    public function testCheckoutHasGuestSteps(): void
+    {
+        $page = $this->make('Checkout');
+        foreach (['personalEmailInput', 'personalFirstNameInput', 'personalLastNameInput', 'personalContinueButton', 'guestToggle', 'addressStreetInput', 'addressCityInput', 'addressPostcodeInput', 'addressCountrySelect', 'addressPhoneInput'] as $key) {
+            $this->assertArrayHasKey($key, $page->selectors, $key);
+        }
+        $this->assertTrue(method_exists($page, 'checkoutAsGuest'));
+        $this->assertTrue(method_exists($page, 'fillNewAddress'));
+    }
 }
