@@ -75,6 +75,14 @@ class TestsSuite
 
     protected static array $pendingDebugMessages = [];
 
+    /** Résultats de régression visuelle du run courant (alimentés par CommonPage::visualCheckpoint). */
+    public static array $visualResults = [];
+
+    public static function recordVisualResult(array $result): void
+    {
+        self::$visualResults[] = $result;
+    }
+
     /**
      * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
      * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
@@ -833,6 +841,9 @@ class TestsSuite
                     $this->stats['failures']++;
                     $this->failed = true;
                 } finally {
+                    // Reset structurel : aucune attache visuelle ne fuite d'un test
+                    // à l'autre, quel que soit l'état (pass compris).
+                    Expect::$latestAttachments = [];
                     $test['expect'] = Expect::getExpectMessage();
                     $this->attachDebugMessages($test);
                     Expect::getNbAssertions();
@@ -917,6 +928,8 @@ class TestsSuite
     {
         $test['screen'] = Expect::$latestError;
         $this->screens[] = $test['screen'];
+
+        $test['attachments'] = Expect::$latestAttachments ?? [];
 
         if (!empty(Expect::$latestScreenshotError)) {
             $this->log('Screenshot capture failed: ' . Expect::$latestScreenshotError);

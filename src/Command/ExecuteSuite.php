@@ -48,6 +48,7 @@ class ExecuteSuite extends Command
             ->addOption('stats', 's', InputOption::VALUE_NONE, 'Show stats')
             ->addOption('file', 'f', InputOption::VALUE_NONE, 'Output to file')
             ->addOption('junit', null, InputOption::VALUE_OPTIONAL, 'Write a JUnit XML report (default path: prestaflow/junit.xml)', false)
+            ->addOption('visual-report', null, InputOption::VALUE_OPTIONAL, 'Écrit un rapport de régression visuelle (HTML)', false)
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -261,6 +262,15 @@ class ExecuteSuite extends Command
         if ($junitPath !== null) {
             $this->filePutContents($junitPath, $report->render());
             $this->success('JUnit report saved to ' . $junitPath, newLine: true, force: true);
+        }
+
+        $visualOption = $input->getOption('visual-report');
+        $visualPath = ($visualOption === false) ? null : ($visualOption ?: 'reports/visual/index.html');
+        if ($visualPath !== null) {
+            $visualReport = new \PrestaFlow\Library\Reports\VisualReport();
+            $this->filePutContents($visualPath, $visualReport->renderHtml(\PrestaFlow\Library\Tests\TestsSuite::$visualResults));
+            $this->filePutContents(dirname($visualPath) . '/visual-results.json', $visualReport->renderJson(\PrestaFlow\Library\Tests\TestsSuite::$visualResults));
+            $this->success('Rapport visuel écrit dans ' . $visualPath, newLine: true, force: true);
         }
 
         return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
