@@ -19,6 +19,9 @@ class Page extends BasePage
             'filterReferenceInput' => '#order_grid_table th input[name="order[reference]"]',
             'searchButton' => '#order_grid_search_form button.grid-search-button',
             'listRowReference' => '#order_grid_table tbody tr:nth-child(${row}) .column-reference',
+            // The row's order-view link (scoped to /orders/ so it doesn't match
+            // the customer link, which also ends in /view).
+            'listRowLink' => '#order_grid_table tbody tr:nth-child(${row}) a[href*="/orders/"][href*="/view"]',
         ];
     }
 
@@ -37,5 +40,11 @@ class Page extends BasePage
     public function getOrderReferenceInList(int $row = 1): string
     {
         return trim($this->getTextContent($this->getSelector('listRowReference', ['row' => $row])));
+    }
+
+    public function openOrder(int $row = 1): void
+    {
+        $this->click($this->getSelector('listRowLink', ['row' => $row]));
+        $this->waitForPageReload();
     }
 }
