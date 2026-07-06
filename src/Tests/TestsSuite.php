@@ -841,6 +841,9 @@ class TestsSuite
                     $this->stats['failures']++;
                     $this->failed = true;
                 } finally {
+                    // Reset structurel : aucune attache visuelle ne fuite d'un test
+                    // à l'autre, quel que soit l'état (pass compris).
+                    Expect::$latestAttachments = [];
                     $test['expect'] = Expect::getExpectMessage();
                     $this->attachDebugMessages($test);
                     Expect::getNbAssertions();
@@ -927,7 +930,6 @@ class TestsSuite
         $this->screens[] = $test['screen'];
 
         $test['attachments'] = Expect::$latestAttachments ?? [];
-        Expect::$latestAttachments = [];
 
         if (!empty(Expect::$latestScreenshotError)) {
             $this->log('Screenshot capture failed: ' . Expect::$latestScreenshotError);

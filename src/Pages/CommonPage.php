@@ -211,6 +211,9 @@ class CommonPage
             ])->saveToFile($actualPath);
         } else {
             $node = $this->getPage()->dom()->querySelector($selector);
+            if ($node === null) {
+                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+            }
             $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
         }
 
