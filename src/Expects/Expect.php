@@ -25,6 +25,14 @@ class Expect extends ExpectLibrary
     public static $latestScreenshotError = null;
     public static $nbAssertions = 0;
 
+    /** Attaches (chemins relatifs) à joindre au testcase courant (régression visuelle). */
+    public static array $latestAttachments = [];
+
+    public static function setVisualAttachments(array $paths): void
+    {
+        self::$latestAttachments = $paths;
+    }
+
     protected static string $locale = 'en';
     protected static ?array $translations = null;
 

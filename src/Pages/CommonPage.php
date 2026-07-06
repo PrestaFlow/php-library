@@ -191,6 +191,60 @@ class CommonPage
         return TestsSuite::getPage();
     }
 
+    /**
+     * Point de contrôle de régression visuelle.
+     * - pas de référence => capture-la (auto-baseline), PASS.
+     * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
+     * $selector null => capture pleine page ; sinon capture de l'élément.
+     */
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98): void
+    {
+        $file = $name . '.png';
+        $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
+        $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
+
+        if ($selector === null) {
+            $this->getPage()->screenshot([
+                'captureBeyondViewport' => true,
+                'clip' => $this->getPage()->getFullPageClip(),
+                'format' => 'png',
+            ])->saveToFile($actualPath);
+        } else {
+            $node = $this->getPage()->dom()->querySelector($selector);
+            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+        }
+
+        if (!is_file($refPath)) {
+            copy($actualPath, $refPath);
+            \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
+                'name' => $name, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
+                'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
+            ]);
+            \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
+            return;
+        }
+
+        $comparator = new \PrestaFlow\Library\Visual\VisualComparator();
+        $score = $comparator->compare($refPath, $actualPath);
+        $diffPath = \PrestaFlow\Library\Utils\Screenshots::diffPath($file, create: true);
+        $comparator->generateDiff($refPath, $actualPath, $diffPath);
+
+        $status = $score >= $threshold ? 'pass' : 'fail';
+        \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
+            'name' => $name, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
+            'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
+        ]);
+
+        if ($status === 'fail') {
+            \PrestaFlow\Library\Expects\Expect::setVisualAttachments([
+                \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', $file),
+                \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('diff', $file),
+            ]);
+        }
+
+        \PrestaFlow\Library\Expects\Expect::that($score >= $threshold)->isTheSameAs(true);
+    }
+
     public function pageTitle()
     {
         return $this->translate($this->pageTitle);
