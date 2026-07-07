@@ -195,26 +195,35 @@ class CommonPage
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
-     * $selector null => capture pleine page ; sinon capture de l'élément.
+     *
+     * Modes de capture :
+     * - $selector non null => capture de l'élément ;
+     * - $selector null && $fullPage=true (défaut) => pleine page ;
+     * - $selector null && $fullPage=false => VIEWPORT seul (hauteur fixe de la
+     *   fenêtre). À utiliser pour les pages HAUTES à contenu lazy dont la hauteur
+     *   pleine page varie selon l'état de chargement (faux écarts).
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true): void
     {
         $file = $name . '.png';
         $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
         $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
 
-        if ($selector === null) {
+        if ($selector !== null) {
+            $node = $this->getPage()->dom()->querySelector($selector);
+            if ($node === null) {
+                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+            }
+            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+        } elseif ($fullPage) {
             $this->getPage()->screenshot([
                 'captureBeyondViewport' => true,
                 'clip' => $this->getPage()->getFullPageClip(),
                 'format' => 'png',
             ])->saveToFile($actualPath);
         } else {
-            $node = $this->getPage()->dom()->querySelector($selector);
-            if ($node === null) {
-                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
-            }
-            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+            // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
+            $this->getPage()->screenshot(['format' => 'png'])->saveToFile($actualPath);
         }
 
         if (!is_file($refPath)) {
