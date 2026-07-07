@@ -406,9 +406,21 @@ class TestsSuite
         for ($try = 1; ; $try++) {
             try {
                 $pages = TestsSuite::getBrowser()?->getPages();
+                $createdNew = false;
                 if (count($pages) == 0) {
                     TestsSuite::getBrowser()?->createPage();
+                    $createdNew = true;
                 }
+
+                // Si on vient de créer la page (aucune n'existait), les en-têtes
+                // persistants (ex. Authorization Basic Auth) doivent y être appliqués
+                // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
+                // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
+                // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
+                if ($createdNew) {
+                    TestsSuite::applyExtraHttpHeaders();
+                }
+
                 return TestsSuite::getBrowser()?->getPages()[0];
             } catch (\Throwable $e) {
                 if ($try >= 3) {
