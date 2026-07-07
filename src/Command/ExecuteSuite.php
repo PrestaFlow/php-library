@@ -270,7 +270,11 @@ class ExecuteSuite extends Command
         if ($visualPath !== null) {
             // Fuseau du stamp : option CLI > env PRESTAFLOW_TZ > UTC. Fallback UTC
             // si l'identifiant est invalide (ne casse jamais la génération du rapport).
-            $tzName = $input->getOption('visual-report-tz') ?: ($_ENV['PRESTAFLOW_TZ'] ?? 'UTC');
+            // On lit à la fois $_ENV et getenv() : selon variables_order de PHP,
+            // seul l'un ou l'autre peut être peuplé par le shell parent (setup-php CI
+            // ne peuple pas $_ENV par défaut).
+            $tzName = $input->getOption('visual-report-tz')
+                ?: ($_ENV['PRESTAFLOW_TZ'] ?? getenv('PRESTAFLOW_TZ') ?: 'UTC');
             try {
                 $tz = new \DateTimeZone($tzName);
             } catch (\Exception $e) {
