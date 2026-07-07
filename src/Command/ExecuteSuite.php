@@ -49,6 +49,7 @@ class ExecuteSuite extends Command
             ->addOption('file', 'f', InputOption::VALUE_NONE, 'Output to file')
             ->addOption('junit', null, InputOption::VALUE_OPTIONAL, 'Write a JUnit XML report (default path: prestaflow/junit.xml)', false)
             ->addOption('visual-report', null, InputOption::VALUE_OPTIONAL, 'Écrit un rapport de régression visuelle (HTML)', false)
+            ->addOption('visual-report-tz', null, InputOption::VALUE_REQUIRED, 'Fuseau horaire du stamp du rapport visuel (ex. Europe/Brussels). Défaut : env PRESTAFLOW_TZ ou UTC.')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
@@ -267,9 +268,18 @@ class ExecuteSuite extends Command
         $visualOption = $input->getOption('visual-report');
         $visualPath = ($visualOption === false) ? null : ($visualOption ?: 'reports/visual/index.html');
         if ($visualPath !== null) {
+            // Fuseau du stamp : option CLI > env PRESTAFLOW_TZ > UTC. Fallback UTC
+            // si l'identifiant est invalide (ne casse jamais la génération du rapport).
+            $tzName = $input->getOption('visual-report-tz') ?: ($_ENV['PRESTAFLOW_TZ'] ?? 'UTC');
+            try {
+                $tz = new \DateTimeZone($tzName);
+            } catch (\Exception $e) {
+                $tz = new \DateTimeZone('UTC');
+            }
+
             $visualReport = new \PrestaFlow\Library\Reports\VisualReport();
             // Stamp partagé HTML/JSON (une seule lecture de l'horloge).
-            $generatedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $generatedAt = new \DateTimeImmutable('now', $tz);
             $this->filePutContents($visualPath, $visualReport->renderHtml(\PrestaFlow\Library\Tests\TestsSuite::$visualResults, $generatedAt));
             $this->filePutContents(dirname($visualPath) . '/visual-results.json', $visualReport->renderJson(\PrestaFlow\Library\Tests\TestsSuite::$visualResults, $generatedAt));
             $this->success('Rapport visuel écrit dans ' . $visualPath, newLine: true, force: true);

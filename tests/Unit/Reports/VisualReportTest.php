@@ -28,16 +28,28 @@ final class VisualReportTest extends TestCase
         $this->assertStringContainsString('baseline', $html);
     }
 
-    public function testHtmlShowsGeneratedAtStamp(): void
+    public function testHtmlShowsGeneratedAtStampInUtc(): void
     {
         $at = new \DateTimeImmutable('2026-07-06T15:30:45', new \DateTimeZone('UTC'));
         $html = (new VisualReport())->renderHtml([
             ['name'=>'login','status'=>'pass','score'=>1.0,'threshold'=>0.98,'reference'=>null,'actual'=>null,'diff'=>null],
         ], $at);
 
-        // Format ISO dans l'attribut datetime + rendu humain lisible dans le texte.
         $this->assertStringContainsString('datetime="2026-07-06T15:30:45+00:00"', $html);
         $this->assertStringContainsString('2026-07-06 15:30:45 UTC', $html);
+    }
+
+    public function testHtmlShowsGeneratedAtStampInLocalTz(): void
+    {
+        // Été → Europe/Brussels = CEST (UTC+2). L'abbréviation doit apparaître
+        // dans le rendu humain, l'ISO doit porter le bon offset.
+        $at = new \DateTimeImmutable('2026-07-06T17:30:45', new \DateTimeZone('Europe/Brussels'));
+        $html = (new VisualReport())->renderHtml([
+            ['name'=>'login','status'=>'pass','score'=>1.0,'threshold'=>0.98,'reference'=>null,'actual'=>null,'diff'=>null],
+        ], $at);
+
+        $this->assertStringContainsString('datetime="2026-07-06T17:30:45+02:00"', $html);
+        $this->assertStringContainsString('2026-07-06 17:30:45 CEST', $html);
     }
 
     public function testJsonSummary(): void

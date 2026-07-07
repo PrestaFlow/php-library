@@ -34,8 +34,9 @@ final class VisualReport
             . '.imgs figure{margin:0}.imgs img{width:100%;border:1px solid #e2e2e2;border-radius:6px}'
             . '.cap{font-size:12px;color:#666;margin-bottom:4px}</style></head><body>';
 
+        // `T` = abbréviation du fuseau (CEST/UTC/…). ATOM = ISO 8601 avec offset.
         $stampAttr = htmlspecialchars($generatedAt->format(\DateTimeInterface::ATOM), ENT_QUOTES);
-        $stampHuman = htmlspecialchars($generatedAt->format('Y-m-d H:i:s') . ' UTC');
+        $stampHuman = htmlspecialchars($generatedAt->format('Y-m-d H:i:s T'));
 
         $summary = '<h1>Régression visuelle</h1>'
             . '<p class="stamp">Généré le <time datetime="' . $stampAttr . '">' . $stampHuman . '</time></p>'
