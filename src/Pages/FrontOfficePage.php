@@ -46,9 +46,26 @@ class FrontOfficePage extends CommonPage
         }
 
         $url = $this->getPageURL($page, $params);
-        TestsSuite::getPage()->close();
-        TestsSuite::getBrowser()->createPage();
-        $this->getPage()->navigate($url)->waitForNavigation();
+
+        // close()+createPage() peut floter au démarrage à froid : l'énumération des
+        // targets pendant qu'une page se ferme/crée lève « Call to a member function
+        // getTargetInfo() on null ». On réessaie la séquence quelques fois.
+        $attempts = 3;
+        for ($try = 1; ; $try++) {
+            try {
+                TestsSuite::getPage()->close();
+                TestsSuite::getBrowser()->createPage();
+                // Page recréée : réappliquer les en-têtes persistants (ex. Basic Auth).
+                TestsSuite::applyExtraHttpHeaders();
+                $this->getPage()->navigate($url)->waitForNavigation();
+                break;
+            } catch (\Throwable $e) {
+                if ($try >= $attempts) {
+                    throw $e;
+                }
+                usleep(800000);
+            }
+        }
 
         try {
             $bodyContent = $this->getTextContent('body');

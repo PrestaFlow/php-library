@@ -191,6 +191,72 @@ class CommonPage
         return TestsSuite::getPage();
     }
 
+    /**
+     * Point de contrôle de régression visuelle.
+     * - pas de référence => capture-la (auto-baseline), PASS.
+     * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
+     *
+     * Modes de capture :
+     * - $selector non null => capture de l'élément ;
+     * - $selector null && $fullPage=true (défaut) => pleine page ;
+     * - $selector null && $fullPage=false => VIEWPORT seul (hauteur fixe de la
+     *   fenêtre). À utiliser pour les pages HAUTES à contenu lazy dont la hauteur
+     *   pleine page varie selon l'état de chargement (faux écarts).
+     */
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true): void
+    {
+        $file = $name . '.png';
+        $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
+        $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
+
+        if ($selector !== null) {
+            $node = $this->getPage()->dom()->querySelector($selector);
+            if ($node === null) {
+                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+            }
+            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+        } elseif ($fullPage) {
+            $this->getPage()->screenshot([
+                'captureBeyondViewport' => true,
+                'clip' => $this->getPage()->getFullPageClip(),
+                'format' => 'png',
+            ])->saveToFile($actualPath);
+        } else {
+            // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
+            $this->getPage()->screenshot(['format' => 'png'])->saveToFile($actualPath);
+        }
+
+        if (!is_file($refPath)) {
+            copy($actualPath, $refPath);
+            \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
+                'name' => $name, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
+                'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
+            ]);
+            \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
+            return;
+        }
+
+        $comparator = new \PrestaFlow\Library\Visual\VisualComparator();
+        $score = $comparator->compare($refPath, $actualPath);
+        $diffPath = \PrestaFlow\Library\Utils\Screenshots::diffPath($file, create: true);
+        $comparator->generateDiff($refPath, $actualPath, $diffPath);
+
+        $status = $score >= $threshold ? 'pass' : 'fail';
+        \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
+            'name' => $name, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
+            'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
+        ]);
+
+        if ($status === 'fail') {
+            \PrestaFlow\Library\Expects\Expect::setVisualAttachments([
+                \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', $file),
+                \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('diff', $file),
+            ]);
+        }
+
+        \PrestaFlow\Library\Expects\Expect::that($score >= $threshold)->isTheSameAs(true);
+    }
+
     public function pageTitle()
     {
         return $this->translate($this->pageTitle);

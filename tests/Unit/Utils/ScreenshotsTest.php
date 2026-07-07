@@ -75,4 +75,22 @@ final class ScreenshotsTest extends TestCase
         $_ENV['PRESTAFLOW_SCREENSHOT_DELAY'] = '-2';
         $this->assertSame(0, Screenshots::captureDelay());
     }
+
+    public function testVisualPathsResolveUnderSubdirs(): void
+    {
+        $this->assertStringEndsWith('/visual-baseline/login.png', Screenshots::referencePath('login.png'));
+        $this->assertStringEndsWith('/screens/actual/login.png', Screenshots::actualPath('login.png'));
+        $this->assertStringEndsWith('/screens/diff/login.png', Screenshots::diffPath('login.png'));
+    }
+
+    public function testRelativeVisualPath(): void
+    {
+        $this->assertSame('prestaflow/screens/diff/login.png', Screenshots::relativeVisualPath('diff', 'login.png'));
+    }
+
+    public function testCreateMakesParentDir(): void
+    {
+        $path = Screenshots::actualPath('t_' . getmypid() . '.png', create: true);
+        $this->assertDirectoryExists(dirname($path));
+    }
 }

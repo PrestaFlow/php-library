@@ -7,6 +7,7 @@ use Dotenv\Dotenv;
 use Error;
 use Exception;
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Communication\Message;
 use HeadlessChromium\Cookies\Cookie;
 use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
@@ -74,6 +75,20 @@ class TestsSuite
     protected static $lines = [];
 
     protected static array $pendingDebugMessages = [];
+
+    /** Résultats de régression visuelle du run courant (alimentés par CommonPage::visualCheckpoint). */
+    public static array $visualResults = [];
+
+    public static function recordVisualResult(array $result): void
+    {
+        self::$visualResults[] = $result;
+    }
+
+    /**
+     * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
+     * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
+     */
+    public static array $extraHttpHeaders = [];
 
     protected $draft = false;
     protected $groups = 'all';
@@ -348,18 +363,36 @@ class TestsSuite
             if (!$force) {
                 return null;
             }
-            $browserFactory = new BrowserFactory();
 
-            //$browserFactory->addOptions(['headless' => (bool) $headless]);
-
-            $browser = $browserFactory->createBrowser([
-                'userAgent' => 'PrestaFlow',
+            $options = [
+                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
                 'keepAlive' => true,
                 'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
                 'ignoreCertificateErrors' => true,
-            ]);
-            \file_put_contents($socketFile, $browser->getSocketUri());
+            ];
+
+            // Le lancement d'un navigateur « froid » échoue parfois au handshake
+            // CDP (« Message could not be sent. Reason: the connection is closed »).
+            // On réessaie quelques fois : sinon toute la suite ne tourne pas (et,
+            // sans rapport JUnit produit, le job peut passer au vert à tort).
+            $browser = null;
+            $lastError = null;
+            for ($attempt = 0; $attempt < 3; $attempt++) {
+                try {
+                    $browser = (new BrowserFactory())->createBrowser($options);
+                    \file_put_contents($socketFile, $browser->getSocketUri());
+                    $lastError = null;
+                    break;
+                } catch (\Throwable $e2) {
+                    $lastError = $e2;
+                    usleep(700000);
+                }
+            }
+
+            if ($lastError !== null) {
+                throw $lastError;
+            }
         }
 
         return $browser;
@@ -367,11 +400,23 @@ class TestsSuite
 
     public static function getPage()
     {
-        $pages = TestsSuite::getBrowser()?->getPages();
-        if (count($pages) == 0) {
-            TestsSuite::getBrowser()?->createPage();
+        // L'énumération des targets (getPages) peut floter au démarrage à froid,
+        // pendant qu'une page se ferme/crée : « Call to a member function
+        // getTargetInfo() on null ». On réessaie quelques fois avant d'échouer.
+        for ($try = 1; ; $try++) {
+            try {
+                $pages = TestsSuite::getBrowser()?->getPages();
+                if (count($pages) == 0) {
+                    TestsSuite::getBrowser()?->createPage();
+                }
+                return TestsSuite::getBrowser()?->getPages()[0];
+            } catch (\Throwable $e) {
+                if ($try >= 3) {
+                    throw $e;
+                }
+                usleep(500000);
+            }
         }
-        return TestsSuite::getBrowser()?->getPages()[0];
     }
 
     public function before($headless = null, bool $getBrowser = true)
@@ -393,6 +438,17 @@ class TestsSuite
 
         TestsSuite::getBrowser(headless: $headless, force: true);
 
+        // Authentification HTTP Basic (env) posée en header sur TOUTES les requêtes
+        // (navigation top-level, sous-ressources ET XHR), avant toute navigation.
+        // Plus fiable que des identifiants dans l'URL (https://user:pass@host/…),
+        // que Chrome n'applique pas aux requêtes XHR ni toujours aux redirections.
+        $this->presetBasicAuth();
+
+        // Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
+        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
+        // consentement (RGPD) sur un environnement protégé/preprod.
+        $this->presetEnvCookies();
+
         try {
             $page = TestsSuite::getPage();
             if ($page !== null) {
@@ -407,6 +463,121 @@ class TestsSuite
         }
 
         $this->start_time = hrtime(true);
+    }
+
+    /**
+     * Authentification HTTP Basic via l'environnement, posée en en-tête sur toutes
+     * les requêtes (utile pour un environnement protégé : preprod/staging).
+     *
+     * PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS. Best-effort.
+     *
+     * On pose l'en-tête au niveau de la CONNEXION du navigateur : BrowserFactory
+     * réapplique ces en-têtes à chaque nouvelle page. C'est indispensable car
+     * FrontOfficePage::goToPage() ferme la page courante et en crée une neuve —
+     * un en-tête posé uniquement sur la page initiale serait perdu. On l'applique
+     * aussi à la page courante pour couvrir la toute première navigation.
+     */
+    protected function presetBasicAuth(): void
+    {
+        $user = $_ENV['PRESTAFLOW_BASIC_USER'] ?? null;
+        $pass = $_ENV['PRESTAFLOW_BASIC_PASS'] ?? null;
+        if ($user === null || $user === '') {
+            return;
+        }
+
+        $authHeader = 'Basic '.\base64_encode($user.':'.($pass ?? ''));
+
+        // Mémorisé pour réapplication après chaque (re)création de page (goToPage).
+        TestsSuite::$extraHttpHeaders['Authorization'] = $authHeader;
+
+        $browser = TestsSuite::getBrowser();
+        if ($browser) {
+            try {
+                // Hérité par chaque page créée ensuite (dont le createPage de goToPage).
+                $browser->getConnection()->setConnectionHttpHeaders(['Authorization' => $authHeader]);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
+
+        // Applique sur la page courante (première navigation).
+        TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
+     * (Ré)applique self::$extraHttpHeaders sur la page courante. À appeler après
+     * toute (re)création de page — notamment dans goToPage — car un en-tête posé
+     * sur une page fermée est perdu. Best-effort.
+     */
+    public static function applyExtraHttpHeaders(): void
+    {
+        if (empty(TestsSuite::$extraHttpHeaders)) {
+            return;
+        }
+
+        $page = TestsSuite::getPage();
+        if (!$page) {
+            return;
+        }
+
+        try {
+            // Network doit être activé pour que Network.setExtraHTTPHeaders prenne effet.
+            $page->getSession()->sendMessageSync(new Message('Network.enable'));
+            $page->setExtraHTTPHeaders(TestsSuite::$extraHttpHeaders);
+        } catch (Throwable $e) {
+            // best-effort
+        }
+    }
+
+    /**
+     * Pré-règle des cookies fournis via l'environnement, avant toute navigation.
+     *
+     * PRESTAFLOW_COOKIES = tableau JSON d'objets {name, value, domain?, path?, secure?}.
+     * Exemple (neutraliser un bandeau RGPD Knowband) :
+     *   PRESTAFLOW_COOKIES=[{"name":"___kbgdcc","value":"eyIx...","domain":"preprod.example.com"}]
+     *
+     * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
+     */
+    protected function presetEnvCookies(): void
+    {
+        $raw = $_ENV['PRESTAFLOW_COOKIES'] ?? null;
+        if (!$raw) {
+            return;
+        }
+
+        $cookies = \json_decode($raw, true);
+        if (!is_array($cookies)) {
+            return;
+        }
+
+        $page = TestsSuite::getPage();
+        if (!$page) {
+            return;
+        }
+
+        foreach ($cookies as $c) {
+            if (empty($c['name'])) {
+                continue;
+            }
+
+            $params = [];
+            foreach (['domain', 'path', 'secure', 'httpOnly', 'sameSite', 'expires', 'url'] as $key) {
+                if (array_key_exists($key, $c)) {
+                    $params[$key] = $c[$key];
+                }
+            }
+            if (!isset($params['path'])) {
+                $params['path'] = '/';
+            }
+
+            try {
+                $page->setCookies([
+                    Cookie::create($c['name'], (string) ($c['value'] ?? ''), $params),
+                ])->await();
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
     }
 
     public function after()
@@ -494,6 +665,14 @@ class TestsSuite
 
     public function loadGlobals()
     {
+        // Répertoire de travail courant : le CLI `prestaflow` est lancé depuis la
+        // racine du projet qui consomme la lib, où se trouvent .env / .env.local.
+        // C'est le chemin le plus fiable, y compris quand la lib est installée en
+        // symlink (path repo Composer) — auquel cas __DIR__ pointe hors du projet.
+        // `createImmutable` : la première valeur trouvée gagne → on charge d'abord.
+        $dotenv = Dotenv::createImmutable(getcwd(), ['.env.local', '.env']);
+        $dotenv->safeLoad();
+
         $dotenv = Dotenv::createImmutable(__DIR__.'/../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
         // When importing the library in a project, the .env file is not in the same directory
@@ -675,6 +854,9 @@ class TestsSuite
                     $this->stats['failures']++;
                     $this->failed = true;
                 } finally {
+                    // Reset structurel : aucune attache visuelle ne fuite d'un test
+                    // à l'autre, quel que soit l'état (pass compris).
+                    Expect::$latestAttachments = [];
                     $test['expect'] = Expect::getExpectMessage();
                     $this->attachDebugMessages($test);
                     Expect::getNbAssertions();
@@ -759,6 +941,8 @@ class TestsSuite
     {
         $test['screen'] = Expect::$latestError;
         $this->screens[] = $test['screen'];
+
+        $test['attachments'] = Expect::$latestAttachments ?? [];
 
         if (!empty(Expect::$latestScreenshotError)) {
             $this->log('Screenshot capture failed: ' . Expect::$latestScreenshotError);

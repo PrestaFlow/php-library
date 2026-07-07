@@ -101,4 +101,27 @@ final class JUnitReportTest extends TestCase
         $this->assertFalse(isset($case->{'system-out'}));
         $this->assertStringNotContainsString('Screenshot:', (string) $case->failure['message']);
     }
+
+    public function testMultipleAttachmentsOnFailure(): void
+    {
+        $report = new \PrestaFlow\Library\Reports\JUnitReport();
+        $report->addSuite([
+            'suite' => 'Tests\\Visual\\Suites\\VisualRegressionTestSuite',
+            'title' => 'Régression visuelle',
+            'stats' => ['failures' => 1, 'time' => 1000],
+            'tests' => [[
+                'title' => 'login',
+                'state' => 'fail',
+                'time' => 500,
+                'expect' => ['fail' => ['score 0.82 < 0.98']],
+                'attachments' => [
+                    'prestaflow/screens/actual/login.png',
+                    'prestaflow/screens/diff/login.png',
+                ],
+            ]],
+        ]);
+        $xml = $report->render();
+        $this->assertStringContainsString('[[ATTACHMENT|prestaflow/screens/actual/login.png]]', $xml);
+        $this->assertStringContainsString('[[ATTACHMENT|prestaflow/screens/diff/login.png]]', $xml);
+    }
 }
