@@ -268,8 +268,10 @@ class ExecuteSuite extends Command
         $visualPath = ($visualOption === false) ? null : ($visualOption ?: 'reports/visual/index.html');
         if ($visualPath !== null) {
             $visualReport = new \PrestaFlow\Library\Reports\VisualReport();
-            $this->filePutContents($visualPath, $visualReport->renderHtml(\PrestaFlow\Library\Tests\TestsSuite::$visualResults));
-            $this->filePutContents(dirname($visualPath) . '/visual-results.json', $visualReport->renderJson(\PrestaFlow\Library\Tests\TestsSuite::$visualResults));
+            // Stamp partagé HTML/JSON (une seule lecture de l'horloge).
+            $generatedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $this->filePutContents($visualPath, $visualReport->renderHtml(\PrestaFlow\Library\Tests\TestsSuite::$visualResults, $generatedAt));
+            $this->filePutContents(dirname($visualPath) . '/visual-results.json', $visualReport->renderJson(\PrestaFlow\Library\Tests\TestsSuite::$visualResults, $generatedAt));
             $this->success('Rapport visuel écrit dans ' . $visualPath, newLine: true, force: true);
         }
 
