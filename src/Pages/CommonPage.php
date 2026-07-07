@@ -274,6 +274,11 @@ class CommonPage
 
     public function goToUrl(string $url)
     {
+        // Filet : réappliquer les en-têtes persistants (ex. Authorization Basic
+        // Auth) avant chaque navigation. Sans ça, la 1re navigation d'un run peut
+        // partir sans les en-têtes si la page courante n'a jamais été (re)configurée
+        // → 401 → chrome-error://. Idempotent, no-op sans en-têtes définis.
+        \PrestaFlow\Library\Tests\TestsSuite::applyExtraHttpHeaders();
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
