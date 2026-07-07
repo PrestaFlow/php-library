@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-06-field-io-robustness.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "IO Task 0: CommonPage getInputValue/selectOption/setValueByJs",
+      "status": "completed",
+      "description": "**Goal:** Fix getInputValue (JS .value) + selectOption (querySelector+change, remove file_put_contents) + add setValueByJs.\n\n**Files:**\n- Modify: src/Pages/CommonPage.php\n- Test: tests/Unit/Pages/CommonPageIoTest.php (new)\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/CommonPageIoTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"tests/Unit/Pages/CommonPageIoTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/CommonPageIoTest.php && composer test-unit\", \"acceptanceCriteria\": [\"getInputValue JS .value\", \"selectOption querySelector+change no debug\", \"setValueByJs present\", \"test-unit green\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "IO Task 1: factor pages onto fixed core",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Remove duplicated JS workarounds; delegate to fixed getInputValue/selectValue/setValueByJs.\n\n**Files:**\n- Modify: src/Pages/Common/BackOffice/Products/Page.php\n- Modify: src/Pages/Common/BackOffice/OrderView/Page.php\n- Modify: src/Pages/Common/FrontOffice/Checkout/Page.php\n- Test: tests/Unit/Pages/BackOfficeOrderViewTest.php (guard)\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeOrderViewTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Products/Page.php\", \"src/Pages/Common/BackOffice/OrderView/Page.php\", \"src/Pages/Common/FrontOffice/Checkout/Page.php\", \"tests/Unit/Pages/BackOfficeOrderViewTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeOrderViewTest.php && composer test-unit\", \"acceptanceCriteria\": [\"Products uses setValueByJs, jsSetValue removed\", \"OrderView uses getInputValue+selectValue, readValue removed\", \"Checkout country via selectValue\", \"test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-06T00:00:00Z"
+}

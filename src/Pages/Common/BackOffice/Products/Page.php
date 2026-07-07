@@ -107,8 +107,8 @@ class Page extends BasePage
         // Pricing/Stocks tabs, which are inactive by default — a click+type there
         // can't focus the field and leaks the text into the name. Set those via JS.
         $this->setValue($this->getSelector('formNameInput'), $name);
-        $this->jsSetValue($this->getSelector('formPriceInput'), (string) $price);
-        $this->jsSetValue($this->getSelector('formQuantityInput'), (string) $quantity);
+        $this->setValueByJs($this->getSelector('formPriceInput'), (string) $price);
+        $this->setValueByJs($this->getSelector('formQuantityInput'), (string) $quantity);
         // Enable the product BEFORE saving so the online state persists.
         $this->enableProduct();
         $this->click($this->getSelector('formSaveButton'));
@@ -172,7 +172,7 @@ class Page extends BasePage
     public function updatePrice(float $price): void
     {
         // The price field is on the (inactive) Pricing tab; set it via JS.
-        $this->jsSetValue($this->getSelector('formPriceInput'), (string) $price);
+        $this->setValueByJs($this->getSelector('formPriceInput'), (string) $price);
         $this->click($this->getSelector('formSaveButton'));
         $this->waitForPageReload();
     }
@@ -185,21 +185,5 @@ class Page extends BasePage
             '(function(){var e=document.querySelector(%s);return e?e.value:"";})()',
             $sel
         ))->getReturnValue());
-    }
-
-    /**
-     * Set an input's value via JS (value + input/change events). Reliable for
-     * fields on inactive tabs, where a click+type can't focus the element and
-     * would leak the text into whatever input currently has focus.
-     */
-    private function jsSetValue(string $selector, string $value): void
-    {
-        $sel = json_encode($selector);
-        $val = json_encode($value);
-        $this->getPage()->evaluate(sprintf(
-            '(function(){var e=document.querySelector(%s);if(e){e.value=%s;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));}})()',
-            $sel,
-            $val
-        ));
     }
 }

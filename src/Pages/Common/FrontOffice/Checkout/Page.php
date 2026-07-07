@@ -65,15 +65,7 @@ class Page extends BasePage
         $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
         $this->setValue($this->getSelector('addressPostcodeInput'), $address['postcode'] ?? '');
         if (!empty($address['country'])) {
-            // selectValue only handles a bare #id/.class; this is a compound
-            // selector, so pick the option by label via JS + fire change.
-            $sel = json_encode($this->getSelector('addressCountrySelect'));
-            $val = json_encode($address['country']);
-            $this->getPage()->evaluate(sprintf(
-                '(function(){var s=document.querySelector(%s);if(!s)return;var o=[].slice.call(s.options).find(function(x){return x.text.trim()===%s;});if(o){s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));}})()',
-                $sel,
-                $val
-            ));
+            $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
         }
         $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 

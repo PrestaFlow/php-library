@@ -43,15 +43,8 @@ class Page extends BasePage
     public function updateStatus(string $status): void
     {
         // The status field is a select2: set the underlying <select> value by
-        // option label and fire "change" (the lib's selectOption doesn't drive
-        // select2), then submit.
-        $sel = json_encode($this->getSelector('statusSelect'));
-        $label = json_encode($status);
-        $this->getPage()->evaluate(sprintf(
-            '(function(){var s=document.querySelector(%s);if(!s)return;var o=[].slice.call(s.options).find(function(x){return x.text.trim()===%s;});if(o){s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));}})()',
-            $sel,
-            $label
-        ));
+        // option label and fire "change" (the lib's selectValue does this).
+        $this->selectValue($this->getSelector('statusSelect'), $status);
         $this->click($this->getSelector('updateStatusButton'));
         $this->waitForPageReload();
     }
@@ -81,7 +74,7 @@ class Page extends BasePage
 
     public function getInternalNote(): string
     {
-        return $this->readValue($this->getSelector('internalNoteTextarea'));
+        return (string) $this->getInputValue($this->getSelector('internalNoteTextarea'));
     }
 
     public function addTracking(string $number): void
@@ -109,7 +102,7 @@ class Page extends BasePage
         // unreliable to read headlessly.)
         $this->openShippingModal();
 
-        return $this->readValue($this->getSelector('trackingNumberInput'));
+        return (string) $this->getInputValue($this->getSelector('trackingNumberInput'));
     }
 
     private function openShippingModal(): void
@@ -123,21 +116,5 @@ class Page extends BasePage
             $this->getPage()->waitUntilContainsElement($this->getSelector('trackingSaveButton'), 8000);
         } catch (\Throwable $e) {
         }
-    }
-
-    /**
-     * Read an input/textarea's current `.value` property via JS. Unlike the
-     * library's getInputValue (which reads the `value` attribute), this returns
-     * the live value — the only reliable read for a <textarea>, whose value is
-     * text content, not an attribute.
-     */
-    private function readValue(string $selector): string
-    {
-        $sel = json_encode($selector);
-
-        return trim((string) $this->getPage()->evaluate(sprintf(
-            '(function(){var e=document.querySelector(%s);return e?e.value:"";})()',
-            $sel
-        ))->getReturnValue());
     }
 }

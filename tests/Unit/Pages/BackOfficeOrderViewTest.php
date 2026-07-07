@@ -39,4 +39,10 @@ final class BackOfficeOrderViewTest extends TestCase
         $this->assertArrayHasKey('listRowLink', $page->selectors);
         $this->assertTrue(method_exists($page, 'openOrder'));
     }
+
+    public function testUsesSharedIoHelpers(): void
+    {
+        $class = 'PrestaFlow\\Library\\Pages\\Common\\BackOffice\\OrderView\\Page';
+        $this->assertFalse(method_exists($class, 'readValue'), 'readValue should be removed in favour of getInputValue');
+    }
 }
