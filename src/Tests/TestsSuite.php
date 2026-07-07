@@ -398,11 +398,23 @@ class TestsSuite
 
     public static function getPage()
     {
-        $pages = TestsSuite::getBrowser()?->getPages();
-        if (count($pages) == 0) {
-            TestsSuite::getBrowser()?->createPage();
+        // L'énumération des targets (getPages) peut floter au démarrage à froid,
+        // pendant qu'une page se ferme/crée : « Call to a member function
+        // getTargetInfo() on null ». On réessaie quelques fois avant d'échouer.
+        for ($try = 1; ; $try++) {
+            try {
+                $pages = TestsSuite::getBrowser()?->getPages();
+                if (count($pages) == 0) {
+                    TestsSuite::getBrowser()?->createPage();
+                }
+                return TestsSuite::getBrowser()?->getPages()[0];
+            } catch (\Throwable $e) {
+                if ($try >= 3) {
+                    throw $e;
+                }
+                usleep(500000);
+            }
         }
-        return TestsSuite::getBrowser()?->getPages()[0];
     }
 
     public function before($headless = null, bool $getBrowser = true)
