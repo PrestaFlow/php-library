@@ -74,7 +74,7 @@ final class BackOfficeNavigationTest extends TestCase
         $expected = [
             'Categories' => ['#subtab-AdminCategories', '#subtab-AdminCatalog'],
             'Customers'  => ['#subtab-AdminCustomers', '#subtab-AdminParentCustomer'],
-            'Modules'    => ['#subtab-AdminModulesManage', '#subtab-AdminParentModulesSf'],
+            'Modules'    => ['#subtab-AdminModulesSf', '#subtab-AdminParentModulesSf'],
             'Carriers'   => ['#subtab-AdminCarriers', '#subtab-AdminParentShipping'],
         ];
         foreach ($expected as $name => [$menu, $parent]) {

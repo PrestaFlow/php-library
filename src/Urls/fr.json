@@ -1,3 +1,6 @@
 {
-	"guest-tracking": "suivi-commande-invite"
+	"guest-tracking": "suivi-commande-invite",
+	"login": "connexion",
+	"cart": "panier?action=show",
+	"order": "commande"
 }

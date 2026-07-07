@@ -36,6 +36,17 @@ class Page extends BasePage
         $this->waitForNavigation();
     }
 
+    /**
+     * Navigate to a product by its canonical FrontOffice path (e.g.
+     * "1-1-hummingbird-printed-t-shirt.html"). PrestaShop friendly URLs cannot
+     * be rebuilt from the id alone, so scenarios pass the known path.
+     */
+    public function goToProductPath(string $path)
+    {
+        $base = rtrim($this->getGlobal('FO_URL'), '/') . '/';
+        $this->goToUrl($base . ltrim($path, '/'));
+    }
+
     public function getPrice()
     {
         $price = $this->getTextContent($this->getSelector('currentProductPrice'));

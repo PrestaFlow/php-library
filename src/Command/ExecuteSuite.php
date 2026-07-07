@@ -285,6 +285,13 @@ class ExecuteSuite extends Command
             $this->success('Rapport visuel écrit dans ' . $visualPath, newLine: true, force: true);
         }
 
+        try {
+            \PrestaFlow\Library\Tests\TestsSuite::getBrowser(force: false)?->close();
+        } catch (\Throwable $e) {
+        }
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer'));
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer-options'));
+
         return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
     }
 

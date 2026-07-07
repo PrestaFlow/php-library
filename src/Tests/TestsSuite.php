@@ -56,6 +56,7 @@ class TestsSuite
 
     public $globals = [];
     public $pages = [];
+    public $params = [];
 
     public $customs = [
         'selectors' => [],
@@ -368,6 +369,7 @@ class TestsSuite
                 'keepAlive' => true,
                 'windowSize' => [1920, 1000],
                 'headless' => (bool) $headless,
+                'ignoreCertificateErrors' => true,
             ];
 
             // Le lancement d'un navigateur « froid » échoue parfois au handshake
@@ -448,18 +450,16 @@ class TestsSuite
         $this->presetEnvCookies();
 
         try {
-            $cookies = TestsSuite::getPage()?->getCookies();
-            if ($cookies instanceof CookiesCollection && count($cookies)) {
-                foreach ($cookies as $cookie) {
-                    if (str_starts_with($cookie->getName(), 'PrestaShop-')) {
-                        TestsSuite::getPage()->setCookies([
-                            Cookie::create($cookie->getName(), '', ['expires'])
-                        ])->await();
-                    }
-                }
+            $page = TestsSuite::getPage();
+            if ($page !== null) {
+                // Clear all browser cookies so each suite starts from a clean,
+                // unauthenticated state (the previous per-cookie clearing set a
+                // malformed expiry and never actually removed the admin session).
+                $page->getSession()->sendMessageSync(
+                    new \HeadlessChromium\Communication\Message('Network.clearBrowserCookies')
+                );
             }
-        } catch (Exception $e) {
-            //
+        } catch (\Throwable $e) {
         }
 
         $this->start_time = hrtime(true);
@@ -582,8 +582,9 @@ class TestsSuite
 
     public function after()
     {
-        TestsSuite::getBrowser(force: false)?->close();
-
+        // The keepAlive browser is intentionally left open so the next suite in
+        // the same run can reconnect to it. It is closed once at the end of the
+        // run by the command (ExecuteSuite).
         $this->end_time = hrtime(true);
         $this->stats['time'] = round(($this->end_time - $this->start_time) / 1e+6);
     }

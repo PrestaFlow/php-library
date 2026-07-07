@@ -15,7 +15,7 @@ class Page extends BasePage
             'passwordInput' => '#passwd',
             'submitLoginButton' => '#submit_login',
             'alertDangerDiv' => '.alert-danger',
-            'alertDangerTextBlock' => '.alert-danger .alert-text',
+            'alertDangerTextBlock' => '.alert-danger',
             'employeeInfosDropDown' => '#employee_infos a',
             'headerEmployeeContainer' => '#header-employee-container',
             'logoutLink' => '#header_logout',
@@ -24,12 +24,9 @@ class Page extends BasePage
 
     public function logout()
     {
-        if ($this->isVisible($this->selector('employeeInfosDropDown')) !== false) {
-            $this->leftClick($this->getSelector('employeeInfosDropDown'));
-        } else if ($this->isVisible($this->selector('headerEmployeeContainer')) !== false) {
-            $this->leftClick($this->getSelector('headerEmployeeContainer'));
-        }
-
-        $this->click($this->getSelector('logoutLink'));
+        // The logout link lives inside a collapsed dropdown (hidden until opened),
+        // which coordinate-based clicks can't reach reliably. Navigate to the stable
+        // logout route instead; it clears the session and redirects to the login page.
+        $this->goToPage('logout');
     }
 }

@@ -61,9 +61,11 @@ final class PageFactorizationTest extends TestCase
         $this->assertTrue(method_exists($this->make('v7', 'FrontOffice\\PricesDrop'), 'getListingTitle'));
     }
 
-    public function testDashboardDeltaPreserved(): void
+    public function testDashboardTitleIsConsistentAcrossVersions(): void
     {
-        $this->assertSame('Tableau de bord', $this->make('v9', 'BackOffice\\Dashboard')->pageTitle);
+        // v9 no longer hardcodes a French title; it inherits 'Dashboard' and
+        // relies on the translation layer (pageTitle()) for locale.
+        $this->assertSame('Dashboard', $this->make('v9', 'BackOffice\\Dashboard')->pageTitle);
         $this->assertSame('Dashboard', $this->make('v7', 'BackOffice\\Dashboard')->pageTitle);
     }
 

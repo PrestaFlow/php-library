@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-02-ps9-product-create.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "PS9-Create Task 0: create flow + selectors + scenario fix",
+      "status": "completed",
+      "description": "**Goal:** Products page creates & publishes a standard product via PS 9's real JS/AJAX flow; scenario no longer double-enables after save; structural test proves new selectors + ordering.\n\n**Files:**\n- Modify: src/Pages/Common/BackOffice/Products/Page.php (defineSelectors, goToNewProduct, createProduct)\n- Modify: src/Scenarios/CreateProductAndVerify.php (remove redundant enableProduct() call)\n- Modify (test): tests/Unit/Pages/BackOfficeProductsTest.php\n\n**Acceptance Criteria:**\n- [ ] defineSelectors adds createProductButton => '#create_product_create', sets formPriceInput => '#product_pricing_retail_price_price_tax_excluded', formQuantityInput => '#product_stock_quantities_delta_quantity_delta'\n- [ ] goToNewProduct clicks newProductButton, waitForPageReload, then createProductButton, waitForPageReload\n- [ ] createProduct fills name/price/quantity, clicks productOnlineToggle BEFORE formSaveButton, then waitForPageReload\n- [ ] CreateProductAndVerify no longer calls enableProduct()\n- [ ] composer test-unit green\n\n**Verify:** vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php && composer test-unit\n\n```json:metadata\n{\"files\": [\"src/Pages/Common/BackOffice/Products/Page.php\", \"src/Scenarios/CreateProductAndVerify.php\", \"tests/Unit/Pages/BackOfficeProductsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeProductsTest.php && composer test-unit\", \"acceptanceCriteria\": [\"createProductButton/formPriceInput/formQuantityInput selectors correct\", \"goToNewProduct = Add link then create-draft click\", \"createProduct activates before save\", \"scenario drops enableProduct()\", \"composer test-unit green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-02T12:00:00Z"
+}

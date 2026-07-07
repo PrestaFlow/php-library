@@ -6,6 +6,8 @@ screens/masked/*
 screens/references/*
 screens/errors/*
 .env
+.env.local
+prestaflow/
 .vscode/settings.json
 datas/.broswer
 .phpunit.cache/

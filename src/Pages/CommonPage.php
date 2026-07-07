@@ -305,12 +305,16 @@ class CommonPage
             if ($waitForSelector) {
                 $this->getPage()->waitUntilContainsElement($selector, $timeout);
             }
-            $element = $this->getPage()->dom()->querySelector($selector);
-            $value = $element->getAttribute('value');
+            // Read the live `.value` property (works for <textarea> and for
+            // values that differ from the initial `value` attribute).
+            $value = $this->getPage()->evaluate(sprintf(
+                '(function(){var e=document.querySelector(%s);return e?e.value:null;})()',
+                json_encode($selector)
+            ))->getReturnValue();
             if ($value === null) {
                 return '';
             }
-            return trim(str_replace(['&nbsp;'], '', $value));
+            return trim(str_replace(['&nbsp;'], '', (string) $value));
         } catch (OperationTimedOut | Exception $e) {
             return false;
         }
@@ -331,8 +335,20 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
-        $element = $this->getPage()->dom()->querySelector($selector);
-        return $element->click();
+        try {
+            $element = $this->getPage()->dom()->querySelector($selector);
+            if ($element !== null) {
+                return $element->click();
+            }
+        } catch (\Throwable $e) {
+            // Element is hidden or outside the viewport (e.g. a collapsed menu
+            // sub-link): fall back to a JS click, which navigates regardless.
+        }
+
+        return $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);if(e){e.click();return true;}return false;})()',
+            json_encode($selector)
+        ))->getReturnValue();
     }
 
     public function leftClick($selector, $nth = 1)
@@ -342,33 +358,48 @@ class CommonPage
 
     public function waitForPageReload()
     {
-        $this->getPage()->evaluate('some js that will reload the page')->waitForPageReload();
+        try {
+            // Wait for the navigation triggered by the preceding action, bounded and
+            // non-blocking: if it already completed (or is slow), downstream selector
+            // waits take over instead of hanging on chrome-php's 30s default.
+            $this->getPage()->waitForReload(\HeadlessChromium\Page::LOAD, 10000);
+        } catch (\Throwable $e) {
+        }
     }
 
     public function selectOption($selector, $value)
     {
-        $originalSelector = $selector;
+        // Works with any CSS selector (incl. compound). Select the <option> by
+        // its label and fire "change" so JS-enhanced selects (select2) update.
+        $found = $this->getPage()->evaluate(sprintf(
+            '(function(){var s=document.querySelector(%s);if(!s)return false;'
+            . 'var o=[].slice.call(s.options).find(function(x){return x.text.trim()===%s;});'
+            . 'if(!o)return false;s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));return true;})()',
+            json_encode($selector),
+            json_encode($value)
+        ))->getReturnValue();
 
-        if (str_starts_with($selector, '#')) {
-            $selector = str_replace('#', '', $selector);
-            $selector = 'select[@id="' . $selector . '"]';
-        } elseif (str_starts_with($selector, '.')) {
-            $selector = str_replace('.', '', $selector);
-            $selector = 'select[@class="' . $selector . '"]';
-        }
-
-        file_put_contents('temp.log', json_encode($this->getPage()));
-        $element = $this->getPage()->dom()->search('//'.$selector.'/option[contains(text(), "' . $value . '")]');
-        if ($element !== null && count($element)) {
-            $element[0]->setAttributeValue('selected', 'selected');
-        } else {
-            Expect::that(count($element))->isGreaterThan(0, 'Option "' . $value . '" not found for selector "' . $originalSelector . '"');
+        if ($found !== true) {
+            Expect::that($found)->equals(true, 'Option "' . $value . '" not found for selector "' . $selector . '"');
         }
     }
 
     public function selectValue($selector, $value)
     {
         $this->selectOption($selector, $value);
+    }
+
+    public function setValueByJs(string $selector, string $value): void
+    {
+        // Set a value directly via JS (value + input/change). Reliable for fields
+        // on inactive tabs or otherwise not focusable, where click+type fails.
+        $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);if(e){e.value=%s;'
+            . 'e.dispatchEvent(new Event("input",{bubbles:true}));'
+            . 'e.dispatchEvent(new Event("change",{bubbles:true}));}})()',
+            json_encode($selector),
+            json_encode($value)
+        ));
     }
 
     /**
