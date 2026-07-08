@@ -450,29 +450,31 @@ class TestsSuite
 
         TestsSuite::getBrowser(headless: $headless, force: true);
 
-        // Authentification HTTP Basic (env) posée en header sur TOUTES les requêtes
-        // (navigation top-level, sous-ressources ET XHR), avant toute navigation.
-        // Plus fiable que des identifiants dans l'URL (https://user:pass@host/…),
-        // que Chrome n'applique pas aux requêtes XHR ni toujours aux redirections.
-        $this->presetBasicAuth();
-
-        // Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
-        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
-        // consentement (RGPD) sur un environnement protégé/preprod.
-        $this->presetEnvCookies();
-
+        // 1) Nettoyer les cookies héritées de la suite précédente. Cet appel doit
+        //    précéder presetEnvCookies() : sinon il EFFACE les cookies qu'on vient
+        //    tout juste de poser (ex. ___kbgdcc pour neutraliser un bandeau RGPD →
+        //    le bandeau ré-apparaît, un « h1 » générique attrape « Centre de
+        //    paramètres des cookies » et les tests plantent).
         try {
             $page = TestsSuite::getPage();
             if ($page !== null) {
-                // Clear all browser cookies so each suite starts from a clean,
-                // unauthenticated state (the previous per-cookie clearing set a
-                // malformed expiry and never actually removed the admin session).
                 $page->getSession()->sendMessageSync(
                     new \HeadlessChromium\Communication\Message('Network.clearBrowserCookies')
                 );
             }
         } catch (\Throwable $e) {
         }
+
+        // 2) Authentification HTTP Basic (env) posée en header sur TOUTES les
+        // requêtes (navigation top-level, sous-ressources ET XHR), avant toute
+        // navigation. Plus fiable que des identifiants dans l'URL, que Chrome
+        // n'applique pas aux requêtes XHR ni toujours aux redirections.
+        $this->presetBasicAuth();
+
+        // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
+        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
+        // consentement (RGPD) sur un environnement protégé/preprod.
+        $this->presetEnvCookies();
 
         $this->start_time = hrtime(true);
     }
