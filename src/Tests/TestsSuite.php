@@ -519,6 +519,20 @@ class TestsSuite
     }
 
     /**
+     * Ferme la page courante et en crée une fraîche, en réappliquant les en-têtes
+     * persistants (ex. Authorization Basic Auth). C'est LE point d'entrée pour
+     * démarrer sur une session propre : sans le applyExtraHttpHeaders derrière, la
+     * navigation qui suit part sans en-têtes → 401 → chrome-error://. Idempotent
+     * quant aux en-têtes (no-op si aucun n'est défini).
+     */
+    public static function recreatePage(): void
+    {
+        TestsSuite::getPage()?->close();
+        TestsSuite::getBrowser()?->createPage();
+        TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
      * (Ré)applique self::$extraHttpHeaders sur la page courante. À appeler après
      * toute (re)création de page — notamment dans goToPage — car un en-tête posé
      * sur une page fermée est perdu. Best-effort.
