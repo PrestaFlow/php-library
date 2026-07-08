@@ -53,10 +53,7 @@ class FrontOfficePage extends CommonPage
         $attempts = 3;
         for ($try = 1; ; $try++) {
             try {
-                TestsSuite::getPage()->close();
-                TestsSuite::getBrowser()->createPage();
-                // Page recréée : réappliquer les en-têtes persistants (ex. Basic Auth).
-                TestsSuite::applyExtraHttpHeaders();
+                TestsSuite::recreatePage();
                 $this->getPage()->navigate($url)->waitForNavigation();
                 break;
             } catch (\Throwable $e) {
@@ -124,16 +121,11 @@ class FrontOfficePage extends CommonPage
 
     public function goToUrl(string $url)
     {
-        // Intentionally overrides CommonPage::goToUrl (a plain navigate) to force
-        // a clean FrontOffice session — recreating the page like goToPage does —
-        // before hitting an absolute FO URL (e.g. a product's canonical preview
-        // URL read from the BackOffice), so BackOffice cookies don't leak in.
-        TestsSuite::getPage()->close();
-        TestsSuite::getBrowser()->createPage();
-        // La page vient d'être recréée : réappliquer les en-têtes persistants
-        // (ex. Authorization Basic Auth) sinon la navigation part sans eux → 401 →
-        // chrome-error://. Identique à ce que goToPage fait déjà.
-        TestsSuite::applyExtraHttpHeaders();
+        // Override intentionnel de CommonPage::goToUrl (simple navigate) : recrée
+        // la page pour partir sur une session FrontOffice propre (utile pour ne
+        // pas hériter des cookies BackOffice) avant d'atteindre une URL absolue.
+        // recreatePage() se charge de réappliquer les en-têtes persistants.
+        TestsSuite::recreatePage();
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
