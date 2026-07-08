@@ -364,10 +364,20 @@ class TestsSuite
                 return null;
             }
 
+            // Dimensions de la fenêtre : PRESTAFLOW_WINDOW_SIZE_WIDTH/HEIGHT en
+            // env (utile pour émuler mobile/tablet/desktop). Défaut FHD 1920×1080.
+            // On lit à la fois $_ENV et getenv() : selon variables_order de PHP,
+            // seul l'un ou l'autre peut être peuplé par le shell parent (setup-php
+            // CI ne peuple pas $_ENV par défaut).
+            $envWidth  = $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH']  ?? getenv('PRESTAFLOW_WINDOW_SIZE_WIDTH');
+            $envHeight = $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? getenv('PRESTAFLOW_WINDOW_SIZE_HEIGHT');
+            $winWidth  = (int) ($envWidth  ?: 1920);
+            $winHeight = (int) ($envHeight ?: 1080);
+
             $options = [
-                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
+                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? getenv('PRESTAFLOW_USER_AGENT') ?: 'PrestaFlow',
                 'keepAlive' => true,
-                'windowSize' => [1920, 1000],
+                'windowSize' => [$winWidth, $winHeight],
                 'headless' => (bool) $headless,
                 'ignoreCertificateErrors' => true,
             ];
