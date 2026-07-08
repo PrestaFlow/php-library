@@ -130,6 +130,10 @@ class FrontOfficePage extends CommonPage
         // URL read from the BackOffice), so BackOffice cookies don't leak in.
         TestsSuite::getPage()->close();
         TestsSuite::getBrowser()->createPage();
+        // La page vient d'être recréée : réappliquer les en-têtes persistants
+        // (ex. Authorization Basic Auth) sinon la navigation part sans eux → 401 →
+        // chrome-error://. Identique à ce que goToPage fait déjà.
+        TestsSuite::applyExtraHttpHeaders();
         $this->getPage()->navigate($url)->waitForNavigation();
     }
 
