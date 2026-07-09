@@ -24,15 +24,16 @@ final class VisualReport
             . '<title>Régression visuelle</title><style>'
             . 'body{font-family:system-ui,sans-serif;margin:2rem;color:#1a1a1a}'
             . 'h1{font-size:20px;margin:0 0 .25rem}.stamp{color:#666;font-size:13px;margin:0 0 1rem}'
-            . '.sum{display:flex;gap:1rem;margin:1rem 0}'
+            . '.sum{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}'
             . '.card{border:1px solid #e2e2e2;border-radius:10px;padding:1rem;margin:1rem 0}'
-            . '.hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}'
+            . '.hd{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;align-items:center;margin-bottom:.75rem}'
             . '.badge{font-size:12px;padding:3px 10px;border-radius:6px}'
             . '.pass{background:#e1f5ee;color:#0f6e56}.fail{background:#fceceb;color:#a32d2d}'
             . '.baseline{background:#e6f1fb;color:#0c447c}'
-            . '.imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}'
-            . '.imgs figure{margin:0}.imgs img{width:100%;border:1px solid #e2e2e2;border-radius:6px}'
-            . '.cap{font-size:12px;color:#666;margin-bottom:4px}</style></head><body>';
+            . '.imgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem}'
+            . '.imgs figure{margin:0;min-width:0}.imgs img{width:100%;height:auto;border:1px solid #e2e2e2;border-radius:6px;display:block}'
+            . '.cap{font-size:12px;color:#666;margin-bottom:4px}'
+            . '@media (max-width:640px){body{margin:1rem}.card{padding:.75rem}h1{font-size:18px}}</style></head><body>';
 
         // `T` = abbréviation du fuseau (CEST/UTC/…). ATOM = ISO 8601 avec offset.
         $stampAttr = htmlspecialchars($generatedAt->format(\DateTimeInterface::ATOM), ENT_QUOTES);
