@@ -192,6 +192,30 @@ class CommonPage
     }
 
     /**
+     * Scrolle jusqu'à ce que $selector arrive en haut du viewport. À utiliser
+     * juste avant une capture en mode VIEWPORT (visualCheckpoint sans sélecteur,
+     * $fullPage=false) pour cadrer la capture sur le contenu utile plutôt que
+     * sur le haut de la page (bandeaux promo, cookies, etc.). No-op si le
+     * sélecteur est absent — la lib laisse au projet le soin de garantir la
+     * présence de l'ancre (waitFor, etc.).
+     */
+    public function scrollToAnchor(string $selector, int $settleMs = 400): void
+    {
+        try {
+            $selectorJson = json_encode($selector);
+            $this->getPage()->evaluate(
+                "(function(){"
+                . " var el = document.querySelector($selectorJson);"
+                . " if (el) { el.scrollIntoView({block: 'start'}); }"
+                . "})()"
+            );
+            usleep($settleMs * 1000);
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le scroll a échoué
+        }
+    }
+
+    /**
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
