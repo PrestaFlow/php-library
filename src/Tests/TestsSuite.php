@@ -636,7 +636,7 @@ class TestsSuite
     {
         $this->globals = array_merge($this->globals, $globals);
 
-        $this->exctractVersions($this->globals['PS_VERSION'] ?? '8.1.0');
+        $this->resolveVersion();
         $this->setLocale($this->globals['LOCALE'] ?? 'en');
 
         return $this;
