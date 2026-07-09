@@ -68,4 +68,12 @@ final class VersionOverrideTest extends TestCase
 
         $this->assertSame('8', $suite->getMajorVersion());
     }
+
+    public function testOnVersionThrowsOnInvalidInput(): void
+    {
+        $suite = $this->makeSuite();
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Invalid PS version");
+        $suite->onVersion('garbage');
+    }
 }
