@@ -39,6 +39,8 @@ class ExecuteSuite extends Command
 
     protected $file = 'prestaflow/results.json';
 
+    protected array $aggregatedSuites = [];
+
     use Output;
 
     protected function configure(): void
@@ -225,8 +227,7 @@ class ExecuteSuite extends Command
 
                     if (self::OUTPUT_JSON === $this->getOutputMode()) {
                         if ($input->getOption('file')) {
-                            $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
-                            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+                            $this->aggregatedSuites[] = $suite->results(false);
                         } else {
                             $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
                         }
@@ -243,6 +244,14 @@ class ExecuteSuite extends Command
 
         $this->sections['progressIndicator']->finish('Finished');
         $this->sections['progressBar']->clear();
+
+        if ($input->getOption('file') && self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->filePutContents(
+                $this->file,
+                json_encode(['suites' => $this->aggregatedSuites], JSON_PRETTY_PRINT)
+            );
+            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+        }
 
         if (!$nbSuites) {
             $this->success('Tests folder is empty', newLine: true);
