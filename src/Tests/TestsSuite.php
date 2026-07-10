@@ -164,10 +164,13 @@ class TestsSuite
 
     public function it(string $description, Closure $steps)
     {
+        $reflection = new \ReflectionFunction($steps);
         $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'datasets' => $this->datasets,
+            'file' => $reflection->getFileName(),
+            'line' => $reflection->getStartLine(),
         ];
 
         return $this;
@@ -175,10 +178,13 @@ class TestsSuite
 
     public function skip(string $description, Closure $steps)
     {
+        $reflection = new \ReflectionFunction($steps);
         $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'skip' => true,
+            'file' => $reflection->getFileName(),
+            'line' => $reflection->getStartLine(),
         ];
 
         return $this;
@@ -186,10 +192,13 @@ class TestsSuite
 
     public function todo(string $description, Closure $steps)
     {
+        $reflection = new \ReflectionFunction($steps);
         $this->tests[] = [
             'title' => $description,
             'steps' => $steps,
             'todo' => true,
+            'file' => $reflection->getFileName(),
+            'line' => $reflection->getStartLine(),
         ];
 
         return $this;
