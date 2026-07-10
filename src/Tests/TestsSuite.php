@@ -243,15 +243,17 @@ class TestsSuite
         return $this->groups;
     }
 
-    public static function getFilePath($filename = '.broswer')
+    public static function getFilePath($filename = '.browser')
     {
         if (function_exists('storage_path')) {
-            $filePath = storage_path().'/datas/'.$filename;
-        } else {
-            $filePath = __DIR__.'/../../datas/'.$filename;
+            $dir = storage_path().'/datas';
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0777, true);
+            }
+            return $dir.'/'.$filename;
         }
 
-        return $filePath;
+        return sys_get_temp_dir().'/prestaflow-'.$filename;
     }
 
 
@@ -276,8 +278,8 @@ class TestsSuite
             'headless' => (bool) $headless,
         ];
 
-        $browserOptionsFile = TestsSuite::getFilePath('.broswer-options');
-        $socketFile = TestsSuite::getFilePath('.broswer');
+        $browserOptionsFile = TestsSuite::getFilePath('.browser-options');
+        $socketFile = TestsSuite::getFilePath('.browser');
 
         $socket = null;
         if (file_exists($browserOptionsFile)) {
@@ -327,20 +329,14 @@ class TestsSuite
 
     public static function getSocketFilePath()
     {
-        if (function_exists('storage_path')) {
-            $socketFilePath = storage_path().'/datas/.broswer';
-        } else {
-            $socketFilePath = __DIR__.'/../../datas/.broswer';
-        }
-
-        return $socketFilePath;
+        return self::getFilePath('.browser');
     }
 
     public static function getBrowser(bool $headless = true, bool $force = true)
     {
         $browser = null;
 
-        $socketFile = TestsSuite::getFilePath('.broswer');
+        $socketFile = TestsSuite::getFilePath('.browser');
 
         $socket = null;
         if (file_exists($socketFile)) {

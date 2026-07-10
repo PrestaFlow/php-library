@@ -293,8 +293,8 @@ class ExecuteSuite extends Command
             \PrestaFlow\Library\Tests\TestsSuite::getBrowser(force: false)?->close();
         } catch (\Throwable $e) {
         }
-        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer'));
-        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer-options'));
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser'));
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser-options'));
 
         return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
     }
