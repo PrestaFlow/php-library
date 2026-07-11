@@ -252,15 +252,17 @@ class TestsSuite
         return $this->groups;
     }
 
-    public static function getFilePath($filename = '.broswer')
+    public static function getFilePath($filename = '.browser')
     {
         if (function_exists('storage_path')) {
-            $filePath = storage_path().'/datas/'.$filename;
-        } else {
-            $filePath = __DIR__.'/../../datas/'.$filename;
+            $dir = storage_path().'/datas';
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0777, true);
+            }
+            return $dir.'/'.$filename;
         }
 
-        return $filePath;
+        return sys_get_temp_dir().'/prestaflow-'.$filename;
     }
 
 
@@ -285,8 +287,8 @@ class TestsSuite
             'headless' => (bool) $headless,
         ];
 
-        $browserOptionsFile = TestsSuite::getFilePath('.broswer-options');
-        $socketFile = TestsSuite::getFilePath('.broswer');
+        $browserOptionsFile = TestsSuite::getFilePath('.browser-options');
+        $socketFile = TestsSuite::getFilePath('.browser');
 
         $socket = null;
         if (file_exists($browserOptionsFile)) {
@@ -336,20 +338,14 @@ class TestsSuite
 
     public static function getSocketFilePath()
     {
-        if (function_exists('storage_path')) {
-            $socketFilePath = storage_path().'/datas/.broswer';
-        } else {
-            $socketFilePath = __DIR__.'/../../datas/.broswer';
-        }
-
-        return $socketFilePath;
+        return self::getFilePath('.browser');
     }
 
     public static function getBrowser(bool $headless = true, bool $force = true)
     {
         $browser = null;
 
-        $socketFile = TestsSuite::getFilePath('.broswer');
+        $socketFile = TestsSuite::getFilePath('.browser');
 
         $socket = null;
         if (file_exists($socketFile)) {
@@ -373,10 +369,20 @@ class TestsSuite
                 return null;
             }
 
+            // Dimensions de la fenêtre : PRESTAFLOW_WINDOW_SIZE_WIDTH/HEIGHT en
+            // env (utile pour émuler mobile/tablet/desktop). Défaut FHD 1920×1080.
+            // On lit à la fois $_ENV et getenv() : selon variables_order de PHP,
+            // seul l'un ou l'autre peut être peuplé par le shell parent (setup-php
+            // CI ne peuple pas $_ENV par défaut).
+            $envWidth  = $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH']  ?? getenv('PRESTAFLOW_WINDOW_SIZE_WIDTH');
+            $envHeight = $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? getenv('PRESTAFLOW_WINDOW_SIZE_HEIGHT');
+            $winWidth  = (int) ($envWidth  ?: 1920);
+            $winHeight = (int) ($envHeight ?: 1080);
+
             $options = [
-                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
+                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? getenv('PRESTAFLOW_USER_AGENT') ?: 'PrestaFlow',
                 'keepAlive' => true,
-                'windowSize' => [1920, 1000],
+                'windowSize' => [$winWidth, $winHeight],
                 'headless' => (bool) $headless,
                 'ignoreCertificateErrors' => true,
             ];
@@ -415,9 +421,21 @@ class TestsSuite
         for ($try = 1; ; $try++) {
             try {
                 $pages = TestsSuite::getBrowser()?->getPages();
+                $createdNew = false;
                 if (count($pages) == 0) {
                     TestsSuite::getBrowser()?->createPage();
+                    $createdNew = true;
                 }
+
+                // Si on vient de créer la page (aucune n'existait), les en-têtes
+                // persistants (ex. Authorization Basic Auth) doivent y être appliqués
+                // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
+                // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
+                // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
+                if ($createdNew) {
+                    TestsSuite::applyExtraHttpHeaders();
+                }
+
                 return TestsSuite::getBrowser()?->getPages()[0];
             } catch (\Throwable $e) {
                 if ($try >= 3) {
@@ -447,29 +465,31 @@ class TestsSuite
 
         TestsSuite::getBrowser(headless: $headless, force: true);
 
-        // Authentification HTTP Basic (env) posée en header sur TOUTES les requêtes
-        // (navigation top-level, sous-ressources ET XHR), avant toute navigation.
-        // Plus fiable que des identifiants dans l'URL (https://user:pass@host/…),
-        // que Chrome n'applique pas aux requêtes XHR ni toujours aux redirections.
-        $this->presetBasicAuth();
-
-        // Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
-        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
-        // consentement (RGPD) sur un environnement protégé/preprod.
-        $this->presetEnvCookies();
-
+        // 1) Nettoyer les cookies héritées de la suite précédente. Cet appel doit
+        //    précéder presetEnvCookies() : sinon il EFFACE les cookies qu'on vient
+        //    tout juste de poser (ex. ___kbgdcc pour neutraliser un bandeau RGPD →
+        //    le bandeau ré-apparaît, un « h1 » générique attrape « Centre de
+        //    paramètres des cookies » et les tests plantent).
         try {
             $page = TestsSuite::getPage();
             if ($page !== null) {
-                // Clear all browser cookies so each suite starts from a clean,
-                // unauthenticated state (the previous per-cookie clearing set a
-                // malformed expiry and never actually removed the admin session).
                 $page->getSession()->sendMessageSync(
                     new \HeadlessChromium\Communication\Message('Network.clearBrowserCookies')
                 );
             }
         } catch (\Throwable $e) {
         }
+
+        // 2) Authentification HTTP Basic (env) posée en header sur TOUTES les
+        // requêtes (navigation top-level, sous-ressources ET XHR), avant toute
+        // navigation. Plus fiable que des identifiants dans l'URL, que Chrome
+        // n'applique pas aux requêtes XHR ni toujours aux redirections.
+        $this->presetBasicAuth();
+
+        // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
+        // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
+        // consentement (RGPD) sur un environnement protégé/preprod.
+        $this->presetEnvCookies();
 
         $this->start_time = hrtime(true);
     }
@@ -510,6 +530,20 @@ class TestsSuite
         }
 
         // Applique sur la page courante (première navigation).
+        TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
+     * Ferme la page courante et en crée une fraîche, en réappliquant les en-têtes
+     * persistants (ex. Authorization Basic Auth). C'est LE point d'entrée pour
+     * démarrer sur une session propre : sans le applyExtraHttpHeaders derrière, la
+     * navigation qui suit part sans en-têtes → 401 → chrome-error://. Idempotent
+     * quant aux en-têtes (no-op si aucun n'est défini).
+     */
+    public static function recreatePage(): void
+    {
+        TestsSuite::getPage()?->close();
+        TestsSuite::getBrowser()?->createPage();
         TestsSuite::applyExtraHttpHeaders();
     }
 
