@@ -2,6 +2,8 @@
 
 namespace PrestaFlow\Library\Traits;
 
+use PrestaFlow\Library\Utils\Env;
+
 trait Version
 {
     const SUPPORTED_VERSIONS = [
@@ -48,7 +50,7 @@ trait Version
 
         $version = $this->psVersionOverride
             ?? $propertyVersion
-            ?? ($_ENV['PRESTAFLOW_PS_VERSION'] ?? null)
+            ?? Env::get('PRESTAFLOW_PS_VERSION')
             ?? ($this->globals['PS_VERSION'] ?? null)
             ?? '8.1.0';
 

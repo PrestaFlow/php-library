@@ -2,6 +2,8 @@
 
 namespace PrestaFlow\Library\Utils;
 
+use PrestaFlow\Library\Utils\Env;
+
 final class Screenshots
 {
     public const ERRORS_SUBPATH = 'screens/errors';
@@ -94,7 +96,7 @@ final class Screenshots
 
     public static function captureDelay(): int
     {
-        $delay = (int) ($_ENV['PRESTAFLOW_SCREENSHOT_DELAY'] ?? 3);
+        $delay = (int) Env::get('PRESTAFLOW_SCREENSHOT_DELAY', 3);
 
         return $delay < 0 ? 0 : $delay;
     }

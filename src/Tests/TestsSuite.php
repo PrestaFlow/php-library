@@ -17,6 +17,7 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
+use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\ErrorHandler\Error\FatalError;
@@ -371,16 +372,11 @@ class TestsSuite
 
             // Dimensions de la fenêtre : PRESTAFLOW_WINDOW_SIZE_WIDTH/HEIGHT en
             // env (utile pour émuler mobile/tablet/desktop). Défaut FHD 1920×1080.
-            // On lit à la fois $_ENV et getenv() : selon variables_order de PHP,
-            // seul l'un ou l'autre peut être peuplé par le shell parent (setup-php
-            // CI ne peuple pas $_ENV par défaut).
-            $envWidth  = $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH']  ?? getenv('PRESTAFLOW_WINDOW_SIZE_WIDTH');
-            $envHeight = $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? getenv('PRESTAFLOW_WINDOW_SIZE_HEIGHT');
-            $winWidth  = (int) ($envWidth  ?: 1920);
-            $winHeight = (int) ($envHeight ?: 1080);
+            $winWidth  = (int) (Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH')  ?: 1920);
+            $winHeight = (int) (Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT') ?: 1080);
 
             $options = [
-                'userAgent' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? getenv('PRESTAFLOW_USER_AGENT') ?: 'PrestaFlow',
+                'userAgent' => Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow'),
                 'keepAlive' => true,
                 'windowSize' => [$winWidth, $winHeight],
                 'headless' => (bool) $headless,
@@ -508,8 +504,8 @@ class TestsSuite
      */
     protected function presetBasicAuth(): void
     {
-        $user = $_ENV['PRESTAFLOW_BASIC_USER'] ?? null;
-        $pass = $_ENV['PRESTAFLOW_BASIC_PASS'] ?? null;
+        $user = Env::get('PRESTAFLOW_BASIC_USER');
+        $pass = Env::get('PRESTAFLOW_BASIC_PASS');
         if ($user === null || $user === '') {
             return;
         }
@@ -583,7 +579,7 @@ class TestsSuite
      */
     protected function presetEnvCookies(): void
     {
-        $raw = $_ENV['PRESTAFLOW_COOKIES'] ?? null;
+        $raw = Env::get('PRESTAFLOW_COOKIES');
         if (!$raw) {
             return;
         }
@@ -722,36 +718,36 @@ class TestsSuite
         $dotenv = Dotenv::createImmutable(__DIR__.'/../../../../../', ['.env.local', '.env']);
         $dotenv->safeLoad();
 
-        if (isset($_ENV['PRESTAFLOW_DEBUG'])) {
-            $_ENV['PRESTAFLOW_DEBUG'] = filter_var($_ENV['PRESTAFLOW_DEBUG'], FILTER_VALIDATE_BOOLEAN);
+        if (Env::has('PRESTAFLOW_DEBUG')) {
+            $_ENV['PRESTAFLOW_DEBUG'] = filter_var(Env::get('PRESTAFLOW_DEBUG'), FILTER_VALIDATE_BOOLEAN);
         } else {
             $_ENV['PRESTAFLOW_DEBUG'] = false;
         }
 
-        if (isset($_ENV['PRESTAFLOW_HEADLESS'])) {
-            $_ENV['PRESTAFLOW_HEADLESS'] = filter_var($_ENV['PRESTAFLOW_HEADLESS'], FILTER_VALIDATE_BOOLEAN);
+        if (Env::has('PRESTAFLOW_HEADLESS')) {
+            $_ENV['PRESTAFLOW_HEADLESS'] = filter_var(Env::get('PRESTAFLOW_HEADLESS'), FILTER_VALIDATE_BOOLEAN);
         } else {
             $_ENV['PRESTAFLOW_HEADLESS'] = true;
         }
 
-        if (isset($_ENV['PRESTAFLOW_PREFIX_LOCALE'])) {
-            $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = filter_var($_ENV['PRESTAFLOW_PREFIX_LOCALE'], FILTER_VALIDATE_BOOLEAN);
+        if (Env::has('PRESTAFLOW_PREFIX_LOCALE')) {
+            $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = filter_var(Env::get('PRESTAFLOW_PREFIX_LOCALE'), FILTER_VALIDATE_BOOLEAN);
         } else {
             $_ENV['PRESTAFLOW_PREFIX_LOCALE'] = false;
         }
 
-        if (isset($_ENV['PRESTAFLOW_VERBOSE'])) {
-            $_ENV['PRESTAFLOW_VERBOSE'] = filter_var($_ENV['PRESTAFLOW_VERBOSE'], FILTER_VALIDATE_BOOLEAN);
+        if (Env::has('PRESTAFLOW_VERBOSE')) {
+            $_ENV['PRESTAFLOW_VERBOSE'] = filter_var(Env::get('PRESTAFLOW_VERBOSE'), FILTER_VALIDATE_BOOLEAN);
         } else {
             $_ENV['PRESTAFLOW_VERBOSE'] = true;
         }
 
-        $frontOfficeUrl = $_ENV['PRESTAFLOW_FO_URL'] ?? 'https://localhost/';
+        $frontOfficeUrl = Env::get('PRESTAFLOW_FO_URL', 'https://localhost/');
         if (!str_ends_with($frontOfficeUrl, '/')) {
             $frontOfficeUrl .= '/';
         }
 
-        $backOfficeUrl = $_ENV['PRESTAFLOW_BO_URL'] ?? $frontOfficeUrl . 'admin-dev/';
+        $backOfficeUrl = Env::get('PRESTAFLOW_BO_URL', $frontOfficeUrl . 'admin-dev/');
         if (!str_starts_with($backOfficeUrl, 'https://') && !str_starts_with($backOfficeUrl, 'http://')) {
             $backOfficeUrl = $frontOfficeUrl . $backOfficeUrl;
         }
@@ -760,31 +756,31 @@ class TestsSuite
         }
 
         $this->globals = [
-            'PS_VERSION' => $_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0',
-            'LOCALE' => $_ENV['PRESTAFLOW_LOCALE'] ?? 'en',
-            'PREFIX_LOCALE' => (bool) $_ENV['PRESTAFLOW_PREFIX_LOCALE'] ?? false,
+            'PS_VERSION' => Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'),
+            'LOCALE' => Env::get('PRESTAFLOW_LOCALE', 'en'),
+            'PREFIX_LOCALE' => (bool) Env::get('PRESTAFLOW_PREFIX_LOCALE', false),
             'BO' => [
                 'URL' => $backOfficeUrl,
-                'EMAIL' => $_ENV['PRESTAFLOW_BO_EMAIL'] ?? 'demo@prestashop.com',
-                'PASSWD' => $_ENV['PRESTAFLOW_BO_PASSWD'] ?? 'Correct Horse Battery Staple',
+                'EMAIL' => Env::get('PRESTAFLOW_BO_EMAIL', 'demo@prestashop.com'),
+                'PASSWD' => Env::get('PRESTAFLOW_BO_PASSWD', 'Correct Horse Battery Staple'),
             ],
             'FO' => [
                 'URL' => $frontOfficeUrl,
-                'EMAIL' => $_ENV['PRESTAFLOW_FO_EMAIL'] ?? 'pub@prestashop.com',
-                'PASSWD' => $_ENV['PRESTAFLOW_FO_PASSWD'] ?? '123456789',
+                'EMAIL' => Env::get('PRESTAFLOW_FO_EMAIL', 'pub@prestashop.com'),
+                'PASSWD' => Env::get('PRESTAFLOW_FO_PASSWD', '123456789'),
             ],
-            'DEBUG' => (bool) $_ENV['PRESTAFLOW_DEBUG'] ?? false,
-            'VERBOSE' => (bool) $_ENV['PRESTAFLOW_VERBOSE'] ?? true,
+            'DEBUG' => (bool) Env::get('PRESTAFLOW_DEBUG', false),
+            'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),
             'BROWSER' => [
-                'HEADLESS' => (bool) $_ENV['PRESTAFLOW_HEADLESS'] ?? true,
-                'WINDOW_SIZE_HEIGHT' => $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] ?? 1920,
-                'WINDOW_SIZE_WIDTH' => $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'] ?? 1000,
-                'USER_AGENT' => $_ENV['PRESTAFLOW_USER_AGENT'] ?? 'PrestaFlow',
+                'HEADLESS' => (bool) Env::get('PRESTAFLOW_HEADLESS', true),
+                'WINDOW_SIZE_HEIGHT' => Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT', 1920),
+                'WINDOW_SIZE_WIDTH' => Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH', 1000),
+                'USER_AGENT' => Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow'),
             ],
         ];
 
-        $this->exctractVersions($_ENV['PRESTAFLOW_PS_VERSION'] ?? '8.1.0');
-        $this->setLocale($_ENV['PRESTAFLOW_LOCALE'] ?? 'en');
+        $this->exctractVersions(Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'));
+        $this->setLocale(Env::get('PRESTAFLOW_LOCALE', 'en'));
     }
 
     public function isVerboseMode(): bool
