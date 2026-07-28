@@ -216,6 +216,34 @@ class CommonPage
     }
 
     /**
+     * Best-effort : dimensions du viewport courant via le navigateur. `null`
+     * pour un des deux (ou les deux) si l'info n'est pas disponible (page
+     * absente, evaluate en échec, etc.) — VisualTag::resolve() sait gérer
+     * les segments manquants avec un placeholder `?`.
+     *
+     * @return array{0: ?int, 1: ?int} [width, height]
+     */
+    private function getViewportSize(): array
+    {
+        try {
+            $value = $this->getPage()->evaluate(
+                '(function(){return [window.innerWidth, window.innerHeight];})()'
+            )->getReturnValue();
+
+            if (is_array($value) && count($value) === 2) {
+                return [
+                    $value[0] !== null ? (int) $value[0] : null,
+                    $value[1] !== null ? (int) $value[1] : null,
+                ];
+            }
+        } catch (\Throwable $e) {
+            // best-effort : le tag auto retombera sur des placeholders `?`
+        }
+
+        return [null, null];
+    }
+
+    /**
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
@@ -226,10 +254,31 @@ class CommonPage
      * - $selector null && $fullPage=false => VIEWPORT seul (hauteur fixe de la
      *   fenêtre). À utiliser pour les pages HAUTES à contenu lazy dont la hauteur
      *   pleine page varie selon l'état de chargement (faux écarts).
+     *
+     * $tag : identifiant de baseline `(name, tag)`. `'auto'` (défaut) dérive le
+     * tag de la version PS majeure + du viewport + de la locale (cf.
+     * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
+     * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto'): void
     {
-        $file = $name . '.png';
+        $rawMajorVersion = $this->getMajorVersion();
+        $majorVersion = (is_string($rawMajorVersion) || is_int($rawMajorVersion))
+            && ctype_digit((string) $rawMajorVersion)
+            ? (int) $rawMajorVersion
+            : null;
+
+        [$viewportWidth, $viewportHeight] = $this->getViewportSize();
+
+        $resolvedTag = \PrestaFlow\Library\Visual\VisualTag::resolve(
+            $tag,
+            $majorVersion,
+            $viewportWidth,
+            $viewportHeight,
+            $this->getLocale()
+        );
+
+        $file = $name . '--' . $resolvedTag . '.png';
         $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
         $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
 
@@ -253,7 +302,7 @@ class CommonPage
         if (!is_file($refPath)) {
             copy($actualPath, $refPath);
             \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-                'name' => $name, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
+                'name' => $name, 'tag' => $resolvedTag, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
                 'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
             ]);
             \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
@@ -267,7 +316,7 @@ class CommonPage
 
         $status = $score >= $threshold ? 'pass' : 'fail';
         \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-            'name' => $name, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
+            'name' => $name, 'tag' => $resolvedTag, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
             'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
         ]);
 

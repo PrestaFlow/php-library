@@ -85,6 +85,40 @@ class TestsSuite
     }
 
     /**
+     * Sérialise la tranche de self::$visualResults produite pendant l'exécution
+     * du test courant (de $startIndex jusqu'à la fin) au format attendu dans
+     * results.json (cf. spec MVP2, section « results.json — nouveau bloc »).
+     *
+     * `actual_relpath` / `diff_relpath` ne sont renseignés que pour un statut
+     * `fail` (seul cas où l'action CI a besoin d'uploader ces fichiers) ;
+     * `null` pour `baseline`/`pass`.
+     *
+     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, actual_relpath: ?string, diff_relpath: ?string}>
+     */
+    private static function buildVisualBlock(int $startIndex): array
+    {
+        $slice = array_slice(self::$visualResults, $startIndex);
+
+        return array_map(static function (array $raw): array {
+            $needsFiles = $raw['status'] === 'fail';
+
+            return [
+                'name' => $raw['name'],
+                'tag' => $raw['tag'] ?? null,
+                'status' => $raw['status'],
+                'score' => $raw['score'],
+                'threshold' => $raw['threshold'],
+                'actual_relpath' => ($needsFiles && !empty($raw['actual']))
+                    ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', basename($raw['actual']))
+                    : null,
+                'diff_relpath' => ($needsFiles && !empty($raw['diff']))
+                    ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('diff', basename($raw['diff']))
+                    : null,
+            ];
+        }, $slice);
+    }
+
+    /**
      * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
      * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
      */
@@ -853,6 +887,8 @@ class TestsSuite
             $this->tests = $tests;
 
             foreach ($this->tests as &$test) {
+                $visualStartIndex = count(self::$visualResults);
+
                 try {
                     $startTime = hrtime(true);
 
@@ -900,6 +936,7 @@ class TestsSuite
                     Expect::getNbAssertions();
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
+                    $test['visual'] = self::buildVisualBlock($visualStartIndex);
 
                     match ($test['state']) {
                         'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
