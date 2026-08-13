@@ -515,6 +515,12 @@ class TestsSuite
         // n'applique pas aux requêtes XHR ni toujours aux redirections.
         $this->presetBasicAuth();
 
+        // 2b) En-têtes HTTP arbitraires depuis l'environnement (PRESTAFLOW_EXTRA_HEADERS,
+        // JSON objet). Utiles pour un bypass WAF/CDN (Cloudflare WAF Skip rule via
+        // `X-CI-Bypass: <secret>`), du request tracing (`X-Request-Id`), etc.
+        // Posés APRÈS Basic Auth pour pouvoir les surcharger si besoin.
+        $this->presetExtraHeadersFromEnv();
+
         // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
         // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
         // consentement (RGPD) sur un environnement protégé/preprod.
@@ -559,6 +565,66 @@ class TestsSuite
         }
 
         // Applique sur la page courante (première navigation).
+        TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
+     * En-têtes HTTP arbitraires depuis l'environnement PRESTAFLOW_EXTRA_HEADERS.
+     *
+     * Format : objet JSON `{"Header-Name": "value", ...}`. Chaque paire est
+     * fusionnée dans self::$extraHttpHeaders — donc appliquée à toutes les
+     * requêtes (navigation top-level, sous-ressources, XHR) et réappliquée
+     * après chaque recreatePage(). Mêmes garanties que presetBasicAuth().
+     *
+     * Cas d'usage :
+     *  - Bypass WAF/CDN (ex. Cloudflare WAF Skip rule : `X-CI-Bypass: <secret>`)
+     *  - Request tracing (`X-Request-Id`, `X-CI-Run: <id>`)
+     *  - En-têtes spécifiques d'un edge (Netlify, Vercel, etc.)
+     *
+     * Best-effort : JSON invalide → warning stderr, on n'interrompt pas le
+     * bootstrap. Les clés non-string ou valeurs non-string sont ignorées.
+     */
+    protected function presetExtraHeadersFromEnv(): void
+    {
+        $raw = $_ENV['PRESTAFLOW_EXTRA_HEADERS'] ?? null;
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            fwrite(STDERR, "[PrestaFlow] PRESTAFLOW_EXTRA_HEADERS: JSON invalide, ignoré.\n");
+            return;
+        }
+
+        $added = [];
+        foreach ($decoded as $name => $value) {
+            if (!is_string($name) || $name === '' || !is_scalar($value)) {
+                continue;
+            }
+            $added[$name] = (string) $value;
+        }
+        if ($added === []) {
+            return;
+        }
+
+        // Merge : on préserve les en-têtes déjà posés (ex. Authorization par
+        // presetBasicAuth). L'ordre d'appel dans before() fait que Basic Auth
+        // gagne — sauf si l'utilisateur redéfinit explicitement 'Authorization'
+        // dans PRESTAFLOW_EXTRA_HEADERS (surcharge volontaire).
+        TestsSuite::$extraHttpHeaders = array_merge(TestsSuite::$extraHttpHeaders, $added);
+
+        // Même chemin d'application que Basic Auth : au niveau de la connexion
+        // pour héritage par chaque nouvelle page, puis sur la page courante.
+        $browser = TestsSuite::getBrowser();
+        if ($browser) {
+            try {
+                $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
+
         TestsSuite::applyExtraHttpHeaders();
     }
 
