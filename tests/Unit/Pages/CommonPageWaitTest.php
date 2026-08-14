@@ -33,25 +33,30 @@ final class CommonPageWaitTest extends TestCase
 
     public function testWaitVisibleWaitsForVisibleElement(): void
     {
-        $page = $this->makePage([false, true]);
+        $page = $this->mockPage('isVisible');
+        $page->expects($this->exactly(2))
+            ->method('isVisible')
+            ->with('#save', 100)
+            ->willReturnOnConsecutiveCalls(false, true);
 
         $page->waitVisible('#save', 500);
-
-        $this->assertSame(2, $page->visibilityChecks);
     }
 
     public function testWaitHiddenWaitsForElementToDisappear(): void
     {
-        $page = $this->makePage([true, false]);
+        $page = $this->mockPage('isVisible');
+        $page->expects($this->exactly(2))
+            ->method('isVisible')
+            ->with('.loading', 100)
+            ->willReturnOnConsecutiveCalls(true, false);
 
         $page->waitHidden('.loading', 500);
-
-        $this->assertSame(2, $page->visibilityChecks);
     }
 
     public function testWaitVisibleBuildsUsefulDefaultMessage(): void
     {
-        $page = $this->makePage([false]);
+        $page = $this->mockPage('isVisible');
+        $page->method('isVisible')->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Element did not become visible: #missing');
@@ -61,26 +66,30 @@ final class CommonPageWaitTest extends TestCase
 
     public function testWaitForTextWaitsUntilTextAppears(): void
     {
-        $page = $this->makeTextPage(['Loading', 'Order confirmed']);
+        $page = $this->mockPage('getTextContent');
+        $page->expects($this->exactly(2))
+            ->method('getTextContent')
+            ->with('body', 1, true, 100)
+            ->willReturnOnConsecutiveCalls('Loading', 'Order confirmed');
 
         $page->waitForText('Order confirmed', 500);
-
-        $this->assertSame(2, $page->textChecks);
-        $this->assertSame('body', $page->lastSelector);
     }
 
     public function testWaitForTextSupportsScopedSelector(): void
     {
-        $page = $this->makeTextPage(['Saved']);
+        $page = $this->mockPage('getTextContent');
+        $page->expects($this->once())
+            ->method('getTextContent')
+            ->with('.notification', 1, true, 100)
+            ->willReturn('Saved');
 
         $page->waitForText('Saved', 500, '.notification');
-
-        $this->assertSame('.notification', $page->lastSelector);
     }
 
     public function testWaitForTextUsesProvidedFailureMessage(): void
     {
-        $page = $this->makeTextPage(['Still loading']);
+        $page = $this->mockPage('getTextContent');
+        $page->method('getTextContent')->willReturn('Still loading');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Confirmation message did not appear.');
@@ -88,66 +97,16 @@ final class CommonPageWaitTest extends TestCase
         $page->waitForText('Done', 1, 'body', 'Confirmation message did not appear.');
     }
 
-    private function makePage(array $visibility = []): CommonPage
+    private function makePage(): CommonPage
     {
-        return new class ('en', '8.1.0', [], [], $visibility) extends CommonPage {
-            public int $visibilityChecks = 0;
-
-            private array $visibility;
-
-            public function __construct(string $locale, string $patchVersion, array $globals, array $customs, array $visibility)
-            {
-                parent::__construct($locale, $patchVersion, $globals, $customs);
-                $this->visibility = $visibility;
-            }
-
-            public function isVisible($selector, $timeout = 1000)
-            {
-                ++$this->visibilityChecks;
-
-                if ($this->visibility === []) {
-                    return false;
-                }
-
-                if (count($this->visibility) === 1) {
-                    return $this->visibility[0];
-                }
-
-                return array_shift($this->visibility);
-            }
-        };
+        return new CommonPage('en', '8.1.0', []);
     }
 
-    private function makeTextPage(array $contents): CommonPage
+    private function mockPage(string $method): CommonPage
     {
-        return new class ('en', '8.1.0', [], [], $contents) extends CommonPage {
-            public int $textChecks = 0;
-
-            public string $lastSelector = '';
-
-            private array $contents;
-
-            public function __construct(string $locale, string $patchVersion, array $globals, array $customs, array $contents)
-            {
-                parent::__construct($locale, $patchVersion, $globals, $customs);
-                $this->contents = $contents;
-            }
-
-            public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
-            {
-                ++$this->textChecks;
-                $this->lastSelector = $selector;
-
-                if ($this->contents === []) {
-                    return false;
-                }
-
-                if (count($this->contents) === 1) {
-                    return $this->contents[0];
-                }
-
-                return array_shift($this->contents);
-            }
-        };
+        return $this->getMockBuilder(CommonPage::class)
+            ->setConstructorArgs(['en', '8.1.0', []])
+            ->onlyMethods([$method])
+            ->getMock();
     }
 }
