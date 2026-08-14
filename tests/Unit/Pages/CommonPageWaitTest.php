@@ -59,6 +59,35 @@ final class CommonPageWaitTest extends TestCase
         $page->waitVisible('#missing', 1);
     }
 
+    public function testWaitForTextWaitsUntilTextAppears(): void
+    {
+        $page = $this->makeTextPage(['Loading', 'Order confirmed']);
+
+        $page->waitForText('Order confirmed', 500);
+
+        $this->assertSame(2, $page->textChecks);
+        $this->assertSame('body', $page->lastSelector);
+    }
+
+    public function testWaitForTextSupportsScopedSelector(): void
+    {
+        $page = $this->makeTextPage(['Saved']);
+
+        $page->waitForText('Saved', 500, '.notification');
+
+        $this->assertSame('.notification', $page->lastSelector);
+    }
+
+    public function testWaitForTextUsesProvidedFailureMessage(): void
+    {
+        $page = $this->makeTextPage(['Still loading']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Confirmation message did not appear.');
+
+        $page->waitForText('Done', 1, 'body', 'Confirmation message did not appear.');
+    }
+
     private function makePage(array $visibility = []): CommonPage
     {
         return new class ('en', '8.1.0', [], [], $visibility) extends CommonPage {
@@ -85,6 +114,39 @@ final class CommonPageWaitTest extends TestCase
                 }
 
                 return array_shift($this->visibility);
+            }
+        };
+    }
+
+    private function makeTextPage(array $contents): CommonPage
+    {
+        return new class ('en', '8.1.0', [], [], $contents) extends CommonPage {
+            public int $textChecks = 0;
+
+            public string $lastSelector = '';
+
+            private array $contents;
+
+            public function __construct(string $locale, string $patchVersion, array $globals, array $customs, array $contents)
+            {
+                parent::__construct($locale, $patchVersion, $globals, $customs);
+                $this->contents = $contents;
+            }
+
+            public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
+            {
+                ++$this->textChecks;
+                $this->lastSelector = $selector;
+
+                if ($this->contents === []) {
+                    return false;
+                }
+
+                if (count($this->contents) === 1) {
+                    return $this->contents[0];
+                }
+
+                return array_shift($this->contents);
             }
         };
     }

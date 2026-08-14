@@ -556,6 +556,19 @@ class CommonPage
         );
     }
 
+    public function waitForText(string $text, int $timeout = 10000, string $selector = 'body', ?string $message = null): void
+    {
+        $this->waitUntil(
+            function () use ($selector, $text) {
+                $content = $this->getTextContent($selector, 1, true, 100);
+
+                return is_string($content) && str_contains($content, $text);
+            },
+            $timeout,
+            $message ?? sprintf('Text did not appear in %s: %s', $selector, $text)
+        );
+    }
+
     public function isVisible($selector, $timeout = 1000)
     {
         return $this->elementIsVisible($selector, $timeout);
