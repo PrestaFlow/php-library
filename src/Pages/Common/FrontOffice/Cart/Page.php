@@ -26,7 +26,6 @@ class Page extends BasePage
 
     public function proceedToCheckout(): void
     {
-        $this->click($this->getSelector('checkoutButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('checkoutButton'));
     }
 }

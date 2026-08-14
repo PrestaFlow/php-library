@@ -53,14 +53,12 @@ class Page extends BasePage
     public function filterByName(string $name): void
     {
         $this->setValue($this->getSelector('filterNameInput'), $name);
-        $this->click($this->getSelector('searchButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('searchButton'));
     }
 
     public function resetFilter(): void
     {
-        $this->click($this->getSelector('resetButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('resetButton'));
     }
 
     public function getListCount(): int
@@ -96,8 +94,7 @@ class Page extends BasePage
         // "Standard product" is pre-selected. Clicking "Add new product" submits
         // the create form and redirects to /products/{id}/edit, rendering the
         // full editable product form.
-        $this->click($this->getSelector('createProductButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('createProductButton'));
     }
 
     public function createProduct(string $name, float $price = 0, int $quantity = 0): void
@@ -111,8 +108,7 @@ class Page extends BasePage
         $this->setValueByJs($this->getSelector('formQuantityInput'), (string) $quantity);
         // Enable the product BEFORE saving so the online state persists.
         $this->enableProduct();
-        $this->click($this->getSelector('formSaveButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('formSaveButton'));
     }
 
     public function deleteProduct(int $row = 1): void
@@ -125,8 +121,7 @@ class Page extends BasePage
             $this->getPage()->waitUntilContainsElement($this->getSelector('deleteConfirmButton'), 10000);
         } catch (\Throwable $e) {
         }
-        $this->click($this->getSelector('deleteConfirmButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('deleteConfirmButton'));
     }
 
     public function getSuccessMessage(): string
@@ -165,16 +160,14 @@ class Page extends BasePage
 
     public function openProduct(int $row = 1): void
     {
-        $this->click($this->getSelector('listRowLink', ['row' => $row]));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('listRowLink', ['row' => $row]));
     }
 
     public function updatePrice(float $price): void
     {
         // The price field is on the (inactive) Pricing tab; set it via JS.
         $this->setValueByJs($this->getSelector('formPriceInput'), (string) $price);
-        $this->click($this->getSelector('formSaveButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('formSaveButton'));
     }
 
     public function getFormPrice(): string

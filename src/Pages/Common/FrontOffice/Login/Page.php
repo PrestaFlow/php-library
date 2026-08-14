@@ -38,9 +38,7 @@ class Page extends BasePage
 
         // Wait for navigation if login is successful
         if ($waitForNavigation) {
-            $this->click($this->getSelector('submitLoginButton'));
-            $this->waitForPageReload();
-            //TestsSuite::getPage()->waitForReload();
+            $this->clickAndWaitReload($this->getSelector('submitLoginButton'));
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }

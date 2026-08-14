@@ -33,8 +33,7 @@ class Page extends BasePage
     public function filterByReference(string $reference): void
     {
         $this->setValue($this->getSelector('filterReferenceInput'), $reference);
-        $this->click($this->getSelector('searchButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('searchButton'));
     }
 
     public function getOrderReferenceInList(int $row = 1): string
@@ -44,7 +43,6 @@ class Page extends BasePage
 
     public function openOrder(int $row = 1): void
     {
-        $this->click($this->getSelector('listRowLink', ['row' => $row]));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('listRowLink', ['row' => $row]));
     }
 }

@@ -36,8 +36,7 @@ class Page extends BasePage
 
     public function confirmAddresses(): void
     {
-        $this->click($this->getSelector('addressesContinueButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('addressesContinueButton'));
     }
 
     public function checkoutAsGuest(string $email, string $firstName, string $lastName): void
@@ -55,8 +54,7 @@ class Page extends BasePage
             '(function(){[].slice.call(document.querySelectorAll("#checkout-personal-information-step input[type=checkbox]")).forEach(function(c){if(c.required&&!c.checked){c.click();}});})()'
         );
 
-        $this->click($this->getSelector('personalContinueButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('personalContinueButton'));
     }
 
     public function fillNewAddress(array $address): void
@@ -69,22 +67,19 @@ class Page extends BasePage
         }
         $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 
-        $this->click($this->getSelector('addressesContinueButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('addressesContinueButton'));
     }
 
     public function chooseShipping(): void
     {
         $this->click($this->getSelector('shippingOption'));
-        $this->click($this->getSelector('shippingContinueButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('shippingContinueButton'));
     }
 
     public function choosePaymentAndConfirm(): void
     {
         $this->click($this->getSelector('paymentOption'));
         $this->click($this->getSelector('termsCheckbox'));
-        $this->click($this->getSelector('placeOrderButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('placeOrderButton'));
     }
 }
