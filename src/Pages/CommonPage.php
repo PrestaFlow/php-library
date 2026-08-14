@@ -523,6 +523,39 @@ class CommonPage
         return true;
     }
 
+    public function waitUntil(callable $condition, int $timeout = 10000, string $message = 'Condition was not met.'): void
+    {
+        $deadline = microtime(true) + ($timeout / 1000);
+
+        do {
+            if ($condition()) {
+                return;
+            }
+
+            usleep(100000);
+        } while (microtime(true) < $deadline);
+
+        throw new \RuntimeException($message);
+    }
+
+    public function waitVisible($selector, int $timeout = 10000, ?string $message = null): void
+    {
+        $this->waitUntil(
+            fn () => $this->isVisible($selector, 100),
+            $timeout,
+            $message ?? sprintf('Element did not become visible: %s', $selector)
+        );
+    }
+
+    public function waitHidden($selector, int $timeout = 10000, ?string $message = null): void
+    {
+        $this->waitUntil(
+            fn () => !$this->isVisible($selector, 100),
+            $timeout,
+            $message ?? sprintf('Element did not become hidden: %s', $selector)
+        );
+    }
+
     public function isVisible($selector, $timeout = 1000)
     {
         return $this->elementIsVisible($selector, $timeout);
