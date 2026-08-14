@@ -40,7 +40,7 @@ final class ExtraHeadersFromEnvTest extends TestCase
 
     private function invoke(): void
     {
-        $suite = new class extends TestsSuite {
+        $suite = new class(loadGlobals: false, getBrowser: false) extends TestsSuite {
             public function callPreset(): void
             {
                 $this->presetExtraHeadersFromEnv();
