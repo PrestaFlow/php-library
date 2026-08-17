@@ -6,6 +6,7 @@ use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as DomPage;
+use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
@@ -532,16 +533,23 @@ class CommonPage
     public function waitUntil(callable $condition, int $timeout = 10000, string $message = 'Condition was not met.'): void
     {
         $deadline = microtime(true) + ($timeout / 1000);
+        $interval = 100000; // 100ms
 
-        do {
+        while (true) {
             if ($condition()) {
                 return;
             }
 
-            usleep(100000);
-        } while (microtime(true) < $deadline);
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0) {
+                break;
+            }
 
-        throw new \RuntimeException($message);
+            // Cap the sleep so we don't overshoot the deadline.
+            usleep((int) min($interval, $remaining * 1_000_000));
+        }
+
+        throw new TimeoutException($message);
     }
 
     public function waitVisible($selector, int $timeout = 10000, ?string $message = null): void
@@ -564,10 +572,17 @@ class CommonPage
 
     public function waitForText(string $text, int $timeout = 10000, string $selector = 'body', ?string $message = null): void
     {
-        $this->waitUntil(
-            function () use ($selector, $text) {
-                $content = $this->getTextContent($selector, 1, true, 100);
+        $waitForSelector = true;
 
+        $this->waitUntil(
+            function () use ($selector, $text, &$waitForSelector) {
+                $content = $this->getTextContent($selector, 1, $waitForSelector, 100);
+                // Only wait for the selector on the first poll; subsequent
+                // polls only care about the text content.
+                $waitForSelector = false;
+
+                // getTextContent returns false on timeout and '' when the
+                // element has no text yet — is_string filters out the false.
                 return is_string($content) && str_contains($content, $text);
             },
             $timeout,

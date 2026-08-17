@@ -3,6 +3,7 @@
 namespace PrestaFlow\Tests\Unit\Pages;
 
 use PHPUnit\Framework\TestCase;
+use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Pages\CommonPage;
 
 final class CommonPageWaitTest extends TestCase
@@ -29,6 +30,32 @@ final class CommonPageWaitTest extends TestCase
         $this->expectExceptionMessage('Expected condition did not happen.');
 
         $page->waitUntil(fn () => false, 1, 'Expected condition did not happen.');
+    }
+
+    public function testWaitUntilThrowsTimeoutException(): void
+    {
+        $page = $this->makePage();
+
+        $this->expectException(TimeoutException::class);
+
+        $page->waitUntil(fn () => false, 1);
+    }
+
+    public function testWaitUntilRespectsDeadline(): void
+    {
+        $page = $this->makePage();
+
+        $start = microtime(true);
+        try {
+            $page->waitUntil(fn () => false, 200);
+        } catch (TimeoutException $e) {
+            // expected
+        }
+        $elapsedMs = (microtime(true) - $start) * 1000;
+
+        // Should be close to 200ms, well below 400ms (i.e. no 100ms overshoot per iteration).
+        $this->assertLessThan(350, $elapsedMs);
+        $this->assertGreaterThanOrEqual(200, $elapsedMs);
     }
 
     public function testWaitVisibleWaitsForVisibleElement(): void
@@ -67,12 +94,19 @@ final class CommonPageWaitTest extends TestCase
     public function testWaitForTextWaitsUntilTextAppears(): void
     {
         $page = $this->mockPage('getTextContent');
+        $calls = [];
         $page->expects($this->exactly(2))
             ->method('getTextContent')
-            ->with('body', 1, true, 100)
-            ->willReturnOnConsecutiveCalls('Loading', 'Order confirmed');
+            ->willReturnCallback(function (...$args) use (&$calls) {
+                $calls[] = $args;
+                return count($calls) === 1 ? 'Loading' : 'Order confirmed';
+            });
 
         $page->waitForText('Order confirmed', 500);
+
+        // First poll waits for the selector; subsequent polls skip it.
+        $this->assertSame(['body', 1, true, 100], $calls[0]);
+        $this->assertSame(['body', 1, false, 100], $calls[1]);
     }
 
     public function testWaitForTextSupportsScopedSelector(): void
