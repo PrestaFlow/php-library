@@ -616,16 +616,16 @@ class TestsSuite
 
         // Même chemin d'application que Basic Auth : au niveau de la connexion
         // pour héritage par chaque nouvelle page, puis sur la page courante.
-        $browser = TestsSuite::getBrowser();
+        $browser = TestsSuite::getBrowser(force: false);
         if ($browser) {
             try {
                 $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
             } catch (Throwable $e) {
                 // best-effort
             }
-        }
 
-        TestsSuite::applyExtraHttpHeaders();
+            TestsSuite::applyExtraHttpHeaders();
+        }
     }
 
     /**

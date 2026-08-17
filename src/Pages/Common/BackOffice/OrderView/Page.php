@@ -45,8 +45,7 @@ class Page extends BasePage
         // The status field is a select2: set the underlying <select> value by
         // option label and fire "change" (the lib's selectValue does this).
         $this->selectValue($this->getSelector('statusSelect'), $status);
-        $this->click($this->getSelector('updateStatusButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('updateStatusButton'));
     }
 
     public function hasStatusInHistory(string $status): bool
@@ -91,8 +90,7 @@ class Page extends BasePage
             $sel,
             $val
         ));
-        $this->click($this->getSelector('trackingSaveButton'));
-        $this->waitForPageReload();
+        $this->clickAndWaitReload($this->getSelector('trackingSaveButton'));
     }
 
     public function getTracking(): string
