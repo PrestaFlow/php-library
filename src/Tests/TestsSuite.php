@@ -18,12 +18,13 @@ use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
 use PrestaFlow\Library\Utils\Output;
+use PrestaFlow\Library\Utils\OutputStates;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
 
-class TestsSuite
+class TestsSuite implements OutputStates
 {
     use Locale;
     use Version;
