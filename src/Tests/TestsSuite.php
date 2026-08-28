@@ -125,6 +125,13 @@ class TestsSuite implements OutputStates
      */
     public static array $extraHttpHeaders = [];
 
+    /**
+     * Navigateur déjà connecté et URI du socket associé : sans cette mémoïsation,
+     * getBrowser() rouvre une WebSocket et un handshake CDP par appel.
+     */
+    protected static $browserInstance = null;
+    protected static ?string $browserInstanceSocket = null;
+
     protected $draft = false;
     protected $groups = 'all';
 
@@ -386,6 +393,19 @@ class TestsSuite implements OutputStates
             }
         }
 
+        // Socket disparu/changé ou navigateur mort : le cache est périmé. isConnected()
+        // ne lit que l'état local de la socket, sans aller-retour CDP.
+        if (self::$browserInstance !== null) {
+            if ($socket !== null
+                && self::$browserInstanceSocket === $socket
+                && self::$browserInstance->getConnection()->isConnected()) {
+                return self::$browserInstance;
+            }
+
+            self::$browserInstance = null;
+            self::$browserInstanceSocket = null;
+        }
+
         try {
             if ($socket === null) {
                 if (!$force) {
@@ -426,7 +446,8 @@ class TestsSuite implements OutputStates
             for ($attempt = 0; $attempt < 3; $attempt++) {
                 try {
                     $browser = (new BrowserFactory())->createBrowser($options);
-                    \file_put_contents($socketFile, $browser->getSocketUri());
+                    $socket = $browser->getSocketUri();
+                    \file_put_contents($socketFile, $socket);
                     $lastError = null;
                     break;
                 } catch (\Throwable $e2) {
@@ -440,6 +461,9 @@ class TestsSuite implements OutputStates
             }
         }
 
+        self::$browserInstance = $browser;
+        self::$browserInstanceSocket = $socket;
+
         return $browser;
     }
 
@@ -450,23 +474,25 @@ class TestsSuite implements OutputStates
         // getTargetInfo() on null ». On réessaie quelques fois avant d'échouer.
         for ($try = 1; ; $try++) {
             try {
-                $pages = TestsSuite::getBrowser()?->getPages();
-                $createdNew = false;
+                // Un seul getBrowser() et une seule énumération par tentative : on ne
+                // réénumère qu'après un createPage() effectif.
+                $browser = TestsSuite::getBrowser();
+                $pages = $browser?->getPages();
+
                 if (count($pages) == 0) {
-                    TestsSuite::getBrowser()?->createPage();
-                    $createdNew = true;
-                }
+                    $browser?->createPage();
 
-                // Si on vient de créer la page (aucune n'existait), les en-têtes
-                // persistants (ex. Authorization Basic Auth) doivent y être appliqués
-                // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
-                // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
-                // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
-                if ($createdNew) {
+                    // Si on vient de créer la page (aucune n'existait), les en-têtes
+                    // persistants (ex. Authorization Basic Auth) doivent y être appliqués
+                    // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
+                    // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
+                    // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
                     TestsSuite::applyExtraHttpHeaders();
+
+                    $pages = $browser?->getPages();
                 }
 
-                return TestsSuite::getBrowser()?->getPages()[0];
+                return $pages[0];
             } catch (\Throwable $e) {
                 if ($try >= 3) {
                     throw $e;
