@@ -287,21 +287,23 @@ class CommonPage
         $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
         $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
 
+        $page = $this->getPage();
+
         if ($selector !== null) {
-            $node = $this->getPage()->dom()->querySelector($selector);
+            $node = $page->dom()->querySelector($selector);
             if ($node === null) {
                 throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
             }
-            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+            $page->screenshotElement($node)->saveToFile($actualPath);
         } elseif ($fullPage) {
-            $this->getPage()->screenshot([
+            $page->screenshot([
                 'captureBeyondViewport' => true,
-                'clip' => $this->getPage()->getFullPageClip(),
+                'clip' => $page->getFullPageClip(),
                 'format' => 'png',
             ])->saveToFile($actualPath);
         } else {
             // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
-            $this->getPage()->screenshot(['format' => 'png'])->saveToFile($actualPath);
+            $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
         }
 
         if (!is_file($refPath)) {
@@ -368,10 +370,11 @@ class CommonPage
     public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             $value = $element->getText();
             if ($value === null) {
                 return '';
@@ -385,12 +388,13 @@ class CommonPage
     public function getInputValue($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
             // Read the live `.value` property (works for <textarea> and for
             // values that differ from the initial `value` attribute).
-            $value = $this->getPage()->evaluate(sprintf(
+            $value = $page->evaluate(sprintf(
                 '(function(){var e=document.querySelector(%s);return e?e.value:null;})()',
                 json_encode($selector)
             ))->getReturnValue();
@@ -406,10 +410,11 @@ class CommonPage
     public function navigateTo($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             return $element->click();
         } catch (OperationTimedOut | Exception $e) {
             return false;
@@ -418,8 +423,10 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
+        $page = $this->getPage();
+
         try {
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             if ($element !== null) {
                 return $element->click();
             }
@@ -428,7 +435,7 @@ class CommonPage
             // sub-link): fall back to a JS click, which navigates regardless.
         }
 
-        return $this->getPage()->evaluate(sprintf(
+        return $page->evaluate(sprintf(
             '(function(){var e=document.querySelector(%s);if(e){e.click();return true;}return false;})()',
             json_encode($selector)
         ))->getReturnValue();
@@ -500,8 +507,10 @@ class CommonPage
 
         $textContent = $this->getInputValue($selector);
 
+        $page = $this->getPage();
+
         if ($textContent !== null && $textContent !== '') {
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             if ($element !== null) {
                 // Clear the input value
                 $element->setAttributeValue('value', '');
@@ -509,8 +518,8 @@ class CommonPage
         }
 
         // Alternatively, you can use the keyboard to delete the text
-        // $this->getPage()->keyboard()->typeRawKey('Del'); // Delete key
-        $this->getPage()->keyboard()->typeText($value);
+        // $page->keyboard()->typeRawKey('Del'); // Delete key
+        $page->keyboard()->typeText($value);
         // or
         // $element->sendKeys($value);
     }

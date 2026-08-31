@@ -77,18 +77,19 @@ class Page extends BasePage
         // type-choice modal. Read its real href and navigate directly to the
         // full-page create flow instead (bypasses the modal), mirroring how
         // goToSubMenu resolves menu links.
+        $page = $this->getPage();
         try {
-            $this->getPage()->waitUntilContainsElement($this->getSelector('newProductButton'), 10000);
+            $page->waitUntilContainsElement($this->getSelector('newProductButton'), 10000);
         } catch (\Throwable $e) {
             // fall through; the evaluate below reports a null href if absent
         }
         $sel = json_encode($this->getSelector('newProductButton'));
-        $href = $this->getPage()->evaluate(sprintf(
+        $href = $page->evaluate(sprintf(
             '(function(){var e=document.querySelector(%s);return e&&e.href?e.href:null;})()',
             $sel
         ))->getReturnValue();
         if (is_string($href) && $href !== '') {
-            $this->getPage()->navigate($href)->waitForNavigation();
+            $page->navigate($href)->waitForNavigation();
         }
         $this->waitForPageReload();
         // "Standard product" is pre-selected. Clicking "Add new product" submits

@@ -105,13 +105,14 @@ class Page extends BasePage
 
     private function openShippingModal(): void
     {
+        $page = $this->getPage();
         $editSel = json_encode($this->getSelector('trackingEditButton'));
-        $this->getPage()->evaluate(sprintf(
+        $page->evaluate(sprintf(
             '(function(){var e=document.querySelector(%s);if(e)e.click();})()',
             $editSel
         ));
         try {
-            $this->getPage()->waitUntilContainsElement($this->getSelector('trackingSaveButton'), 8000);
+            $page->waitUntilContainsElement($this->getSelector('trackingSaveButton'), 8000);
         } catch (\Throwable $e) {
         }
     }

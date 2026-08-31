@@ -81,8 +81,10 @@ class BackOfficePage extends CommonPage
         // (not clickable by coordinates) and whose parent is itself a navigation
         // link (clicking it navigates away too early). Read the sub-link's
         // resolved href and navigate to it directly, then wait for the page.
+        $page = $this->getPage();
+
         try {
-            $this->getPage()->waitUntilContainsElement($linkSelector, 10000);
+            $page->waitUntilContainsElement($linkSelector, 10000);
         } catch (\Throwable $e) {
             // fall through; the evaluate below will report a null href
         }
@@ -90,14 +92,14 @@ class BackOfficePage extends CommonPage
         // The menu entry is often a <li> wrapping the real <a>; read the anchor's
         // href (or the element's own href when the selector already targets a link).
         $sel = json_encode($linkSelector);
-        $href = $this->getPage()->evaluate(sprintf(
+        $href = $page->evaluate(sprintf(
             '(function(){var e=document.querySelector(%s+" a")||document.querySelector(%s);return e&&e.href?e.href:null;})()',
             $sel,
             $sel
         ))->getReturnValue();
 
         if (is_string($href) && $href !== '') {
-            $this->getPage()->navigate($href)->waitForNavigation();
+            $page->navigate($href)->waitForNavigation();
         }
     }
 }
