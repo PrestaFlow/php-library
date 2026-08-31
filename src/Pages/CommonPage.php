@@ -120,8 +120,12 @@ class CommonPage
 
     public function __call($name, $arguments)
     {
-        if (!is_null($this->getPage()) && method_exists($this->getPage(), $name)) {
-            call_user_func_array([$this->getPage(), $name], $arguments);
+        // getPage() rouvre une connexion CDP : les trois évaluations d'origine
+        // (condition, method_exists, invocation) triplaient chaque appel proxifié.
+        $page = $this->getPage();
+
+        if (!is_null($page) && method_exists($page, $name)) {
+            call_user_func_array([$page, $name], $arguments);
         }
     }
 
