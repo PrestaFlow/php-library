@@ -33,6 +33,18 @@ class TestsSuite
 
     public string $title = '';
     public array $tests = [];
+
+    /**
+     * Optional callback invoked once per test, right after the test's state
+     * ('pass' | 'fail' | 'skip' | 'skipped' | 'todo') is settled. Signature:
+     *   function (TestsSuite $suite, array $test): void
+     *
+     * Consumers use this to stream progress out of a long-running suite —
+     * e.g. persist partial stats to a DB row so a UI can show "3/10 passed"
+     * before the suite finishes. Kept intentionally simple: no return value,
+     * exceptions are swallowed (progress reporting must never break a run).
+     */
+    public $onAfterTest = null;
     protected array $stats = [
         'passes' => 0,
         'failures' => 0,
@@ -90,6 +102,15 @@ class TestsSuite
      * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
      */
     public static array $extraHttpHeaders = [];
+
+    /**
+     * Contexte de navigation courant ('FO' | 'BO' | null). Utilisé par
+     * recreatePageIfContextChanged() pour n'imposer un close+createPage que
+     * lorsqu'on bascule entre FrontOffice et BackOffice (ou au premier appel).
+     * Une navigation intra-contexte réutilise la page courante — session,
+     * cookies et JS state conservés — ce qui économise ~3s par navigation.
+     */
+    public static ?string $currentContext = null;
 
     protected $draft = false;
     protected $groups = 'all';
@@ -544,6 +565,23 @@ class TestsSuite
     }
 
     /**
+     * Variante contextuelle de recreatePage(). Ne recrée la page que si le
+     * contexte de navigation change (FO ↔ BO) ou au tout premier appel. Sinon,
+     * réutilise la page courante et se contente de réappliquer les en-têtes
+     * persistants — la session (cookies, JS state) est conservée, ce qui est
+     * généralement souhaité pour un scénario multi-étapes dans un même côté.
+     */
+    public static function recreatePageIfContextChanged(string $context): void
+    {
+        if (TestsSuite::$currentContext === $context && TestsSuite::getPage() !== null) {
+            TestsSuite::applyExtraHttpHeaders();
+            return;
+        }
+        TestsSuite::recreatePage();
+        TestsSuite::$currentContext = $context;
+    }
+
+    /**
      * (Ré)applique self::$extraHttpHeaders sur la page courante. À appeler après
      * toute (re)création de page — notamment dans goToPage — car un en-tête posé
      * sur une page fermée est perdu. Best-effort.
@@ -910,6 +948,17 @@ class TestsSuite
                         'fail' => $this->fail(test: $test, section: $sectionId, newLine: true),
                         default => $this->info(message: $test, section: $sectionId, newLine: true)
                     };
+
+                    // Progress hook — consumers stream partial state out of a
+                    // long-running suite (see the property doc). Swallow any
+                    // exception: progress reporting must never break a run.
+                    if (is_callable($this->onAfterTest)) {
+                        try {
+                            ($this->onAfterTest)($this, $test);
+                        } catch (Throwable $__) {
+                            // deliberately silent
+                        }
+                    }
                 }
             }
 
