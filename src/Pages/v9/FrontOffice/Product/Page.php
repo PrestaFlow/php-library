@@ -15,11 +15,7 @@ class Page extends BasePage
         $pageSelectors = [
             'quantityWantedInput' => '#quantity_wanted',
             'currentProductPrice' => '.product-price',
-            // PS 9.2's classic theme renamed the button to
-            // .product__add-to-cart-button; .add-to-cart no longer matches
-            // anything there (verified live on 9.2.0). Both are listed so the
-            // v7/v8 pages that delegate here keep working on older themes.
-            'addToCartButton' => '.add-to-cart, .product__add-to-cart-button',
+            'addToCartButton' => '.add-to-cart',
             'modalTitle' => '#myModalLabel',
         ];
 

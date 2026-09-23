@@ -19,7 +19,7 @@
     {
       "id": 3,
       "subject": "Task 3: Audit the 63 selectors",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2
       ],
@@ -35,5 +35,5 @@
       "description": "**Goal:** Prove the audit by running the existing suites against a Hummingbird shop (1) and a Classic shop (2).\n\n**Verify:** every run green, orders confirmed in ps_orders, and the missing-theme warning observed\n\n```json:metadata\n{\"files\": [\"src/Themes/hummingbird.json\", \"src/Pages/v9/FrontOffice\"], \"verifyCommand\": \"./bin/prestaflow run src/Tests/Suites/Scenarios -g opc\", \"acceptanceCriteria\": [\"OPC guest + order and Registration pass on shop 1 with THEME=hummingbird\", \"the same suites pass on shop 2 with THEME=classic\", \"the scenario-level params['theme'] override demonstrably wins\", \"a wrong theme warns and fails visibly rather than passing silently\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-09-23T15:04:10.080716"
+  "lastUpdated": "2026-09-23T15:37:43.471623"
 }

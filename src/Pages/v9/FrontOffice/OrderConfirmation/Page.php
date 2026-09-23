@@ -11,14 +11,8 @@ class Page extends BasePage
     public function defineSelectors()
     {
         return [
-            // Best-effort PS 9 confirmation page — corrected live.
-            // #content-hook_order_confirmation and #order-reference-value only
-            // exist in the classic theme. PS 9 ships hummingbird as the default
-            // and it marks neither — so both selectors also list a
-            // theme-agnostic fallback. body#order-confirmation comes from the
-            // layout's <body id="{$page.page_name}">, which every theme honours.
-            'confirmationBlock' => '#content-hook_order_confirmation, body#order-confirmation',
-            'orderReference' => '#order-reference-value, .order-confirmation__details-list li:first-child',
+            'confirmationBlock' => '#content-hook_order_confirmation',
+            'orderReference' => '#order-reference-value',
         ];
     }
 

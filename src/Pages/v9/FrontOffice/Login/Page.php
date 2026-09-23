@@ -17,11 +17,7 @@ class Page extends BasePage
             'passwordInput' => '#login-form input[name=\'password\']',
             'submitLoginButton' => '#login-form button#submit-login',
             'alertDangerTextBlock' => '#content section.login-form div.help-block li.alert-danger',
-            // The first form is classic's header block; hummingbird (PS 9's
-            // default theme) has no such header entry and exposes the link as
-            // #signout_link in the account menu instead. The bare href match is
-            // the theme-agnostic fallback — both themes point at ?mylogout=.
-            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\'], #signout_link, a[href*=\'mylogout\']',
+            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\']',
         ];
     }
 
