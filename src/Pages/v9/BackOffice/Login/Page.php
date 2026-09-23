@@ -62,6 +62,24 @@ class Page extends BasePage
     }
 
     /**
+     * Whether an employee session is actually open.
+     *
+     * login() fills the form and clicks, but asserts nothing: with wrong
+     * credentials it completes just as quietly as with good ones, and every
+     * later back-office step then silently does nothing while still reporting
+     * success. Callers should assert on this instead of trusting login().
+     *
+     * The logout link is the marker: it only exists for an authenticated
+     * employee. Deliberately NOT headerEmployeeContainer — that id belongs to
+     * the 9.0-era header and is absent from 9.2, where a probe of a live
+     * dashboard returns #header-employee-container: 0 but #header_logout: 1.
+     */
+    public function isLoggedIn(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('logoutLink'), 5000);
+    }
+
+    /**
      * Get login error
      */
     public function getLoginError()

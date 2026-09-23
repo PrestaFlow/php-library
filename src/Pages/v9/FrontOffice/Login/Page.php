@@ -17,7 +17,11 @@ class Page extends BasePage
             'passwordInput' => '#login-form input[name=\'password\']',
             'submitLoginButton' => '#login-form button#submit-login',
             'alertDangerTextBlock' => '#content section.login-form div.help-block li.alert-danger',
-            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\']',
+            // The first form is classic's header block; hummingbird (PS 9's
+            // default theme) has no such header entry and exposes the link as
+            // #signout_link in the account menu instead. The bare href match is
+            // the theme-agnostic fallback — both themes point at ?mylogout=.
+            'logoutLink' => '#_desktop_user_info .user-info a[href*=\'mylogout\'], #signout_link, a[href*=\'mylogout\']',
         ];
     }
 
@@ -44,6 +48,19 @@ class Page extends BasePage
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
+    }
+
+    /**
+     * Whether a customer session is actually open.
+     *
+     * login() fills the form and clicks without asserting anything, so bad
+     * credentials complete as quietly as good ones. The logout link is only
+     * rendered for an authenticated customer, which makes it the signal to
+     * assert on.
+     */
+    public function isLoggedIn(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('logoutLink'), 5000);
     }
 
     public function logout()

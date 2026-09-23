@@ -107,7 +107,11 @@ trait Output
             if (is_string($test['screen'])) {
                 $screenPath = Screenshots::errorPath($test['screen']);
 
-                $this->outputText(baseLine: $baseLine, state: self::DEBUG, title: self::makeIcon(self::DEBUG), message: $test['screen'], secondaryColor: 'gray', section: $section, force: $force);
+                // Print the absolute path, not the bare filename: the filename
+                // alone says nothing about where the capture landed, and most
+                // terminals turn an absolute path into a clickable target even
+                // when they do not support OSC 8 hyperlinks.
+                $this->outputText(baseLine: $baseLine, state: self::DEBUG, title: self::makeIcon(self::DEBUG), message: $screenPath, secondaryColor: 'gray', section: $section, force: $force);
 
                 if ($this->cli && array_key_exists($section, $this->outputSections) && self::terminalSupportsFileHyperlinks()) {
                     $this->outputSections[$section]->writeln($baseLine . '   <href=file://' . $screenPath . '><fg=gray>Open screenshot</></>');
@@ -374,9 +378,26 @@ trait Output
         return number_format($time / 1000, 2, '.', '');
     }
 
+    /**
+     * Whether to emit OSC 8 file hyperlinks.
+     *
+     * There is no way to ask a terminal what it supports, so this stays an
+     * allowlist: a terminal that does not understand OSC 8 prints the raw
+     * escape sequence, which is worse than no link at all. PRESTAFLOW_HYPERLINKS
+     * is the escape hatch for terminals that are not listed (set it to 1 to
+     * force links on, 0 to force them off) — the failure path prints the
+     * screenshot's absolute path either way, so a missing link is never a dead
+     * end.
+     */
     private static function terminalSupportsFileHyperlinks(): bool
     {
+        $forced = Env::get('PRESTAFLOW_HYPERLINKS');
+        if ($forced !== null && $forced !== '') {
+            return filter_var($forced, FILTER_VALIDATE_BOOL);
+        }
+
         $termProgram = (string) (getenv('TERM_PROGRAM') ?: '');
-        return in_array($termProgram, ['iTerm.app', 'vscode'], true);
+
+        return in_array($termProgram, ['iTerm.app', 'vscode', 'WarpTerminal', 'claude-desktop', 'ghostty', 'WezTerm'], true);
     }
 }

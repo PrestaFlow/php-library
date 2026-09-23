@@ -136,15 +136,13 @@ class ExecuteSuite extends Command
         $junitOption = $input->getOption('junit');
         $junitPath = ($junitOption === false) ? null : ($junitOption ?: 'prestaflow/junit.xml');
 
-        $folderPath = ucfirst($input->getArgument('folder'));
-
-        if (!is_dir($folderPath) || !is_dir($folderPath)) {
+        try {
+            $testSuites = $this->resolveSuitePaths((string) $input->getArgument('folder'));
+        } catch (Error $e) {
             $this->sections['progressIndicator']->finish('Finished');
             $this->sections['progressBar']->clear();
-            throw new Error(sprintf('The suites folder [%s] doesn\'t seem to exist', $folderPath));
+            throw $e;
         }
-
-        $testSuites = $this->getTestsSuites($folderPath);
 
         if (!count($testSuites)) {
             $this->sections['progressIndicator']->finish('Finished');
@@ -414,6 +412,55 @@ class ExecuteSuite extends Command
         return $matchDraft && $matchGroups;
     }
 
+    /**
+     * Candidate paths for the runner's argument, most specific first.
+     *
+     * The capitalised variant is a FALLBACK, not an unconditional transform.
+     * The argument defaults to 'tests' while the directory on disk is 'Tests',
+     * which is why a ucfirst() was there in the first place — but applying it
+     * to every argument rewrote 'src/Tests/...' into 'Src/Tests/...', so
+     * targeting a path that does not start with a capital only ever worked on
+     * case-insensitive filesystems. It failed on Linux, and therefore in CI.
+     *
+     * @return array<int, string>
+     */
+    public function candidatePaths(string $argument): array
+    {
+        $capitalised = ucfirst($argument);
+
+        return $capitalised === $argument ? [$argument] : [$argument, $capitalised];
+    }
+
+    /**
+     * Resolve the runner's argument to the list of suite files to execute.
+     *
+     * Accepts a directory, scanned recursively, or a single .php suite file —
+     * passing one file is the natural way to target a single suite, and used to
+     * fail with a message about a missing folder.
+     *
+     * @return array<int, string>
+     *
+     * @throws Error when the argument matches neither a directory nor a suite file
+     */
+    public function resolveSuitePaths(string $argument): array
+    {
+        foreach ($this->candidatePaths($argument) as $path) {
+            if (is_dir($path)) {
+                return $this->getTestsSuites($path);
+            }
+
+            if (is_file($path)) {
+                if (!str_ends_with($path, '.php')) {
+                    throw new Error(sprintf('[%s] is not a PHP suite file', $path));
+                }
+
+                return [$path];
+            }
+        }
+
+        throw new Error(sprintf('The suites path [%s] doesn\'t seem to exist', $argument));
+    }
+
     public function getTestsSuites($folderPath)
     {
         $testSuites = [];
@@ -425,7 +472,10 @@ class ExecuteSuite extends Command
                         foreach ($this->getTestsSuites($folderPath . '/' . $folderFile) as $childFolderFile) {
                             $testSuites[] = $childFolderFile;
                         }
-                    } else {
+                    } elseif (str_ends_with($folderFile, '.php')) {
+                        // Only PHP files can be suites. execute() skipped the
+                        // others further down anyway; filtering here keeps this
+                        // method's contract honest for its callers.
                         $testSuites[] = $folderPath . '/' . $folderFile;
                     }
                 }
