@@ -159,6 +159,103 @@ class CommonPage
         }
     }
 
+    /**
+     * The theme whose selector variants apply to this page.
+     *
+     * Read from the globals rather than from a static trait like Locale: page
+     * constructors call getSelectors() before importPage() could invoke a
+     * setter, so trait-held state would always arrive too late to affect the
+     * merge. $this->globals is assigned on the constructor's first line.
+     */
+    public function getTheme(): string
+    {
+        $theme = $this->globals['THEME'] ?? '';
+
+        return is_string($theme) && $theme !== '' ? $theme : 'classic';
+    }
+
+    public function setTheme(string $theme): void
+    {
+        $this->globals['THEME'] = $theme;
+    }
+
+    /** Set by tests to point the theme loader at fixtures. */
+    public array $themeDirs = [];
+
+    /** The last missing-theme warning, kept so callers can surface it. */
+    public string $lastThemeWarning = '';
+
+    /**
+     * Directories searched for <theme>.json, least specific first.
+     *
+     * The library's own themes, then the consuming project's — so a project can
+     * correct or extend what the library ships without forking it. Mirrors the
+     * root that Tests/Selectors/<locale>.json is already read from.
+     */
+    protected function themeDirectories(): array
+    {
+        if ($this->themeDirs !== []) {
+            return $this->themeDirs;
+        }
+
+        return [
+            __DIR__ . '/../Themes',
+            __DIR__ . '/../../../../../Tests/Themes',
+        ];
+    }
+
+    /**
+     * Selector overrides for the current theme.
+     *
+     * Classic gets no special case: the loader looks for classic.json like it
+     * would for any other theme, finds nothing, and the caller keeps the base
+     * map — which already IS Classic. That is what makes "Classic by default" a
+     * structural property rather than a branch.
+     */
+    protected function getThemeSelectors(array $pageNames): array
+    {
+        $theme = $this->getTheme();
+        $selectors = [];
+        $found = false;
+
+        foreach ($this->themeDirectories() as $dir) {
+            $path = rtrim($dir, '/') . '/' . $theme . '.json';
+            if (!file_exists($path)) {
+                continue;
+            }
+
+            $found = true;
+            $decoded = json_decode(file_get_contents($path), true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            // Same walk as the locale catalog: descend one level per page-name
+            // segment, skipping the trailing "Page".
+            foreach ($pageNames as $pageName) {
+                if ($pageName === 'Page') {
+                    continue;
+                }
+                $decoded = is_array($decoded) && isset($decoded[$pageName]) ? $decoded[$pageName] : [];
+            }
+
+            if (is_array($decoded)) {
+                $selectors = [...$selectors, ...$decoded];
+            }
+        }
+
+        // Silence here would recreate the failure mode this whole mechanism
+        // exists to remove: a suite that looks like it ran and proved nothing.
+        if (!$found && $theme !== 'classic') {
+            $this->lastThemeWarning = sprintf(
+                'No selector file found for theme "%s"; falling back to the Classic base selectors.',
+                $theme
+            );
+        }
+
+        return $selectors;
+    }
+
     public function getGlobal($index)
     {
         $globals = $this->getGlobals();
@@ -610,6 +707,7 @@ class CommonPage
 
         $mergedSelectors = [
             ...$baseSelectors,
+            ...$this->getThemeSelectors($pageNames),
             ...$customSelectors,
             ...$specificSelectors,
         ];

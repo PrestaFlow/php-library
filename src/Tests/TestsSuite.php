@@ -796,6 +796,10 @@ class TestsSuite
         $this->globals = [
             'PS_VERSION' => Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'),
             'LOCALE' => Env::get('PRESTAFLOW_LOCALE', 'en'),
+            // Selector variants are merged per theme. Classic is the default
+            // because it is the library's historical baseline — see
+            // CommonPage::getSelectors().
+            'THEME' => Env::get('PRESTAFLOW_THEME', 'classic'),
             'PREFIX_LOCALE' => (bool) Env::get('PRESTAFLOW_PREFIX_LOCALE', false),
             'BO' => [
                 'URL' => $backOfficeUrl,
