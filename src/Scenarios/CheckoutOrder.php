@@ -42,16 +42,27 @@ class CheckoutOrder extends Scenario
                 $this->getParam('customerEmail'),
                 $this->getParam('customerPassword')
             );
+
+            Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
-        ->it('add a product to the cart', function () use ($frontOfficeProductPage) {
+        ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
+
+            $frontOfficeCartPage->goToCart();
+            Expect::that($frontOfficeCartPage->hasItems())->equals(true);
         })
         ->it('go through the checkout tunnel', function () use ($frontOfficeCartPage, $frontOfficeCheckoutPage) {
             $frontOfficeCartPage->goToCart();
             $frontOfficeCartPage->proceedToCheckout();
             $frontOfficeCheckoutPage->confirmAddresses();
+
+            Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
+
             $frontOfficeCheckoutPage->chooseShipping();
+
+            Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
+
             $frontOfficeCheckoutPage->choosePaymentAndConfirm();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {

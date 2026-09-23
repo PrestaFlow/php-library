@@ -24,6 +24,8 @@ class EditProduct extends Scenario
         ->it('log in to the BackOffice', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->goToPage('index');
             $backOfficeLoginPage->login();
+
+            Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('create a product to edit', function () use ($backOfficeProductsPage) {
             $backOfficeProductsPage->goTo();
@@ -32,6 +34,11 @@ class EditProduct extends Scenario
                 (float) $this->getParam('initialPrice'),
                 (int) $this->getParam('quantity')
             );
+
+            $backOfficeProductsPage->goTo();
+            $backOfficeProductsPage->filterByName($this->getParam('productName'));
+
+            Expect::that($backOfficeProductsPage->getProductNameInList(1))->contains($this->getParam('productName'));
         })
         ->it('open the product from the list and change its price', function () use ($backOfficeProductsPage) {
             $backOfficeProductsPage->goTo();
@@ -46,6 +53,11 @@ class EditProduct extends Scenario
             $backOfficeProductsPage->goTo();
             $backOfficeProductsPage->filterByName($this->getParam('productName'));
             $backOfficeProductsPage->deleteProduct(1);
+
+            $backOfficeProductsPage->goTo();
+            $backOfficeProductsPage->filterByName($this->getParam('productName'));
+
+            Expect::that($backOfficeProductsPage->getListCount())->equals(0);
         });
 
         return $testSuite;

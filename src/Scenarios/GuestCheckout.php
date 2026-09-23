@@ -38,9 +38,12 @@ class GuestCheckout extends Scenario
         extract($testSuite->pages);
 
         $testSuite
-        ->it('add a product to the cart', function () use ($frontOfficeProductPage) {
+        ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
+
+            $frontOfficeCartPage->goToCart();
+            Expect::that($frontOfficeCartPage->hasItems())->equals(true);
         })
         ->it('checkout as a guest and enter an address', function () use ($frontOfficeCartPage, $frontOfficeCheckoutPage) {
             $frontOfficeCartPage->goToCart();
@@ -58,9 +61,14 @@ class GuestCheckout extends Scenario
                 'country' => $this->getParam('addressCountry'),
                 'phone' => $this->getParam('addressPhone'),
             ]);
+
+            Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
         })
         ->it('choose shipping and place the order', function () use ($frontOfficeCheckoutPage) {
             $frontOfficeCheckoutPage->chooseShipping();
+
+            Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
+
             $frontOfficeCheckoutPage->choosePaymentAndConfirm();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {

@@ -29,7 +29,7 @@ class ManageOrder extends Scenario
         extract($testSuite->pages);
 
         $testSuite
-        ->it('open the order in the BackOffice', function () use ($backOfficeLoginPage, $backOfficeOrdersPage) {
+        ->it('open the order in the BackOffice', function () use ($backOfficeLoginPage, $backOfficeOrdersPage, $backOfficeOrderViewPage) {
             $reference = $this->retrieve('orderReference') ?? $this->getParam('orderReference');
 
             $backOfficeLoginPage->goToPage('index');
@@ -38,6 +38,8 @@ class ManageOrder extends Scenario
             $backOfficeOrdersPage->goTo();
             $backOfficeOrdersPage->filterByReference($reference);
             $backOfficeOrdersPage->openOrder(1);
+
+            Expect::that($backOfficeOrderViewPage->getOrderReference())->contains((string) $reference);
         })
         ->it('change the order status', function () use ($backOfficeOrderViewPage) {
             $backOfficeOrderViewPage->updateStatus($this->getParam('orderStatus'));

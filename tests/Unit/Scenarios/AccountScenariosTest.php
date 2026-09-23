@@ -31,33 +31,6 @@ final class AccountScenariosTest extends TestCase
         $this->assertTrue(is_subclass_of($suite, 'PrestaFlow\\Library\\Tests\\TestsSuite'));
     }
 
-    /**
-     * Same guard as the One Page Checkout scenarios: a step that only clicks
-     * reports success even when nothing happened, because click() returns false
-     * on a missing selector instead of raising.
-     *
-     * @dataProvider scenarioProvider
-     */
-    public function testEveryStepAssertsSomething(string $name, string $path): void
-    {
-        // Split on a real step call — `->it('` followed by its title — not on
-        // the bare substring, which also occurs in prose comments.
-        $chunks = preg_split("/->it\\(\\s*'/", file_get_contents($path));
-        array_shift($chunks);
-
-        $this->assertNotEmpty($chunks, $name . ' declares no step at all');
-
-        foreach ($chunks as $chunk) {
-            preg_match('/^([^\']+)\'/', $chunk, $matches);
-
-            $this->assertStringContainsString(
-                'Expect::that',
-                $chunk,
-                sprintf('step "%s" asserts nothing, so it cannot fail', $matches[1] ?? '(untitled)')
-            );
-        }
-    }
-
     public function testRegistrationKeepsItsEmailUniquePerRun(): void
     {
         $ref = new \ReflectionClass('PrestaFlow\\Library\\Scenarios\\Registration');

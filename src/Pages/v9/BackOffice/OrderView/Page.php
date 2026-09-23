@@ -26,7 +26,25 @@ class Page extends BasePage
             // After saving, the tracking number is shown in the shipping table
             // (the modal input is empty when the modal is closed).
             'trackingDisplay' => '.carrier-tracking-num',
+            // The page root carries the order reference in a data attribute
+            // (see Blocks/View header): "Order #<id> <reference>".
+            'orderViewContainer' => '#order-view-page',
         ];
+    }
+
+    /**
+     * The reference of the order currently displayed, read from the page
+     * itself rather than assumed from whatever was searched for — so a step
+     * that opened the wrong row (or never opened one) can be caught.
+     */
+    public function getOrderReference(): string
+    {
+        $sel = json_encode($this->getSelector('orderViewContainer'));
+
+        return trim((string) $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);return e?e.getAttribute("data-order-title"):"";})()',
+            $sel
+        ))->getReturnValue());
     }
 
     public function getCurrentStatus(): string

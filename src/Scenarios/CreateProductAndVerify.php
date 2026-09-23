@@ -24,6 +24,8 @@ class CreateProductAndVerify extends Scenario
         ->it('log in to the BackOffice', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->goToPage('index');
             $backOfficeLoginPage->login();
+
+            Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('create and publish a product', function () use ($backOfficeProductsPage) {
             $backOfficeProductsPage->goTo();
@@ -35,6 +37,11 @@ class CreateProductAndVerify extends Scenario
 
             $this->store('productId', $backOfficeProductsPage->getCreatedProductId());
             $this->store('productUrl', $backOfficeProductsPage->getCreatedProductUrl());
+
+            $backOfficeProductsPage->goTo();
+            $backOfficeProductsPage->filterByName($this->getParam('productName'));
+
+            Expect::that($backOfficeProductsPage->getProductNameInList(1))->contains($this->getParam('productName'));
         })
         ->it('verify the product on the FrontOffice', function () use ($frontOfficeProductPage) {
             $frontOfficeProductPage->goToUrl((string) $this->retrieve('productUrl'));
@@ -45,6 +52,11 @@ class CreateProductAndVerify extends Scenario
             $backOfficeProductsPage->goTo();
             $backOfficeProductsPage->filterByName($this->getParam('productName'));
             $backOfficeProductsPage->deleteProduct(1);
+
+            $backOfficeProductsPage->goTo();
+            $backOfficeProductsPage->filterByName($this->getParam('productName'));
+
+            Expect::that($backOfficeProductsPage->getListCount())->equals(0);
         });
 
         return $testSuite;

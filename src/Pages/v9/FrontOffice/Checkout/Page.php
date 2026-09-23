@@ -40,6 +40,26 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Whether the tunnel has advanced into the delivery (shipping) step. A
+     * false here means the previous click (guest/address form submit) was a
+     * no-op — the click() layer returns false on a missing selector instead
+     * of raising, so the tunnel can silently stay on the step it started on.
+     */
+    public function hasReachedShippingStep(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('shippingOption'), 5000);
+    }
+
+    /**
+     * Whether the tunnel has advanced into the payment step, i.e. the
+     * shipping option was actually selected and confirmed.
+     */
+    public function hasReachedPaymentStep(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('paymentOption'), 5000);
+    }
+
     public function checkoutAsGuest(string $email, string $firstName, string $lastName): void
     {
         // If a guest/sign-in toggle is present, switch to the guest form.
