@@ -30,6 +30,11 @@ class GuestCheckout extends Scenario
         // pages — otherwise cart/checkout URLs fall back to English and 404.
         $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
 
+        // Same precondition as CheckoutOrder: this scenario walks the four-page
+        // tunnel, and the layout is a shop-wide setting another scenario may
+        // have flipped.
+        $this->requireFourPageCheckout($testSuite);
+
         $testSuite->importPage('FrontOffice\Product');
         $testSuite->importPage('FrontOffice\Cart');
         $testSuite->importPage('FrontOffice\Checkout');

@@ -78,7 +78,24 @@ class Page extends BasePage
      */
     public function isOnePageCheckoutSelected(): bool
     {
-        $selector = json_encode($this->getSelector('onePageChoice'));
+        return $this->isChoiceChecked($this->getSelector('onePageChoice'));
+    }
+
+    /**
+     * The symmetric accessor exists so a scenario that needs the four-page
+     * tunnel can assert the state it requires, instead of asserting the absence
+     * of the other one. Reading the live `checked` property rather than the
+     * `checked` attribute: the attribute reflects the markup as served, not what
+     * the radio group holds after a click.
+     */
+    public function isFourPageCheckoutSelected(): bool
+    {
+        return $this->isChoiceChecked($this->getSelector('fourPageChoice'));
+    }
+
+    private function isChoiceChecked(string $selector): bool
+    {
+        $selector = json_encode($selector);
 
         return $this->getPage()->evaluate(
             '(function(){var e=document.querySelector(' . $selector . ');return !!(e&&e.checked);})()'

@@ -85,25 +85,27 @@ class Page extends BasePage
         $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
         $this->setValue($this->getSelector('addressPostcodeInput'), $address['postcode'] ?? '');
         // Only touch the country <select> when it doesn't already show the
-        // requested country. PS9's checkout (hummingbird included) treats ANY
-        // "change" event on this field as a real edit and re-renders the
-        // address form via an AJAX call (order?ajax=1&action=addressForm) to
-        // account for country-specific fields. The HTML that call returns
-        // swaps the "Continue" button for a generic <button type="submit">
-        // that has lost its name="confirm-addresses" attribute, so
-        // addressesContinueButton's selector stops matching anything and the
-        // final click() below silently no-ops, leaving the tunnel stuck on a
-        // fully-filled step 2. Every scenario defaults to the country the
-        // shop already pre-selects, so this reselection is normally a no-op
-        // we can — and must — skip.
+        // requested country: a "change" here makes the checkout re-render the
+        // address form through an AJAX call, and re-rendering costs a round
+        // trip for nothing when the value is the one already selected.
         //
-        // The limitation this leaves: a scenario that genuinely needs a
-        // DIFFERENT country still triggers the re-render and still gets stuck.
-        // That is PrestaShop's behaviour, not something a page object can work
-        // around — checkout/_partials/address-form.tpl holds two submit buttons,
-        // and the AJAX re-render returns the "Save" branch, which carries no
-        // name attribute at all. Do not "fix" it by matching that button: it
-        // submits a different form in a different context.
+        // An earlier version of this comment blamed that re-render for leaving
+        // the tunnel stuck on a filled step 2, and called it PrestaShop's
+        // behaviour. That was wrong. The re-render returns a form whose submit
+        // button has no name="confirm-addresses" ONLY when the shop is running
+        // the One Page Checkout, because the module replaces the whole checkout
+        // process and OrderController::displayAjaxAddressForm() then finds no
+        // CheckoutAddressesStep to read form_has_continue_button from. With the
+        // module active, nothing in the real interface calls that endpoint --
+        // the module points its own JS at its own controller -- so no shop is
+        // affected by it.
+        //
+        // What was actually stuck was us: the scenario walked the four-page
+        // tunnel on a shop another scenario had switched to One Page Checkout,
+        // so these selectors were describing a page that was no longer there.
+        // The fix for that lives in Scenario::requireFourPageCheckout(); this
+        // guard stays because skipping a pointless re-render is worth doing on
+        // its own, not because it works around a defect.
         if (!empty($address['country']) && !$this->countryAlreadySelected($address['country'])) {
             $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
         }

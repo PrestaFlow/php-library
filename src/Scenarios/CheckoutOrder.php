@@ -25,6 +25,11 @@ class CheckoutOrder extends Scenario
         // pages — otherwise login/cart/order URLs fall back to English and 404.
         $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
 
+        // The four-page tunnel this scenario drives only exists while the shop
+        // is on the four-page layout. Set it before anything touches the front
+        // office — a One Page Checkout scenario may have run first.
+        $this->requireFourPageCheckout($testSuite);
+
         $testSuite->importPage('FrontOffice\Login');
         $testSuite->importPage('FrontOffice\Product');
         $testSuite->importPage('FrontOffice\Cart');
