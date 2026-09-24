@@ -28,48 +28,6 @@ if (!$autoloadLoaded) {
     exit(1);
 }
 
-use PrestaFlow\Library\Command\ExecuteSuite;
-use Symfony\Component\Console\Application;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\ConsoleEvents;
-use Symfony\Component\Console\Event\ConsoleErrorEvent;
-use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\EventDispatcher\EventDispatcher;
-
-$dispatcher = new EventDispatcher();
-
-$dispatcher->addListener(ConsoleEvents::ERROR, function (ConsoleErrorEvent $event): void {
-
-    $input = $event->getInput();
-    $output = $event->getOutput();
-
-    $io = new SymfonyStyle($input, $output);
-
-    $command = $event->getCommand();
-
-    $error = $event->getError();
-
-    $io->newLine();
-
-    $io->writeln(sprintf('<fg=red;options=bold>ERROR</> <fg=white>%s</>', $error->getMessage()));
-    $io->writeln(sprintf('<fg=gray;options=bold>TRACE</> <fg=white>%s</>', $error->getFile() . ':' . $error->getLine()));
-
-    foreach ($error->getTrace() as $trace) {
-        $io->writeln(sprintf('<fg=gray;options=bold>TRACE</> <fg=white>%s</>', ($trace['file'] ?? '[internal]') . ':' . ($trace['line'] ?? '?')));
-    }
-
-    // gets the current exit code (the exception code)
-    $exitCode = $event->getExitCode();
-
-    $event->setExitCode(Command::SUCCESS);
-
-    // changes the exception to another one
-    $event->setError(new \LogicException('Caught exception', $exitCode, $event->getError()));
-});
-
-$application = new Application();
-
-$application->add(new ExecuteSuite());
-$application->setDispatcher($dispatcher);
-
-$application->run();
+// Toute la configuration vit dans PrestaFlow\Library\Console\Application (testée) :
+// une exception non rattrapée y donne un code de sortie non nul.
+(new PrestaFlow\Library\Console\Application())->run();
