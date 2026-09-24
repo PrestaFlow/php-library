@@ -85,7 +85,7 @@ class Page extends BasePage
 
         $addressFields = json_encode($this->getSelector('addressFields'));
 
-        $this->waitForCondition(
+        $this->waitForJsCondition(
             'document.querySelector(' . $addressFields . ') '
             . '&& !document.querySelector(' . $addressFields . ').classList.contains("d-none")'
         );
@@ -126,7 +126,7 @@ class Page extends BasePage
             $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
             // The re-render replaces the inputs: wait for the street field to be
             // back in the DOM before typing into it.
-            $this->waitForCondition(
+            $this->waitForJsCondition(
                 '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')'
             );
         }
@@ -158,7 +158,7 @@ class Page extends BasePage
         $this->waitForCarriers();
         $this->click($this->getSelector('carrierOption'));
 
-        $this->waitForCondition(
+        $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
         );
     }
@@ -200,7 +200,7 @@ class Page extends BasePage
      */
     public function isReadyToPlaceOrder(): bool
     {
-        return $this->waitForCondition(
+        return $this->waitForJsCondition(
             '!document.querySelector(' . json_encode($this->getSelector('payButton')) . ').disabled',
             5000
         );
@@ -229,7 +229,7 @@ class Page extends BasePage
             . '.forEach(function(c){if(!c.checked){c.click();}});})()'
         );
 
-        $this->waitForCondition(
+        $this->waitForJsCondition(
             '!document.querySelector(' . json_encode($this->getSelector('payButton')) . ').disabled'
         );
     }
@@ -251,7 +251,7 @@ class Page extends BasePage
      */
     private function waitForCarriers(): void
     {
-        $this->waitForCondition(
+        $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('carrierOption')) . ')'
         );
     }

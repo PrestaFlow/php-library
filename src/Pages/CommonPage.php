@@ -571,6 +571,17 @@ class CommonPage
      * AJAX, a button that lost its disabled attribute. Returns whether the
      * condition was met, so callers choose between asserting and branching.
      *
+     * Not to be confused with waitUntil(), which is the other waiter on this
+     * class and behaves differently in three ways that matter:
+     *
+     *  - the condition runs HERE, in the browser, not in PHP;
+     *  - a timeout returns false instead of throwing TimeoutException;
+     *  - a page that is busy mid-poll (navigation in flight, target detached)
+     *    is retried rather than blowing up the step.
+     *
+     * Reach for waitUntil() when the condition is PHP-side, or when you want a
+     * timeout to fail the step by itself.
+     *
      * @param string $jsExpression a single JS *expression* (no statements, no
      *                             trailing `//` comments), evaluated for
      *                             truthiness; it is spliced into an expression
@@ -580,7 +591,7 @@ class CommonPage
      * @param int    $timeout      total budget in milliseconds
      * @param int    $interval     delay between two polls, in milliseconds
      */
-    public function waitForCondition(string $jsExpression, int $timeout = 10000, int $interval = 200): bool
+    public function waitForJsCondition(string $jsExpression, int $timeout = 10000, int $interval = 200): bool
     {
         $deadline = microtime(true) + ($timeout / 1000);
         $interval = max(1, $interval);
@@ -626,6 +637,22 @@ class CommonPage
         }
 
         return false;
+    }
+
+    /**
+     * @deprecated since 1.8.0, use waitForJsCondition() instead.
+     *
+     * The old name said "condition" without saying whose: this class also has
+     * waitUntil(), which takes a PHP callable and throws on timeout. Neither
+     * name told a reader which one they wanted, so the JS one now says so.
+     *
+     * Kept as a thin alias rather than removed — the rename is cosmetic, and
+     * breaking a public method on a point release would cost callers more than
+     * the confusion did.
+     */
+    public function waitForCondition(string $jsExpression, int $timeout = 10000, int $interval = 200): bool
+    {
+        return $this->waitForJsCondition($jsExpression, $timeout, $interval);
     }
 
     public function selectOption($selector, $value)
@@ -708,6 +735,19 @@ class CommonPage
         return true;
     }
 
+    /**
+     * Poll a PHP callable until it returns truthy, or throw TimeoutException.
+     *
+     * The base the waitVisible() / waitHidden() / waitForText() helpers are
+     * built on. The condition is NOT wrapped: if the callable throws, that
+     * exception propagates — which is what you want for a condition that reads
+     * state PrestaFlow already holds, and not what you want for one that has to
+     * reach into a page that may be navigating.
+     *
+     * For the latter, use waitForJsCondition(): it evaluates a JS expression in
+     * the browser, survives a busy page, and returns false on timeout rather
+     * than throwing.
+     */
     public function waitUntil(callable $condition, int $timeout = 10000, string $message = 'Condition was not met.'): void
     {
         $deadline = microtime(true) + ($timeout / 1000);

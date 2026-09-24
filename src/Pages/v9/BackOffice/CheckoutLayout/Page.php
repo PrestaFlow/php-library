@@ -110,7 +110,7 @@ class Page extends BasePage
         // Bootstrap adds the "show" class once the modal's fade-in transition
         // is done; confirming before that can miss the click target.
         $modalSelector = json_encode($this->getSelector('confirmationModal'));
-        $this->waitForCondition(
+        $this->waitForJsCondition(
             'document.querySelector(' . $modalSelector . ')'
             . '&&document.querySelector(' . $modalSelector . ').classList.contains("show")'
         );

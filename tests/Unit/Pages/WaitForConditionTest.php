@@ -69,12 +69,38 @@ final class FakeConditionPage extends CommonPage
 
 final class WaitForConditionTest extends TestCase
 {
+    /**
+     * The deprecated alias is a public method callers may still be on, so it is
+     * exercised rather than assumed. An alias nobody runs is how a rename
+     * quietly breaks the people it was supposed to spare.
+     */
+    public function testDeprecatedAliasStillDelegates(): void
+    {
+        $page = new FakeConditionPage();
+        $page->results = [false, true];
+
+        $this->assertTrue($page->waitForCondition('window.ready === true', 2000, 20));
+        $this->assertSame(2, $page->calls);
+    }
+
+    public function testDeprecatedAliasForwardsTimeoutAndInterval(): void
+    {
+        $page = new FakeConditionPage();
+        $page->results = [];
+
+        $started = microtime(true);
+        $this->assertFalse($page->waitForCondition('window.ready === true', 150, 20));
+        $elapsed = (microtime(true) - $started) * 1000;
+
+        $this->assertLessThan(1000, $elapsed, 'the alias must pass the caller timeout through, not the default');
+    }
+
     public function testReturnsTrueAndStopsPollingOnFirstTruthyResult(): void
     {
         $page = new FakeConditionPage();
         $page->results = [false, false, true, true];
 
-        $this->assertTrue($page->waitForCondition('window.ready === true', 2000, 20));
+        $this->assertTrue($page->waitForJsCondition('window.ready === true', 2000, 20));
         $this->assertSame(3, $page->calls, 'polling must stop as soon as the condition is met');
     }
 
@@ -83,7 +109,7 @@ final class WaitForConditionTest extends TestCase
         $page = new FakeConditionPage();
         $page->results = [];
 
-        $this->assertFalse($page->waitForCondition('window.ready === true', 200, 20));
+        $this->assertFalse($page->waitForJsCondition('window.ready === true', 200, 20));
         $this->assertGreaterThan(1, $page->calls, 'the helper must poll more than once before giving up');
     }
 
@@ -93,7 +119,7 @@ final class WaitForConditionTest extends TestCase
         $page->throwOnFirstCall = true;
         $page->results = [1 => true];
 
-        $this->assertTrue($page->waitForCondition('window.ready === true', 2000, 20));
+        $this->assertTrue($page->waitForJsCondition('window.ready === true', 2000, 20));
     }
 
     public function testExpressionIsSplicedIntoTruthyGuardedWrapper(): void
@@ -101,7 +127,7 @@ final class WaitForConditionTest extends TestCase
         $page = new FakeConditionPage();
         $page->results = [true];
 
-        $page->waitForCondition('window.ready === true', 2000, 20);
+        $page->waitForJsCondition('window.ready === true', 2000, 20);
 
         $this->assertCount(1, $page->receivedJs);
         $js = $page->receivedJs[0];
@@ -116,7 +142,7 @@ final class WaitForConditionTest extends TestCase
         $page = new FakeConditionPage();
         $page->results = [1, 'yes', []];
 
-        $this->assertFalse($page->waitForCondition('window.ready', 60, 20));
+        $this->assertFalse($page->waitForJsCondition('window.ready', 60, 20));
     }
 
     public function testRethrowsWhenEveryPollFails(): void
@@ -127,7 +153,7 @@ final class WaitForConditionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('page is navigating');
 
-        $page->waitForCondition('x > 0 // malformed', 100, 20);
+        $page->waitForJsCondition('x > 0 // malformed', 100, 20);
     }
 
     public function testTransientErrorAfterASuccessfulPollStillReturnsFalseAtTimeout(): void
@@ -136,7 +162,7 @@ final class WaitForConditionTest extends TestCase
         $page->results = [false];
         $page->throwFromCall = 1;
 
-        $this->assertFalse($page->waitForCondition('window.ready === true', 150, 20));
+        $this->assertFalse($page->waitForJsCondition('window.ready === true', 150, 20));
         $this->assertGreaterThan(1, $page->calls, 'must have polled at least once successfully and then hit errors');
     }
 }
