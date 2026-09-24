@@ -1,0 +1,58 @@
+{
+  "planPath": "docs/superpowers/plans/2026-09-24-flashlight-test-infrastructure.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Compose fixture",
+      "status": "completed",
+      "description": "**Goal:** Three Flashlight shops reachable on 8017/8082/8092.\n\n**Files:**\n- docker-compose.yml\n- .env.flashlight.example\n- .gitignore\n\n**Verify:** docker compose up ps92 -d && sleep 90 && curl -sf http://localhost:8092/\n\n```json:metadata\n{\"files\": [\"docker-compose.yml\", \".env.flashlight.example\", \".gitignore\"], \"verifyCommand\": \"docker compose up ps92 -d && sleep 90 && curl -sf http://localhost:8092/\", \"acceptanceCriteria\": [\"compose config validates\", \"each shop answers 200\", \"back office answers 200/302\", \".gitignore has .env.flashlight\"]}\n```\n\n**Landed in:** 75ec522 + 5be2e19"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Second shop via post-script",
+      "status": "completed",
+      "description": "**Goal:** Every container boots with a working second shop.\n\n**Files:**\n- docker/post-scripts/10-second-shop.sh\n- docker/post-scripts/20-carrier-restrictions.sh\n\n**Verify:** curl -sf http://localhost:8092/shop2/\n\n```json:metadata\n{\"files\": [\"docker/post-scripts/10-second-shop.sh\", \"docker/post-scripts/20-carrier-restrictions.sh\"], \"verifyCommand\": \"curl -sf http://localhost:8092/shop2/\", \"acceptanceCriteria\": [\"/shop2/ answers 200\", \"ps_shop has 2 rows\", \"module_carrier s1==s2\", \"htaccess carries shop2 rules\"]}\n```\n\n**Landed in:** 8073588 + 5be2e19",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Smoke suite",
+      "status": "completed",
+      "description": "**Goal:** A front-office suite meaningful on every version.\n\n**Files:**\n- src/Tests/Suites/Smoke/FrontOfficeSmoke.php\n\n**Verify:** php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/Smoke/FrontOfficeSmoke.php\"], \"verifyCommand\": \"php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php\", \"acceptanceCriteria\": [\"passes on 9.2\", \"every step asserts\", \"proven to fail on a bad URL\"]}\n```\n\n**Landed in:** 3bee2ed",
+      "blockedBy": [
+        2
+      ]
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: CI matrix",
+      "status": "completed",
+      "description": "**Goal:** Smoke suite runs on 1.7, 8.2 and 9.2.\n\n**Files:**\n- .github/workflows/live-smoke.yml\n\n**Verify:** gh run list --limit 1\n\n```json:metadata\n{\"files\": [\".github/workflows/live-smoke.yml\"], \"verifyCommand\": \"gh run list --limit 1\", \"acceptanceCriteria\": [\"three jobs, fail-fast false\", \"9.2 green\", \"1.7 and 8.2 run for real, not skipped\", \"screenshots uploaded on failure\"]}\n```\n\n**Landed in:** c578b61",
+      "blockedBy": [
+        3
+      ]
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Documentation",
+      "status": "completed",
+      "description": "**Goal:** Three commands from clean checkout to passing suite.\n\n**Files:**\n- docs/testing-with-flashlight.md\n- README.md\n\n**Verify:** follow the guide from a clean checkout\n\n```json:metadata\n{\"files\": [\"docs/testing-with-flashlight.md\", \"README.md\"], \"verifyCommand\": \"follow the guide from a clean checkout\", \"acceptanceCriteria\": [\"covers start/configure/run/teardown\", \"documents the two traps\", \"README links it\"]}\n```\n\n**Landed in:** fdab9ad",
+      "blockedBy": [
+        3
+      ]
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Retire the hand-made container",
+      "status": "completed",
+      "description": "**Goal:** One shop story, not two.\n\n**Files:**\n- docs/superpowers/plans/2026-07-10-phase2-task0-flashlight-infra.md\n\n**Verify:** grep -rn 'ps92rc1' --include='*.md' --include='*.php' --include='*.yml' . | grep -v vendor\n\n```json:metadata\n{\"files\": [\"docs/superpowers/plans/2026-07-10-phase2-task0-flashlight-infra.md\"], \"verifyCommand\": \"grep -rn 'ps92rc1' --include='*.md' --include='*.php' --include='*.yml' . | grep -v vendor\", \"acceptanceCriteria\": [\"superseded plan deleted\", \"no committed reference to ps92rc1\"]}\n```\n\n**Landed in:** this commit",
+      "blockedBy": [
+        4,
+        5
+      ]
+    }
+  ],
+  "lastUpdated": "2026-09-24T15:14:20"
+}
