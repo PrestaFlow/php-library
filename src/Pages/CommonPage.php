@@ -6,6 +6,7 @@ use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as DomPage;
+use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Tests\TestsSuite;
@@ -119,8 +120,12 @@ class CommonPage
 
     public function __call($name, $arguments)
     {
-        if (!is_null($this->getPage()) && method_exists($this->getPage(), $name)) {
-            call_user_func_array([$this->getPage(), $name], $arguments);
+        // getPage() rouvre une connexion CDP : les trois évaluations d'origine
+        // (condition, method_exists, invocation) triplaient chaque appel proxifié.
+        $page = $this->getPage();
+
+        if (!is_null($page) && method_exists($page, $name)) {
+            call_user_func_array([$page, $name], $arguments);
         }
     }
 
@@ -313,6 +318,34 @@ class CommonPage
     }
 
     /**
+     * Best-effort : dimensions du viewport courant via le navigateur. `null`
+     * pour un des deux (ou les deux) si l'info n'est pas disponible (page
+     * absente, evaluate en échec, etc.) — VisualTag::resolve() sait gérer
+     * les segments manquants avec un placeholder `?`.
+     *
+     * @return array{0: ?int, 1: ?int} [width, height]
+     */
+    private function getViewportSize(): array
+    {
+        try {
+            $value = $this->getPage()->evaluate(
+                '(function(){return [window.innerWidth, window.innerHeight];})()'
+            )->getReturnValue();
+
+            if (is_array($value) && count($value) === 2) {
+                return [
+                    $value[0] !== null ? (int) $value[0] : null,
+                    $value[1] !== null ? (int) $value[1] : null,
+                ];
+            }
+        } catch (\Throwable $e) {
+            // best-effort : le tag auto retombera sur des placeholders `?`
+        }
+
+        return [null, null];
+    }
+
+    /**
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
@@ -323,34 +356,57 @@ class CommonPage
      * - $selector null && $fullPage=false => VIEWPORT seul (hauteur fixe de la
      *   fenêtre). À utiliser pour les pages HAUTES à contenu lazy dont la hauteur
      *   pleine page varie selon l'état de chargement (faux écarts).
+     *
+     * $tag : identifiant de baseline `(name, tag)`. `'auto'` (défaut) dérive le
+     * tag de la version PS majeure + du viewport + de la locale (cf.
+     * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
+     * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto'): void
     {
-        $file = $name . '.png';
+        $rawMajorVersion = $this->getMajorVersion();
+        $majorVersion = (is_string($rawMajorVersion) || is_int($rawMajorVersion))
+            && ctype_digit((string) $rawMajorVersion)
+            ? (int) $rawMajorVersion
+            : null;
+
+        [$viewportWidth, $viewportHeight] = $this->getViewportSize();
+
+        $resolvedTag = \PrestaFlow\Library\Visual\VisualTag::resolve(
+            $tag,
+            $majorVersion,
+            $viewportWidth,
+            $viewportHeight,
+            $this->getLocale()
+        );
+
+        $file = $name . '--' . $resolvedTag . '.png';
         $actualPath = \PrestaFlow\Library\Utils\Screenshots::actualPath($file, create: true);
         $refPath = \PrestaFlow\Library\Utils\Screenshots::referencePath($file, create: true);
 
+        $page = $this->getPage();
+
         if ($selector !== null) {
-            $node = $this->getPage()->dom()->querySelector($selector);
+            $node = $page->dom()->querySelector($selector);
             if ($node === null) {
                 throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
             }
-            $this->getPage()->screenshotElement($node)->saveToFile($actualPath);
+            $page->screenshotElement($node)->saveToFile($actualPath);
         } elseif ($fullPage) {
-            $this->getPage()->screenshot([
+            $page->screenshot([
                 'captureBeyondViewport' => true,
-                'clip' => $this->getPage()->getFullPageClip(),
+                'clip' => $page->getFullPageClip(),
                 'format' => 'png',
             ])->saveToFile($actualPath);
         } else {
             // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
-            $this->getPage()->screenshot(['format' => 'png'])->saveToFile($actualPath);
+            $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
         }
 
         if (!is_file($refPath)) {
             copy($actualPath, $refPath);
             \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-                'name' => $name, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
+                'name' => $name, 'tag' => $resolvedTag, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
                 'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
             ]);
             \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
@@ -364,7 +420,7 @@ class CommonPage
 
         $status = $score >= $threshold ? 'pass' : 'fail';
         \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-            'name' => $name, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
+            'name' => $name, 'tag' => $resolvedTag, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
             'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
         ]);
 
@@ -414,10 +470,11 @@ class CommonPage
     public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             $value = $element->getText();
             if ($value === null) {
                 return '';
@@ -431,12 +488,13 @@ class CommonPage
     public function getInputValue($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
             // Read the live `.value` property (works for <textarea> and for
             // values that differ from the initial `value` attribute).
-            $value = $this->getPage()->evaluate(sprintf(
+            $value = $page->evaluate(sprintf(
                 '(function(){var e=document.querySelector(%s);return e?e.value:null;})()',
                 json_encode($selector)
             ))->getReturnValue();
@@ -452,10 +510,11 @@ class CommonPage
     public function navigateTo($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
     {
         try {
+            $page = $this->getPage();
             if ($waitForSelector) {
-                $this->getPage()->waitUntilContainsElement($selector, $timeout);
+                $page->waitUntilContainsElement($selector, $timeout);
             }
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             return $element->click();
         } catch (OperationTimedOut | Exception $e) {
             return false;
@@ -464,8 +523,10 @@ class CommonPage
 
     public function click($selector, $nth = 1)
     {
+        $page = $this->getPage();
+
         try {
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             if ($element !== null) {
                 return $element->click();
             }
@@ -474,7 +535,7 @@ class CommonPage
             // sub-link): fall back to a JS click, which navigates regardless.
         }
 
-        return $this->getPage()->evaluate(sprintf(
+        return $page->evaluate(sprintf(
             '(function(){var e=document.querySelector(%s);if(e){e.click();return true;}return false;})()',
             json_encode($selector)
         ))->getReturnValue();
@@ -483,6 +544,12 @@ class CommonPage
     public function leftClick($selector, $nth = 1)
     {
         return $this->getPage()->mouse()->find($selector, $nth)->click();
+    }
+
+    public function clickAndWaitReload($selector, $nth = 1): void
+    {
+        $this->click($selector, $nth);
+        $this->waitForPageReload();
     }
 
     public function waitForPageReload()
@@ -605,8 +672,10 @@ class CommonPage
 
         $textContent = $this->getInputValue($selector);
 
+        $page = $this->getPage();
+
         if ($textContent !== null && $textContent !== '') {
-            $element = $this->getPage()->dom()->querySelector($selector);
+            $element = $page->dom()->querySelector($selector);
             if ($element !== null) {
                 // Clear the input value
                 $element->setAttributeValue('value', '');
@@ -614,8 +683,8 @@ class CommonPage
         }
 
         // Alternatively, you can use the keyboard to delete the text
-        // $this->getPage()->keyboard()->typeRawKey('Del'); // Delete key
-        $this->getPage()->keyboard()->typeText($value);
+        // $page->keyboard()->typeRawKey('Del'); // Delete key
+        $page->keyboard()->typeText($value);
         // or
         // $element->sendKeys($value);
     }
@@ -637,6 +706,66 @@ class CommonPage
         }
 
         return true;
+    }
+
+    public function waitUntil(callable $condition, int $timeout = 10000, string $message = 'Condition was not met.'): void
+    {
+        $deadline = microtime(true) + ($timeout / 1000);
+        $interval = 100000; // 100ms
+
+        while (true) {
+            if ($condition()) {
+                return;
+            }
+
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0) {
+                break;
+            }
+
+            // Cap the sleep so we don't overshoot the deadline.
+            usleep((int) min($interval, $remaining * 1_000_000));
+        }
+
+        throw new TimeoutException($message);
+    }
+
+    public function waitVisible($selector, int $timeout = 10000, ?string $message = null): void
+    {
+        $this->waitUntil(
+            fn () => $this->isVisible($selector, 100),
+            $timeout,
+            $message ?? sprintf('Element did not become visible: %s', $selector)
+        );
+    }
+
+    public function waitHidden($selector, int $timeout = 10000, ?string $message = null): void
+    {
+        $this->waitUntil(
+            fn () => !$this->isVisible($selector, 100),
+            $timeout,
+            $message ?? sprintf('Element did not become hidden: %s', $selector)
+        );
+    }
+
+    public function waitForText(string $text, int $timeout = 10000, string $selector = 'body', ?string $message = null): void
+    {
+        $waitForSelector = true;
+
+        $this->waitUntil(
+            function () use ($selector, $text, &$waitForSelector) {
+                $content = $this->getTextContent($selector, 1, $waitForSelector, 100);
+                // Only wait for the selector on the first poll; subsequent
+                // polls only care about the text content.
+                $waitForSelector = false;
+
+                // getTextContent returns false on timeout and '' when the
+                // element has no text yet — is_string filters out the false.
+                return is_string($content) && str_contains($content, $text);
+            },
+            $timeout,
+            $message ?? sprintf('Text did not appear in %s: %s', $selector, $text)
+        );
     }
 
     public function isVisible($selector, $timeout = 1000)

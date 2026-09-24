@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Command;
 use Error;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
+use PrestaFlow\Library\Utils\OutputStates;
 use PrestaFlow\Library\Reports\JUnitReport;
 use PrestaFlow\Library\Reports\TestRunSummary;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -21,7 +22,7 @@ use Symfony\Component\Console\Output\OutputInterface;
     hidden: false,
     aliases: ['run-test']
 )]
-class ExecuteSuite extends Command
+class ExecuteSuite extends Command implements OutputStates
 {
     protected $io;
     protected $output;

@@ -6,7 +6,7 @@ use PrestaFlow\Library\Utils\Env;
 
 trait Version
 {
-    const SUPPORTED_VERSIONS = [
+    private static array $supportedVersions = [
         '1.7',
         '8',
         '9'
@@ -71,7 +71,7 @@ trait Version
 
     public function isVersionSupported()
     {
-        if (in_array($this->getMajorVersion(), self::SUPPORTED_VERSIONS)) {
+        if (in_array($this->getMajorVersion(), self::$supportedVersions)) {
             return true;
         }
 

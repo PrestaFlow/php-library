@@ -19,12 +19,13 @@ use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
+use PrestaFlow\Library\Utils\OutputStates;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\ErrorHandler\Error\FatalError;
 use Throwable;
 use UnexpectedValueException;
 
-class TestsSuite
+class TestsSuite implements OutputStates
 {
     use Locale;
     use Version;
@@ -98,6 +99,40 @@ class TestsSuite
     }
 
     /**
+     * Sérialise la tranche de self::$visualResults produite pendant l'exécution
+     * du test courant (de $startIndex jusqu'à la fin) au format attendu dans
+     * results.json (cf. spec MVP2, section « results.json — nouveau bloc »).
+     *
+     * `actual_relpath` / `diff_relpath` ne sont renseignés que pour un statut
+     * `fail` (seul cas où l'action CI a besoin d'uploader ces fichiers) ;
+     * `null` pour `baseline`/`pass`.
+     *
+     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, actual_relpath: ?string, diff_relpath: ?string}>
+     */
+    private static function buildVisualBlock(int $startIndex): array
+    {
+        $slice = array_slice(self::$visualResults, $startIndex);
+
+        return array_map(static function (array $raw): array {
+            $needsFiles = $raw['status'] === 'fail';
+
+            return [
+                'name' => $raw['name'],
+                'tag' => $raw['tag'] ?? null,
+                'status' => $raw['status'],
+                'score' => $raw['score'],
+                'threshold' => $raw['threshold'],
+                'actual_relpath' => ($needsFiles && !empty($raw['actual']))
+                    ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', basename($raw['actual']))
+                    : null,
+                'diff_relpath' => ($needsFiles && !empty($raw['diff']))
+                    ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('diff', basename($raw['diff']))
+                    : null,
+            ];
+        }, $slice);
+    }
+
+    /**
      * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
      * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
      */
@@ -111,6 +146,13 @@ class TestsSuite
      * cookies et JS state conservés — ce qui économise ~3s par navigation.
      */
     public static ?string $currentContext = null;
+
+    /**
+     * Navigateur déjà connecté et URI du socket associé : sans cette mémoïsation,
+     * getBrowser() rouvre une WebSocket et un handshake CDP par appel.
+     */
+    protected static $browserInstance = null;
+    protected static ?string $browserInstanceSocket = null;
 
     protected $draft = false;
     protected $groups = 'all';
@@ -378,6 +420,19 @@ class TestsSuite
             }
         }
 
+        // Socket disparu/changé ou navigateur mort : le cache est périmé. isConnected()
+        // ne lit que l'état local de la socket, sans aller-retour CDP.
+        if (self::$browserInstance !== null) {
+            if ($socket !== null
+                && self::$browserInstanceSocket === $socket
+                && self::$browserInstance->getConnection()->isConnected()) {
+                return self::$browserInstance;
+            }
+
+            self::$browserInstance = null;
+            self::$browserInstanceSocket = null;
+        }
+
         try {
             if ($socket === null) {
                 if (!$force) {
@@ -413,7 +468,8 @@ class TestsSuite
             for ($attempt = 0; $attempt < 3; $attempt++) {
                 try {
                     $browser = (new BrowserFactory())->createBrowser($options);
-                    \file_put_contents($socketFile, $browser->getSocketUri());
+                    $socket = $browser->getSocketUri();
+                    \file_put_contents($socketFile, $socket);
                     $lastError = null;
                     break;
                 } catch (\Throwable $e2) {
@@ -427,6 +483,9 @@ class TestsSuite
             }
         }
 
+        self::$browserInstance = $browser;
+        self::$browserInstanceSocket = $socket;
+
         return $browser;
     }
 
@@ -437,23 +496,25 @@ class TestsSuite
         // getTargetInfo() on null ». On réessaie quelques fois avant d'échouer.
         for ($try = 1; ; $try++) {
             try {
-                $pages = TestsSuite::getBrowser()?->getPages();
-                $createdNew = false;
+                // Un seul getBrowser() et une seule énumération par tentative : on ne
+                // réénumère qu'après un createPage() effectif.
+                $browser = TestsSuite::getBrowser();
+                $pages = $browser?->getPages();
+
                 if (count($pages) == 0) {
-                    TestsSuite::getBrowser()?->createPage();
-                    $createdNew = true;
-                }
+                    $browser?->createPage();
 
-                // Si on vient de créer la page (aucune n'existait), les en-têtes
-                // persistants (ex. Authorization Basic Auth) doivent y être appliqués
-                // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
-                // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
-                // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
-                if ($createdNew) {
+                    // Si on vient de créer la page (aucune n'existait), les en-têtes
+                    // persistants (ex. Authorization Basic Auth) doivent y être appliqués
+                    // AVANT que le consommateur n'y navigue. Sans ça, un goToUrl() ferait
+                    // sa navigation sans Basic Auth → 401 → chrome-error. Les chemins
+                    // via goToPage font déjà applyExtraHttpHeaders eux-mêmes.
                     TestsSuite::applyExtraHttpHeaders();
+
+                    $pages = $browser?->getPages();
                 }
 
-                return TestsSuite::getBrowser()?->getPages()[0];
+                return $pages[0];
             } catch (\Throwable $e) {
                 if ($try >= 3) {
                     throw $e;
@@ -503,6 +564,12 @@ class TestsSuite
         // n'applique pas aux requêtes XHR ni toujours aux redirections.
         $this->presetBasicAuth();
 
+        // 2b) En-têtes HTTP arbitraires depuis l'environnement (PRESTAFLOW_EXTRA_HEADERS,
+        // JSON objet). Utiles pour un bypass WAF/CDN (Cloudflare WAF Skip rule via
+        // `X-CI-Bypass: <secret>`), du request tracing (`X-Request-Id`), etc.
+        // Posés APRÈS Basic Auth pour pouvoir les surcharger si besoin.
+        $this->presetExtraHeadersFromEnv();
+
         // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
         // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
         // consentement (RGPD) sur un environnement protégé/preprod.
@@ -548,6 +615,66 @@ class TestsSuite
 
         // Applique sur la page courante (première navigation).
         TestsSuite::applyExtraHttpHeaders();
+    }
+
+    /**
+     * En-têtes HTTP arbitraires depuis l'environnement PRESTAFLOW_EXTRA_HEADERS.
+     *
+     * Format : objet JSON `{"Header-Name": "value", ...}`. Chaque paire est
+     * fusionnée dans self::$extraHttpHeaders — donc appliquée à toutes les
+     * requêtes (navigation top-level, sous-ressources, XHR) et réappliquée
+     * après chaque recreatePage(). Mêmes garanties que presetBasicAuth().
+     *
+     * Cas d'usage :
+     *  - Bypass WAF/CDN (ex. Cloudflare WAF Skip rule : `X-CI-Bypass: <secret>`)
+     *  - Request tracing (`X-Request-Id`, `X-CI-Run: <id>`)
+     *  - En-têtes spécifiques d'un edge (Netlify, Vercel, etc.)
+     *
+     * Best-effort : JSON invalide → warning stderr, on n'interrompt pas le
+     * bootstrap. Les clés non-string ou valeurs non-string sont ignorées.
+     */
+    protected function presetExtraHeadersFromEnv(): void
+    {
+        $raw = $_ENV['PRESTAFLOW_EXTRA_HEADERS'] ?? null;
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            fwrite(STDERR, "[PrestaFlow] PRESTAFLOW_EXTRA_HEADERS: JSON invalide, ignoré.\n");
+            return;
+        }
+
+        $added = [];
+        foreach ($decoded as $name => $value) {
+            if (!is_string($name) || $name === '' || !is_scalar($value)) {
+                continue;
+            }
+            $added[$name] = (string) $value;
+        }
+        if ($added === []) {
+            return;
+        }
+
+        // Merge : on préserve les en-têtes déjà posés (ex. Authorization par
+        // presetBasicAuth). L'ordre d'appel dans before() fait que Basic Auth
+        // gagne — sauf si l'utilisateur redéfinit explicitement 'Authorization'
+        // dans PRESTAFLOW_EXTRA_HEADERS (surcharge volontaire).
+        TestsSuite::$extraHttpHeaders = array_merge(TestsSuite::$extraHttpHeaders, $added);
+
+        // Même chemin d'application que Basic Auth : au niveau de la connexion
+        // pour héritage par chaque nouvelle page, puis sur la page courante.
+        $browser = TestsSuite::getBrowser(force: false);
+        if ($browser) {
+            try {
+                $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+
+            TestsSuite::applyExtraHttpHeaders();
+        }
     }
 
     /**
@@ -896,6 +1023,8 @@ class TestsSuite
             $this->tests = $tests;
 
             foreach ($this->tests as &$test) {
+                $visualStartIndex = count(self::$visualResults);
+
                 try {
                     $startTime = hrtime(true);
 
@@ -943,6 +1072,7 @@ class TestsSuite
                     Expect::getNbAssertions();
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
+                    $test['visual'] = self::buildVisualBlock($visualStartIndex);
 
                     match ($test['state']) {
                         'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),

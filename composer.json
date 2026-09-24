@@ -28,11 +28,18 @@
         "phpunit/phpunit": "^10"
     },
     "require": {
+        "php": "^8.1",
         "chrome-php/chrome": "^1.10",
         "sapientpro/image-comparator": "^1.0",
         "inceddy/image-compare": "^1.0",
-        "symfony/console": "^6.0 || ^7.0",
+        "symfony/console": "^6.0",
         "vlucas/phpdotenv": "^5.6",
-        "symfony/event-dispatcher": "^6.0 || ^7.0"
+        "symfony/event-dispatcher": "^6.0",
+        "smalot/pdfparser": "^2.11"
+    },
+    "config": {
+        "platform": {
+            "php": "8.1.0"
+        }
     }
 }
