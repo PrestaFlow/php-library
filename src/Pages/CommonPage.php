@@ -164,6 +164,103 @@ class CommonPage
         }
     }
 
+    /**
+     * The theme whose selector variants apply to this page.
+     *
+     * Read from the globals rather than from a static trait like Locale: page
+     * constructors call getSelectors() before importPage() could invoke a
+     * setter, so trait-held state would always arrive too late to affect the
+     * merge. $this->globals is assigned on the constructor's first line.
+     */
+    public function getTheme(): string
+    {
+        $theme = $this->globals['THEME'] ?? '';
+
+        return is_string($theme) && $theme !== '' ? $theme : 'classic';
+    }
+
+    public function setTheme(string $theme): void
+    {
+        $this->globals['THEME'] = $theme;
+    }
+
+    /** Set by tests to point the theme loader at fixtures. */
+    public array $themeDirs = [];
+
+    /** The last missing-theme warning, kept so callers can surface it. */
+    public string $lastThemeWarning = '';
+
+    /**
+     * Directories searched for <theme>.json, least specific first.
+     *
+     * The library's own themes, then the consuming project's — so a project can
+     * correct or extend what the library ships without forking it. Mirrors the
+     * root that Tests/Selectors/<locale>.json is already read from.
+     */
+    protected function themeDirectories(): array
+    {
+        if ($this->themeDirs !== []) {
+            return $this->themeDirs;
+        }
+
+        return [
+            __DIR__ . '/../Themes',
+            __DIR__ . '/../../../../../Tests/Themes',
+        ];
+    }
+
+    /**
+     * Selector overrides for the current theme.
+     *
+     * Classic gets no special case: the loader looks for classic.json like it
+     * would for any other theme, finds nothing, and the caller keeps the base
+     * map — which already IS Classic. That is what makes "Classic by default" a
+     * structural property rather than a branch.
+     */
+    protected function getThemeSelectors(array $pageNames): array
+    {
+        $theme = $this->getTheme();
+        $selectors = [];
+        $found = false;
+
+        foreach ($this->themeDirectories() as $dir) {
+            $path = rtrim($dir, '/') . '/' . $theme . '.json';
+            if (!file_exists($path)) {
+                continue;
+            }
+
+            $found = true;
+            $decoded = json_decode(file_get_contents($path), true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            // Same walk as the locale catalog: descend one level per page-name
+            // segment, skipping the trailing "Page".
+            foreach ($pageNames as $pageName) {
+                if ($pageName === 'Page') {
+                    continue;
+                }
+                $decoded = is_array($decoded) && isset($decoded[$pageName]) ? $decoded[$pageName] : [];
+            }
+
+            if (is_array($decoded)) {
+                $selectors = [...$selectors, ...$decoded];
+            }
+        }
+
+        // Silence here would recreate the failure mode this whole mechanism
+        // exists to remove: a suite that looks like it ran and proved nothing.
+        if (!$found && $theme !== 'classic') {
+            $this->lastThemeWarning = sprintf(
+                'No selector file found for theme "%s"; falling back to the Classic base selectors.',
+                $theme
+            );
+        }
+
+        return $selectors;
+    }
+
     public function getGlobal($index)
     {
         $globals = $this->getGlobals();
@@ -359,7 +456,10 @@ class CommonPage
         // partir sans les en-têtes si la page courante n'a jamais été (re)configurée
         // → 401 → chrome-error://. Idempotent, no-op sans en-têtes définis.
         \PrestaFlow\Library\Tests\TestsSuite::applyExtraHttpHeaders();
-        $this->getPage()->navigate($url)->waitForNavigation();
+        // DOM_CONTENT_LOADED (au lieu du LOAD par défaut) : on n'attend pas les
+        // assets tardifs (images, tracking, iframes). Les getters ont chacun leur
+        // waitUntilContainsElement, donc c'est safe pour la majorité des cas.
+        $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
     }
 
     public function waitForPageLoaded()
@@ -461,6 +561,71 @@ class CommonPage
             $this->getPage()->waitForReload(\HeadlessChromium\Page::LOAD, 10000);
         } catch (\Throwable $e) {
         }
+    }
+
+    /**
+     * Poll a JS expression until it is truthy or the timeout expires.
+     *
+     * Complements waitForPageReload() (navigation) and elementIsVisible()
+     * (presence) with a wait on *state*: a section that finished rendering over
+     * AJAX, a button that lost its disabled attribute. Returns whether the
+     * condition was met, so callers choose between asserting and branching.
+     *
+     * @param string $jsExpression a single JS *expression* (no statements, no
+     *                             trailing `//` comments), evaluated for
+     *                             truthiness; it is spliced into an expression
+     *                             position, so a malformed one is a parse error
+     *                             that surfaces as a thrown exception rather than
+     *                             a `false` return
+     * @param int    $timeout      total budget in milliseconds
+     * @param int    $interval     delay between two polls, in milliseconds
+     */
+    public function waitForCondition(string $jsExpression, int $timeout = 10000, int $interval = 200): bool
+    {
+        $deadline = microtime(true) + ($timeout / 1000);
+        $interval = max(1, $interval);
+
+        $everPolled = false;
+        $lastError = null;
+
+        do {
+            try {
+                // The expression is wrapped in its own try/catch: a TypeError on a
+                // node that is not in the DOM yet means "not ready", not "failed".
+                // This only catches runtime errors: a parse error in $jsExpression
+                // fails the whole script and is caught below instead.
+                $remaining = max(1, (int) (($deadline - microtime(true)) * 1000));
+                $met = $this->getPage()->evaluate(
+                    '(function(){try{return !!(' . $jsExpression . ');}catch(e){return false;}})()'
+                )->getReturnValue($remaining);
+
+                $everPolled = true;
+
+                if ($met === true) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // The page is busy (navigation in flight, target detached): retry
+                // until the deadline rather than failing the whole step. But if
+                // every single poll fails this way, it is far more likely a
+                // malformed $jsExpression (parse error) than a transient blip, so
+                // it gets rethrown below instead of masquerading as a timeout.
+                $lastError = $e;
+            }
+
+            $remainingBeforeSleep = $deadline - microtime(true);
+            if ($remainingBeforeSleep <= 0) {
+                break;
+            }
+
+            usleep((int) min($interval * 1000, $remainingBeforeSleep * 1000000));
+        } while (microtime(true) < $deadline);
+
+        if (!$everPolled && $lastError !== null) {
+            throw $lastError;
+        }
+
+        return false;
     }
 
     public function selectOption($selector, $value)
@@ -671,6 +836,7 @@ class CommonPage
 
         $mergedSelectors = [
             ...$baseSelectors,
+            ...$this->getThemeSelectors($pageNames),
             ...$customSelectors,
             ...$specificSelectors,
         ];

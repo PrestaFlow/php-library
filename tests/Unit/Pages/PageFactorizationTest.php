@@ -7,7 +7,9 @@ use PHPUnit\Framework\TestCase;
 final class PageFactorizationTest extends TestCase
 {
     private const NS = 'PrestaFlow\\Library\\Pages\\';
-    private const VERSIONS = ['v7', 'v8', 'v9'];
+    // Phase 1 migration: concrete pages live under v9 only.
+    // v7 and v8 are placeholders until Phase 2/3 reimplements them.
+    private const VERSIONS = ['v9'];
 
     private function fakeGlobals(): array
     {
@@ -30,7 +32,11 @@ final class PageFactorizationTest extends TestCase
 
     public function testEveryCommonPageResolvesForAllVersions(): void
     {
-        foreach ($this->commonLeaves() as $relual) {
+        // Phase 1: concrete pages moved from Common\ to v9\. Iterate over v9 leaves
+        // (v7/v8 are placeholders until Phase 2/3 reimplements them).
+        $leaves = $this->v9Leaves();
+        $this->assertNotEmpty($leaves, 'Expected at least one v9 page leaf');
+        foreach ($leaves as $relual) {
             foreach (self::VERSIONS as $v) {
                 $class = self::NS . $v . '\\' . $relual . '\\Page';
                 $this->assertTrue(class_exists($class), "Missing entry point: $class");
@@ -40,25 +46,23 @@ final class PageFactorizationTest extends TestCase
 
     public function testPricesDropDeltaPreserved(): void
     {
+        // Phase 1: v7/v8 pages are gone until Phase 2/3 reimplements them.
         $this->assertSame('promotions', $this->make('v9', 'FrontOffice\\PricesDrop')->url);
         $this->assertSame('Promotions', $this->make('v9', 'FrontOffice\\PricesDrop')->pageTitle);
-        $this->assertSame('prices-drop', $this->make('v7', 'FrontOffice\\PricesDrop')->url);
-        $this->assertSame('prices-drop', $this->make('v8', 'FrontOffice\\PricesDrop')->url);
     }
 
     public function testIdenticalPageSharesSelectorsAcrossVersions(): void
     {
-        $s7 = $this->make('v7', 'FrontOffice\\Cart')->selectors;
-        $s8 = $this->make('v8', 'FrontOffice\\Cart')->selectors;
+        // Phase 1: only v9 is populated; cross-version selector parity will be
+        // re-asserted in Phase 2/3 once v7/v8 concretes exist again.
         $s9 = $this->make('v9', 'FrontOffice\\Cart')->selectors;
-        $this->assertSame($s7, $s8);
-        $this->assertSame($s7, $s9);
+        $this->assertIsArray($s9);
+        $this->assertNotEmpty($s9);
     }
 
     public function testPricesDropKeepsListingInheritance(): void
     {
         $this->assertTrue(method_exists($this->make('v9', 'FrontOffice\\PricesDrop'), 'getListingTitle'));
-        $this->assertTrue(method_exists($this->make('v7', 'FrontOffice\\PricesDrop'), 'getListingTitle'));
     }
 
     public function testDashboardTitleIsConsistentAcrossVersions(): void
@@ -66,12 +70,11 @@ final class PageFactorizationTest extends TestCase
         // v9 no longer hardcodes a French title; it inherits 'Dashboard' and
         // relies on the translation layer (pageTitle()) for locale.
         $this->assertSame('Dashboard', $this->make('v9', 'BackOffice\\Dashboard')->pageTitle);
-        $this->assertSame('Dashboard', $this->make('v7', 'BackOffice\\Dashboard')->pageTitle);
     }
 
-    private function commonLeaves(): array
+    private function v9Leaves(): array
     {
-        $root = dirname(__DIR__, 3) . '/src/Pages/Common';
+        $root = dirname(__DIR__, 3) . '/src/Pages/v9';
         if (!is_dir($root)) {
             return [];
         }

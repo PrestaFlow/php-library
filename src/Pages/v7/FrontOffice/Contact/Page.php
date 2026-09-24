@@ -2,8 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v7\FrontOffice\Contact;
 
-use PrestaFlow\Library\Pages\Common\FrontOffice\Contact\Page as BasePage;
+use PrestaFlow\Library\Pages\v9\FrontOffice\Contact\Page as V9Page;
 
-class Page extends BasePage
+class Page extends V9Page
 {
 }

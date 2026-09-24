@@ -1,0 +1,39 @@
+{
+  "planPath": "docs/superpowers/plans/2026-09-23-theme-aware-selectors.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Theme resolution",
+      "status": "completed",
+      "description": "**Goal:** A configured theme name reaches every page object, overridable per suite or scenario.\n\n**Files:**\n- Modify: src/Tests/TestsSuite.php, src/Traits/ImportPage.php, src/Pages/CommonPage.php\n- Test: tests/Unit/Pages/ThemeSelectorsTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter ThemeSelectors\n\n```json:metadata\n{\"files\": [\"src/Tests/TestsSuite.php\", \"src/Traits/ImportPage.php\", \"src/Pages/CommonPage.php\", \"tests/Unit/Pages/ThemeSelectorsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter ThemeSelectors\", \"acceptanceCriteria\": [\"PRESTAFLOW_THEME populates globals['THEME'], default classic\", \"params['theme'] overrides the global like params['locale'] does\", \"getTheme() returns classic when nothing is set\", \"no static state: theme read from $this->globals\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: The theme merge tier",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** getSelectors() merges <theme>.json over the base map, project file beating library file, warning when a named theme has no file.\n\n**Files:**\n- Modify: src/Pages/CommonPage.php (getSelectors), src/Traits/ImportPage.php\n- Test: tests/Unit/Pages/ThemeSelectorsTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter ThemeSelectors\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"src/Traits/ImportPage.php\", \"tests/Unit/Pages/ThemeSelectorsTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter ThemeSelectors\", \"acceptanceCriteria\": [\"src/Themes/<theme>.json merged over the base map\", \"Tests/Themes/<theme>.json wins over the library file\", \"order: base -> library theme -> project theme -> locale selectors -> customs\", \"classic needs no file and no branch\", \"a named theme with no file warns once and keeps the base map\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Audit the 63 selectors",
+      "status": "completed",
+      "blockedBy": [
+        2
+      ],
+      "description": "**Goal:** Each of the 11 FrontOffice pages holds the exact Classic selector; src/Themes/hummingbird.json holds the Hummingbird one where they differ. No unions left.\n\n**Files:**\n- Create: src/Themes/hummingbird.json\n- Modify: the 11 FrontOffice page objects\n\n**Verify:** covered by Task 4 \u2014 no unit test can tell a right selector from a wrong one\n\n```json:metadata\n{\"files\": [\"src/Themes/hummingbird.json\", \"src/Pages/v9/FrontOffice\"], \"verifyCommand\": \"grep -rn \\\"' =>\\\" src/Pages/v9/FrontOffice --include=Page.php | grep -E \\\"=> *'[^']*, *[.#\\\\[]\\\"\", \"acceptanceCriteria\": [\"every selector checked against both themes\", \"Classic form in the page, Hummingbird form in the JSON\", \"no stopgap union selectors remain\", \"hummingbird.json holds only diverging keys, nested FrontOffice/<Page>\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Validate against both themes",
+      "status": "pending",
+      "blockedBy": [
+        3
+      ],
+      "description": "**Goal:** Prove the audit by running the existing suites against a Hummingbird shop (1) and a Classic shop (2).\n\n**Verify:** every run green, orders confirmed in ps_orders, and the missing-theme warning observed\n\n```json:metadata\n{\"files\": [\"src/Themes/hummingbird.json\", \"src/Pages/v9/FrontOffice\"], \"verifyCommand\": \"./bin/prestaflow run src/Tests/Suites/Scenarios -g opc\", \"acceptanceCriteria\": [\"OPC guest + order and Registration pass on shop 1 with THEME=hummingbird\", \"the same suites pass on shop 2 with THEME=classic\", \"the scenario-level params['theme'] override demonstrably wins\", \"a wrong theme warns and fails visibly rather than passing silently\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-09-23T15:37:43.471623"
+}

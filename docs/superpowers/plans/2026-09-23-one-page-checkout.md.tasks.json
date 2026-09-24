@@ -1,0 +1,70 @@
+{
+  "planPath": "docs/superpowers/plans/2026-09-23-one-page-checkout.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: CommonPage::waitForCondition",
+      "status": "completed",
+      "description": "**Goal:** Reusable helper polling a JS expression until truthy or timeout, so page objects can wait on state instead of navigation.\n\n**Files:**\n- Modify: src/Pages/CommonPage.php\n- Test: tests/Unit/Pages/WaitForConditionTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter WaitForCondition\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"tests/Unit/Pages/WaitForConditionTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter WaitForCondition\", \"acceptanceCriteria\": [\"waitForCondition(string,int,int): bool exists on CommonPage\", \"returns true on first truthy result and stops polling\", \"returns false when the timeout expires\", \"a JS error or an evaluate() exception counts as not-yet-true\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: FrontOffice OnePageCheckout page object",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** Page object exposing the OPC as intent-level methods, each waiting on the state its AJAX round-trip produces.\n\n**Files:**\n- Create: src/Pages/v9/FrontOffice/OnePageCheckout/Page.php\n- Test: tests/Unit/Pages/OnePageCheckoutPageTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutPage\n\n```json:metadata\n{\"files\": [\"src/Pages/v9/FrontOffice/OnePageCheckout/Page.php\", \"tests/Unit/Pages/OnePageCheckoutPageTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutPage\", \"acceptanceCriteria\": [\"extends Common\\\\FrontOffice\\\\Page, url 'order', pageTitle 'Checkout'\", \"methods: isOnePageCheckoutActive, continueAsGuest, selectAddress, fillNewAddress, selectFirstCarrier, selectFirstPayment, acceptTerms, placeOrder\", \"no sleep(): every AJAX wait goes through waitForCondition()\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: BackOffice CheckoutLayout page object",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** Switch the shop between one-page and four-page checkout from the module configuration, confirmation modal included.\n\n**Files:**\n- Create: src/Pages/v9/BackOffice/CheckoutLayout/Page.php\n\n**Verify:** php -l on the file, then class_exists check\n\n```json:metadata\n{\"files\": [\"src/Pages/v9/BackOffice/CheckoutLayout/Page.php\"], \"verifyCommand\": \"php -l src/Pages/v9/BackOffice/CheckoutLayout/Page.php\", \"acceptanceCriteria\": [\"goTo() navigates via #subtab-AdminParentThemes then #subtab-AdminPsOnePageCheckout\", \"switchToOnePageCheckout/switchToFourPageCheckout select the radio, save and confirm in the modal\", \"the maintenance toggle is never clicked\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: BackOffice OrderSettings page object",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** Turn guest checkout on or off from Shop Parameters > Order Settings.\n\n**Files:**\n- Create: src/Pages/v9/BackOffice/OrderSettings/Page.php\n\n**Verify:** php -l on the file, then class_exists check\n\n```json:metadata\n{\"files\": [\"src/Pages/v9/BackOffice/OrderSettings/Page.php\"], \"verifyCommand\": \"php -l src/Pages/v9/BackOffice/OrderSettings/Page.php\", \"acceptanceCriteria\": [\"goTo() navigates via #subtab-AdminParentOrderPreferences then #subtab-AdminOrderPreferences\", \"setGuestCheckout(bool) selects the matching radio and saves\", \"isGuestCheckoutEnabled() reports the current state\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: OnePageCheckoutOrder scenario (logged-in)",
+      "status": "completed",
+      "blockedBy": [
+        2,
+        3
+      ],
+      "description": "**Goal:** Scenario switching the shop to the one-page layout and placing an order as a logged-in customer, skipping cleanly below 9.2.\n\n**Files:**\n- Create: src/Scenarios/OnePageCheckoutOrder.php\n- Create: src/Tests/Suites/Scenarios/OnePageCheckoutOrder.php\n- Test: tests/Unit/Scenarios/OnePageCheckoutOrderTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutOrder\n\n```json:metadata\n{\"files\": [\"src/Scenarios/OnePageCheckoutOrder.php\", \"src/Tests/Suites/Scenarios/OnePageCheckoutOrder.php\", \"tests/Unit/Scenarios/OnePageCheckoutOrderTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutOrder\", \"acceptanceCriteria\": [\"params declare locale, customerEmail, customerPassword, productUrl, cartQuantity\", \"below 9.2 the scenario produces exactly one skipped test and touches no page\", \"on 9.2+ it logs into BO, switches layout, logs into FO, orders and asserts the confirmation\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: OnePageCheckoutGuest scenario",
+      "status": "completed",
+      "blockedBy": [
+        2,
+        3,
+        4
+      ],
+      "description": "**Goal:** Same checkout as a guest: enable guest checkout, fill the contact e-mail and the inline address form, place the order.\n\n**Files:**\n- Create: src/Scenarios/OnePageCheckoutGuest.php\n- Create: src/Tests/Suites/Scenarios/OnePageCheckoutGuest.php\n- Test: tests/Unit/Scenarios/OnePageCheckoutGuestTest.php\n\n**Verify:** vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutGuest\n\n```json:metadata\n{\"files\": [\"src/Scenarios/OnePageCheckoutGuest.php\", \"src/Tests/Suites/Scenarios/OnePageCheckoutGuest.php\", \"tests/Unit/Scenarios/OnePageCheckoutGuestTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit --testsuite Unit --filter OnePageCheckoutGuest\", \"acceptanceCriteria\": [\"params declare locale, guestEmail, firstName, lastName, address fields, productUrl, cartQuantity\", \"same 9.2 version guard as Task 5\", \"enables guest checkout and the one-page layout before the front-office steps\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: End-to-end validation against the 9.2 shop",
+      "status": "completed",
+      "blockedBy": [
+        5,
+        6
+      ],
+      "description": "**Goal:** Run both suites against the live PrestaShop 9.2.0 container (localhost:8092) and fix whatever the real DOM disagrees with.\n\n**Files:**\n- Create: .env.opc (untracked)\n- Modify as needed: the page objects from Tasks 2-4\n\n**Verify:** ./bin/prestaflow run src/Tests/Suites/Scenarios/OnePageCheckoutOrder.php and the guest suite, both fully green\n\n```json:metadata\n{\"files\": [\"src/Pages/v9/FrontOffice/OnePageCheckout/Page.php\", \"src/Pages/v9/BackOffice/CheckoutLayout/Page.php\", \"src/Pages/v9/BackOffice/OrderSettings/Page.php\"], \"verifyCommand\": \"./bin/prestaflow run src/Tests/Suites/Scenarios/OnePageCheckoutOrder.php\", \"acceptanceCriteria\": [\"both suites reach the order confirmation against localhost:8092\", \"one new row per run in ps_orders\", \"selector corrections land in the page objects, not worked around in the scenarios\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-09-23T14:31:41.577246"
+}

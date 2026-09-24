@@ -17,6 +17,11 @@ trait ImportPage
         if (isset($this->params['locale']) && is_string($this->params['locale'])) {
             $globals['LOCALE'] = $this->params['locale'];
         }
+        if (isset($this->params['theme']) && is_string($this->params['theme'])) {
+            // Mirrors the locale override above. Matters on multistore, where
+            // two shops of one installation can run different themes.
+            $globals['THEME'] = $this->params['theme'];
+        }
         if (isset($this->params['useIsoCode'])) {
             $globals['PREFIX_LOCALE'] = (bool) $this->params['useIsoCode'];
         }
@@ -49,5 +54,10 @@ trait ImportPage
         $pageVarName = lcfirst(str_replace('\\', '', ucwords($pageName, '\\'))).'Page';
 
         $this->pages[$pageVarName] = $pageInstance;
+
+        // One line, once per page: a misconfigured theme must not be silent.
+        if ($pageInstance->lastThemeWarning !== '') {
+            fwrite(STDERR, $pageInstance->lastThemeWarning . PHP_EOL);
+        }
     }
 }

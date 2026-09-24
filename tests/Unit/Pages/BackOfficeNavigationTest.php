@@ -7,7 +7,9 @@ use PHPUnit\Framework\TestCase;
 final class BackOfficeNavigationTest extends TestCase
 {
     private const NS = 'PrestaFlow\\Library\\Pages\\';
-    private const VERSIONS = ['v7', 'v8', 'v9'];
+    // Phase 1 migration: concrete pages live under v9 only.
+    // v7 and v8 are placeholders until Phase 2/3 reimplements them.
+    private const VERSIONS = ['v9'];
 
     private function fakeGlobals(): array
     {

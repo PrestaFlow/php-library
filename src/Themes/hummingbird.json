@@ -1,0 +1,28 @@
+{
+    "FrontOffice": {
+        "Home": {
+            "homePageSection": "#content.page-content--home",
+            "desktopLogo": ".header-bottom__logo",
+            "allProductsLink": ".ps-featuredproducts .module-products__buttons a"
+        },
+        "Product": {
+            "addToCartButton": ".product__add-to-cart-button",
+            "currentProductPrice": ".product__price",
+            "modalTitle": ".blockcart-modal__title"
+        },
+        "Listing": {
+            "productArticle": "#js-product-list .products article:nth-child(${index})"
+        },
+        "Login": {
+            "alertDangerTextBlock": ".login__form-wrapper .help-block .alert-danger",
+            "logoutLink": ".ps-customersignin a[href*=\"mylogout\"]"
+        },
+        "Checkout": {
+            "guestToggle": "#checkout-personal-information-step button[data-bs-target=\"#checkout-guest-form\"]"
+        },
+        "OrderConfirmation": {
+            "confirmationBlock": "body#order-confirmation",
+            "orderReference": ".order-confirmation__details-list li:first-child"
+        }
+    }
+}

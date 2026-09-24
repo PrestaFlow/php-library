@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Pages;
 
 use Exception;
 use HeadlessChromium\Exception\OperationTimedOut;
+use HeadlessChromium\Page as DomPage;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Translations;
@@ -53,8 +54,8 @@ class FrontOfficePage extends CommonPage
         $attempts = 3;
         for ($try = 1; ; $try++) {
             try {
-                TestsSuite::recreatePage();
-                $this->getPage()->navigate($url)->waitForNavigation();
+                TestsSuite::recreatePageIfContextChanged('FO');
+                $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
                 break;
             } catch (\Throwable $e) {
                 if ($try >= $attempts) {
@@ -64,14 +65,21 @@ class FrontOfficePage extends CommonPage
             }
         }
 
+        // Check anti-« [Debug] This page has moved » : évalue une expression JS
+        // au lieu de faire un snapshot DOM complet via getTextContent('body') —
+        // qui coûtait ~2s par navigation sur une home PS chargée.
         try {
-            $bodyContent = $this->getTextContent('body');
-            Expect::that($bodyContent, true)->notContains('[Debug] This page has moved');
+            $hasDebugMoved = $this->getPage()
+                ->evaluate("!!(document.body && document.body.innerText && document.body.innerText.indexOf('[Debug] This page has moved') !== -1)")
+                ->getReturnValue();
+            if ($hasDebugMoved) {
+                Expect::setWarning('debug-mode');
+                $this->click('a');
+                $this->waitForNavigation();
+            }
         } catch (OperationTimedOut | Exception $e) {
             Expect::setWarning('debug-mode');
-
             $this->click('a');
-
             $this->waitForNavigation();
         }
     }
@@ -125,8 +133,18 @@ class FrontOfficePage extends CommonPage
         // la page pour partir sur une session FrontOffice propre (utile pour ne
         // pas hériter des cookies BackOffice) avant d'atteindre une URL absolue.
         // recreatePage() se charge de réappliquer les en-têtes persistants.
-        TestsSuite::recreatePage();
-        $this->getPage()->navigate($url)->waitForNavigation();
+        TestsSuite::recreatePageIfContextChanged('FO');
+        $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
+    }
+
+    public function goToUrlInPlace(string $url)
+    {
+        // Navigation sans recréation de page : conserve la session (cookies, JS
+        // state) de la page courante. À utiliser pour un scénario multi-étapes
+        // qui reste en FrontOffice (ex. home → fiche produit dont l'URL est lue
+        // depuis la home). Préférer goToUrl() quand on veut repartir d'une
+        // session propre (ex. après du BackOffice).
+        parent::goToUrl($url);
     }
 
     public function getTitle()

@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Pages;
 
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Urls;
+use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
 
 class BackOfficePage extends CommonPage
@@ -37,7 +38,11 @@ class BackOfficePage extends CommonPage
         }
 
         $url = $this->getPageURL($page, $params);
-        $this->getPage()->navigate($url)->waitForNavigation();
+        // Bascule contextuelle : ne recrée la page que si on arrive depuis le
+        // FrontOffice (ou au 1er appel) — évite un close+createPage inutile
+        // pour deux navigations BO consécutives.
+        TestsSuite::recreatePageIfContextChanged('BO');
+        $this->getPage()->navigate($url)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED);
     }
 
     public function getPageURL($page, $params = null): string
@@ -73,6 +78,32 @@ class BackOfficePage extends CommonPage
         }
 
         return $url;
+    }
+
+    /**
+     * Put the back office in a single shop context.
+     *
+     * With the multistore feature on, the back office starts in an "All stores"
+     * context, and several pages refuse to render their form there — the
+     * ps_onepagecheckout configuration among them, which shows "Note that this
+     * page is available in a single shop context only" and nothing else. A test
+     * that does not switch context fails on a missing selector with no clue as
+     * to why.
+     *
+     * setShopContext is PrestaShop's own switch and persists in the employee
+     * session, so one call covers every page visited afterwards. On a shop
+     * without multistore it is simply ignored.
+     */
+    public function setSingleShopContext(int $idShop = 1): void
+    {
+        $url = $this->getGlobals()['BO']['URL'];
+        if (!str_ends_with($url, '/')) {
+            $url .= '/';
+        }
+
+        $this->getPage()
+            ->navigate($url . '?setShopContext=s-' . $idShop)
+            ->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED);
     }
 
     public function goToSubMenu(string $parentSelector, string $linkSelector): void

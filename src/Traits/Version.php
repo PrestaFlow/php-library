@@ -2,6 +2,8 @@
 
 namespace PrestaFlow\Library\Traits;
 
+use PrestaFlow\Library\Utils\Env;
+
 trait Version
 {
     private static array $supportedVersions = [
@@ -15,6 +17,57 @@ trait Version
         'minorVersion' => null,
         'majorVersion' => null,
     ];
+
+    /**
+     * Fluent override set via onVersion(); wins over the $psVersion property and env.
+     */
+    protected ?string $psVersionOverride = null;
+
+    /**
+     * Pin a specific PrestaShop version for this suite. Fluent, chainable.
+     * Overrides the $psVersion property and the PRESTAFLOW_PS_VERSION env variable.
+     */
+    public function onVersion(string $version): self
+    {
+        if (!preg_match('/^\d+\.\d+(\.\d+){0,2}$/', $version)) {
+            throw new \InvalidArgumentException(
+                "Invalid PS version: '" . $version . "'. Expected format like '1.7.8.11' or '9.0.1'."
+            );
+        }
+
+        $this->psVersionOverride = $version;
+
+        return $this;
+    }
+
+    /**
+     * Resolve the effective PS version and populate $this->globals['PS_VERSION'] + version parts.
+     * Priority: fluent onVersion() > $psVersion property > PRESTAFLOW_PS_VERSION env > '8.1.0'.
+     */
+    public function resolveVersion(): void
+    {
+        $propertyVersion = property_exists($this, 'psVersion') ? ($this->psVersion ?? null) : null;
+
+        $version = $this->psVersionOverride
+            ?? $propertyVersion
+            ?? Env::get('PRESTAFLOW_PS_VERSION')
+            ?? ($this->globals['PS_VERSION'] ?? null)
+            ?? '8.1.0';
+
+        if (!is_array($this->globals ?? null)) {
+            $this->globals = [];
+        }
+        $this->globals['PS_VERSION'] = $version;
+
+        // Reset all cached version parts defensively so consumers (e.g. Translations, Scenario)
+        // that read the static state without calling resolveVersion() don't see stale values
+        // from a previous suite pinned to a different version.
+        self::$versions['patchVersion'] = null;
+        self::$versions['minorVersion'] = null;
+        self::$versions['majorVersion'] = null;
+
+        $this->exctractVersions($version);
+    }
 
     public function isVersionSupported()
     {

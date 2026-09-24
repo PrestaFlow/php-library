@@ -2,8 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v7\FrontOffice\Category;
 
-use PrestaFlow\Library\Pages\Common\FrontOffice\Category\Page as BasePage;
+use PrestaFlow\Library\Pages\v9\FrontOffice\Category\Page as V9Page;
 
-class Page extends BasePage
+class Page extends V9Page
 {
 }

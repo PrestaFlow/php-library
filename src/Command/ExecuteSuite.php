@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Command;
 
 use Error;
+use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
 use PrestaFlow\Library\Utils\OutputStates;
 use PrestaFlow\Library\Reports\JUnitReport;
@@ -39,6 +40,8 @@ class ExecuteSuite extends Command implements OutputStates
     protected $debugMode = false;
 
     protected $file = 'prestaflow/results.json';
+
+    protected array $aggregatedSuites = [];
 
     use Output;
 
@@ -134,15 +137,13 @@ class ExecuteSuite extends Command implements OutputStates
         $junitOption = $input->getOption('junit');
         $junitPath = ($junitOption === false) ? null : ($junitOption ?: 'prestaflow/junit.xml');
 
-        $folderPath = ucfirst($input->getArgument('folder'));
-
-        if (!is_dir($folderPath) || !is_dir($folderPath)) {
+        try {
+            $testSuites = $this->resolveSuitePaths((string) $input->getArgument('folder'));
+        } catch (Error $e) {
             $this->sections['progressIndicator']->finish('Finished');
             $this->sections['progressBar']->clear();
-            throw new Error(sprintf('The suites folder [%s] doesn\'t seem to exist', $folderPath));
+            throw $e;
         }
-
-        $testSuites = $this->getTestsSuites($folderPath);
 
         if (!count($testSuites)) {
             $this->sections['progressIndicator']->finish('Finished');
@@ -227,8 +228,7 @@ class ExecuteSuite extends Command implements OutputStates
 
                     if (self::OUTPUT_JSON === $this->getOutputMode()) {
                         if ($input->getOption('file')) {
-                            $this->filePutContents($this->file, json_encode($suite->results(false), JSON_PRETTY_PRINT));
-                            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+                            $this->aggregatedSuites[] = $suite->results(false);
                         } else {
                             $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
                         }
@@ -245,6 +245,14 @@ class ExecuteSuite extends Command implements OutputStates
 
         $this->sections['progressIndicator']->finish('Finished');
         $this->sections['progressBar']->clear();
+
+        if ($input->getOption('file') && self::OUTPUT_JSON === $this->getOutputMode()) {
+            $this->filePutContents(
+                $this->file,
+                json_encode(['suites' => $this->aggregatedSuites], JSON_PRETTY_PRINT)
+            );
+            $this->success('Results saved to ' . $this->file, newLine: true, force: true);
+        }
 
         if (!$nbSuites) {
             $this->success('Tests folder is empty', newLine: true);
@@ -271,11 +279,8 @@ class ExecuteSuite extends Command implements OutputStates
         if ($visualPath !== null) {
             // Fuseau du stamp : option CLI > env PRESTAFLOW_TZ > UTC. Fallback UTC
             // si l'identifiant est invalide (ne casse jamais la génération du rapport).
-            // On lit à la fois $_ENV et getenv() : selon variables_order de PHP,
-            // seul l'un ou l'autre peut être peuplé par le shell parent (setup-php CI
-            // ne peuple pas $_ENV par défaut).
             $tzName = $input->getOption('visual-report-tz')
-                ?: ($_ENV['PRESTAFLOW_TZ'] ?? getenv('PRESTAFLOW_TZ') ?: 'UTC');
+                ?: Env::get('PRESTAFLOW_TZ', 'UTC');
             try {
                 $tz = new \DateTimeZone($tzName);
             } catch (\Exception $e) {
@@ -294,8 +299,8 @@ class ExecuteSuite extends Command implements OutputStates
             \PrestaFlow\Library\Tests\TestsSuite::getBrowser(force: false)?->close();
         } catch (\Throwable $e) {
         }
-        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer'));
-        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.broswer-options'));
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser'));
+        @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser-options'));
 
         return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
     }
@@ -408,6 +413,55 @@ class ExecuteSuite extends Command implements OutputStates
         return $matchDraft && $matchGroups;
     }
 
+    /**
+     * Candidate paths for the runner's argument, most specific first.
+     *
+     * The capitalised variant is a FALLBACK, not an unconditional transform.
+     * The argument defaults to 'tests' while the directory on disk is 'Tests',
+     * which is why a ucfirst() was there in the first place — but applying it
+     * to every argument rewrote 'src/Tests/...' into 'Src/Tests/...', so
+     * targeting a path that does not start with a capital only ever worked on
+     * case-insensitive filesystems. It failed on Linux, and therefore in CI.
+     *
+     * @return array<int, string>
+     */
+    public function candidatePaths(string $argument): array
+    {
+        $capitalised = ucfirst($argument);
+
+        return $capitalised === $argument ? [$argument] : [$argument, $capitalised];
+    }
+
+    /**
+     * Resolve the runner's argument to the list of suite files to execute.
+     *
+     * Accepts a directory, scanned recursively, or a single .php suite file —
+     * passing one file is the natural way to target a single suite, and used to
+     * fail with a message about a missing folder.
+     *
+     * @return array<int, string>
+     *
+     * @throws Error when the argument matches neither a directory nor a suite file
+     */
+    public function resolveSuitePaths(string $argument): array
+    {
+        foreach ($this->candidatePaths($argument) as $path) {
+            if (is_dir($path)) {
+                return $this->getTestsSuites($path);
+            }
+
+            if (is_file($path)) {
+                if (!str_ends_with($path, '.php')) {
+                    throw new Error(sprintf('[%s] is not a PHP suite file', $path));
+                }
+
+                return [$path];
+            }
+        }
+
+        throw new Error(sprintf('The suites path [%s] doesn\'t seem to exist', $argument));
+    }
+
     public function getTestsSuites($folderPath)
     {
         $testSuites = [];
@@ -419,7 +473,10 @@ class ExecuteSuite extends Command implements OutputStates
                         foreach ($this->getTestsSuites($folderPath . '/' . $folderFile) as $childFolderFile) {
                             $testSuites[] = $childFolderFile;
                         }
-                    } else {
+                    } elseif (str_ends_with($folderFile, '.php')) {
+                        // Only PHP files can be suites. execute() skipped the
+                        // others further down anyway; filtering here keeps this
+                        // method's contract honest for its callers.
                         $testSuites[] = $folderPath . '/' . $folderFile;
                     }
                 }

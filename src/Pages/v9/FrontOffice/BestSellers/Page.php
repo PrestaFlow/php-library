@@ -2,8 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\BestSellers;
 
-use PrestaFlow\Library\Pages\Common\FrontOffice\BestSellers\Page as BasePage;
+use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as ListingPage;
 
-class Page extends BasePage
+class Page extends ListingPage
 {
 }

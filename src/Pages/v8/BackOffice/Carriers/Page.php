@@ -2,8 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v8\BackOffice\Carriers;
 
-use PrestaFlow\Library\Pages\Common\BackOffice\Carriers\Page as BasePage;
+use PrestaFlow\Library\Pages\v9\BackOffice\Carriers\Page as V9Page;
 
-class Page extends BasePage
+class Page extends V9Page
 {
 }

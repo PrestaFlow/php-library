@@ -2,8 +2,8 @@
 
 namespace PrestaFlow\Library\Pages\v7\FrontOffice\Cart;
 
-use PrestaFlow\Library\Pages\Common\FrontOffice\Cart\Page as BasePage;
+use PrestaFlow\Library\Pages\v9\FrontOffice\Cart\Page as V9Page;
 
-class Page extends BasePage
+class Page extends V9Page
 {
 }
