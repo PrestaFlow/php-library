@@ -25,8 +25,12 @@ class OnePageCheckoutOrder extends Scenario
         // do not hardcode a password here.
         'customerEmail' => null,
         'customerPassword' => null,
-        // Canonical product path — friendly URLs can't be rebuilt from an id.
-        // Mug (id 6): no combinations, so add-to-cart works without posting an
+        // A canonical product path. An id would work too — PrestaShop
+        // canonicalises on the id and ignores the slug (/6-anything redirects to
+        // the real URL), and goToPage('product', $id) now substitutes the
+        // {index} placeholder for scalar params. The path is kept because this
+        // scenario pins one product deliberately: the Mug (id 6) has no
+        // combinations, so add-to-cart works without posting an
         // id_product_attribute, unlike the demo t-shirt this used to point to.
         'productUrl' => '6-mug-the-best-is-yet-to-come.html',
         'cartQuantity' => 1,
