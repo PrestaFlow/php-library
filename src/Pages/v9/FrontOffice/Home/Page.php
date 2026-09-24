@@ -16,6 +16,17 @@ class Page extends BasePage
         ];
     }
 
+    /**
+     * Whether the home page rendered its own content section.
+     *
+     * Distinct from "the request returned 200": a maintenance page, an error
+     * page and a redirect to another shop all answer 200 too.
+     */
+    public function isDisplayed(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('homePageSection'), 5000);
+    }
+
     public function goToAllProducts()
     {
         $this->goToPage('home');
