@@ -1,13 +1,21 @@
 name: Live smoke
 
-# Runs the front-office smoke suite against a throwaway Flashlight shop, one
-# job per PrestaShop version.
+# Runs the smoke suites against a throwaway Flashlight shop, one job per
+# PrestaShop version. Both suites run in every job, and a red in either one
+# fails the job.
 #
-# The 1.7 and 8.2 rows are EXPECTED TO FAIL today: their page objects are
+# Several rows are EXPECTED TO FAIL today. The v7 and v8 page objects are
 # nine-line stubs inheriting the v9 selectors, so the matrix reports an absence
 # of support rather than a regression. They are deliberately not skipped and
 # not `continue-on-error` — the failures are the inventory of what differs per
 # version. `fail-fast: false` keeps one red row from cancelling the others.
+#
+# Measured 2026-09-24 against Flashlight (see the commit that added
+# BackOfficeSmoke for the full table):
+#
+#   FrontOfficeSmoke  green on all of 1.7 / 8.2 / 9.2, classic and hummingbird.
+#   BackOfficeSmoke   red everywhere on the version cross-check; additionally
+#                     red on 1.7 and 8.2 for the login-error read and logout.
 
 on:
   push:
@@ -16,7 +24,7 @@ on:
 
 jobs:
   smoke:
-    name: Smoke (PrestaShop ${{ matrix.ps }})
+    name: Smoke (PrestaShop ${{ matrix.ps }}, ${{ matrix.theme }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -35,6 +43,14 @@ jobs:
             service: ps92
             port: 8092
             theme: hummingbird
+          # Shop 2 of the same container, on its own port and its own theme.
+          # Without this row "9.2 passes" would only ever mean "hummingbird
+          # passes", and a theme-aware selector that silently matched on one
+          # theme would never be caught.
+          - ps: '9.2.0'
+            service: ps92
+            port: 8093
+            theme: classic
 
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +96,11 @@ jobs:
           done
           echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
 
-      - name: Run the smoke suite
+      # Both suites run even when the first one is red, so one job reports the
+      # whole inventory rather than stopping at the front office. Each command's
+      # status is captured separately and the step exits non-zero if either
+      # failed, so neither suite can hide the other's result.
+      - name: Run the smoke suites
         env:
           PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
           PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
@@ -89,12 +109,16 @@ jobs:
           PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
           PRESTAFLOW_THEME: ${{ matrix.theme }}
           PRESTAFLOW_LOCALE: en
-        run: php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php
+        run: |
+          status=0
+          php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php || status=1
+          php bin/prestaflow run src/Tests/Suites/Smoke/BackOfficeSmoke.php || status=1
+          exit $status
 
       - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshots-${{ matrix.ps }}
+          name: screenshots-${{ matrix.ps }}-${{ matrix.theme }}
           path: prestaflow/screens/
           if-no-files-found: ignore

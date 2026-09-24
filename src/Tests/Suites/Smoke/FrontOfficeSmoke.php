@@ -6,15 +6,20 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Tests\TestsSuite;
 
 /**
- * The smallest suite worth running against every supported PrestaShop.
+ * The front-office walk every supported version has to survive.
  *
- * Deliberately not a checkout. The point is to fail EARLY and SPECIFICALLY on a
- * version whose markup differs, so the failure names the page. A tunnel reports
- * the same "stuck at step 2" for a dozen unrelated causes.
+ * Steps are ordered so a failure names the page it happened on, and nothing
+ * below a red step can be trusted: the cart steps depend on the add-to-cart
+ * step having really added something.
  *
- * Nothing here is pinned to a fixture: no product URL, no category id. The
- * suite walks whatever catalogue the shop has, so it is as valid on 1.7.8.11 as
- * on 9.2.0 — and when it fails on one of them, that failure is the finding.
+ * Two rules hold every step here together:
+ *
+ *  - EVERY step asserts. click() answers false on a missing selector instead of
+ *    raising, so a step without an assertion reports success having done
+ *    nothing at all.
+ *  - NOTHING is hardcoded to one catalogue. No product id, no friendly URL, no
+ *    theme-specific selector. Category 3 is the single exception: it is
+ *    "Clothes" on the demo catalogue of 1.7, 8 and 9 alike.
  */
 class FrontOfficeSmoke extends TestsSuite
 {
@@ -23,6 +28,8 @@ class FrontOfficeSmoke extends TestsSuite
         $this->importPage('FrontOffice\Home');
         $this->importPage('FrontOffice\Listing');
         $this->importPage('FrontOffice\Product');
+        $this->importPage('FrontOffice\Cart');
+        $this->importPage('FrontOffice\Category');
 
         extract($this->pages);
 
@@ -34,8 +41,6 @@ class FrontOfficeSmoke extends TestsSuite
             Expect::that($frontOfficeHomePage->isDisplayed())->equals(true);
         })
         ->it('reach the product listing from the home page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
-            // Reads the "all products" link out of the home page and follows it,
-            // so a theme that renames that link fails here and names Home.
             $frontOfficeHomePage->goToAllProducts();
 
             Expect::that($frontOfficeListingPage->getListingTitle())->notEquals('');
@@ -43,9 +48,35 @@ class FrontOfficeSmoke extends TestsSuite
         ->it('open a product and read its price', function () use ($frontOfficeListingPage, $frontOfficeProductPage) {
             $frontOfficeListingPage->goToProduct(1);
 
-            // A price above zero proves three things at once: the listing linked
-            // to a real product, the product page matched its price element, and
-            // parsePrice() understood the rendered format.
+            Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
+        })
+        // addToCart() answers the modal title it read after clicking. An empty
+        // string (or the `false` getTextContent() returns on a timeout) means
+        // either the button selector missed or no confirmation modal opened —
+        // both are the same finding: the add-to-cart markup diverged here.
+        ->it('add the product to the cart', function () use ($frontOfficeProductPage) {
+            $modalTitle = $frontOfficeProductPage->addToCart(1);
+
+            Expect::that($modalTitle)->isNotEmpty();
+        })
+        // Independent of the modal: proves the cart really holds a line rather
+        // than the page merely having shown a confirmation.
+        ->it('the cart page holds the added product', function () use ($frontOfficeCartPage) {
+            $frontOfficeCartPage->goToCart();
+
+            Expect::that($frontOfficeCartPage->hasItems())->equals(true);
+        })
+        // Category 3 is "Clothes" everywhere, so this reaches a listing by id
+        // without a friendly URL. It also exercises the scalar-param
+        // substitution in getPageURL() that f1ad516 fixed.
+        ->it('reach a category listing by id', function () use ($frontOfficeCategoryPage) {
+            $frontOfficeCategoryPage->goToPage('category', 3);
+
+            Expect::that($frontOfficeCategoryPage->getListingTitle())->notEquals('');
+        })
+        ->it('open a product from the category listing', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
+            $frontOfficeCategoryPage->goToProduct(1);
+
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
         });
     }
