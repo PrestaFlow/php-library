@@ -34,11 +34,15 @@ Resolution priority: fluent `onVersion()` → `$psVersion` property → `PRESTAF
 [Flashlight](https://github.com/PrestaShop/prestashop-flashlight) images — one
 service per version, each with its own database and its own port:
 
-| Service | PrestaShop | Shop 1 | Shop 2 | Theme |
-|---|---|---|---|---|
-| `ps17` | 1.7.8.11 | 8017 | 8018 | classic |
-| `ps82` | 8.2.8 | 8082 | 8083 | classic |
-| `ps92` | 9.2.0 | 8092 | 8093 | hummingbird |
+| Service | PrestaShop | Shop 1 | Shop 2 | Shop 1 theme | Shop 2 theme |
+|---|---|---|---|---|---|
+| `ps17` | 1.7.8.11 | 8017 | 8018 | classic | classic |
+| `ps82` | 8.2.8 | 8082 | 8083 | classic | classic |
+| `ps92` | 9.2.0 | 8092 | 8093 | hummingbird | classic |
+
+The 9.2 container therefore gives you both themes from a single boot —
+hummingbird on 8092, classic on 8093 — which is what you want for checking
+that a theme-aware selector resolves per theme.
 
 ```bash
 docker compose up ps92 -d
@@ -48,7 +52,12 @@ php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php
 
 Wait for `/admin-dev/` to answer `302` before running a suite, not for `/` to
 answer `200`: the front office is served well before the post-scripts that
-provision the second shop have finished.
+provision the second shop have finished. A failing post-script does **not**
+stop the container, so a healthy container is not proof of a provisioned shop
+— the smoke suite is.
+
+Full walkthrough, including tear-down and the two traps worth knowing:
+[Testing against a throwaway shop](docs/testing-with-flashlight.md).
 
 The `Live smoke` workflow runs that same suite against all three versions on
 every push to `main` and every pull request.
