@@ -1,0 +1,100 @@
+name: Live smoke
+
+# Runs the front-office smoke suite against a throwaway Flashlight shop, one
+# job per PrestaShop version.
+#
+# The 1.7 and 8.2 rows are EXPECTED TO FAIL today: their page objects are
+# nine-line stubs inheriting the v9 selectors, so the matrix reports an absence
+# of support rather than a regression. They are deliberately not skipped and
+# not `continue-on-error` — the failures are the inventory of what differs per
+# version. `fail-fast: false` keeps one red row from cancelling the others.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    name: Smoke (PrestaShop ${{ matrix.ps }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ps: '1.7.8.11'
+            service: ps17
+            port: 8017
+            theme: classic
+          - ps: '8.2.8'
+            service: ps82
+            port: 8082
+            theme: classic
+          - ps: '9.2.0'
+            service: ps92
+            port: 8092
+            theme: hummingbird
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Start the shop
+        run: docker compose up ${{ matrix.service }} -d
+
+      # Probe /admin-dev/, not /. The front office answers 200 well before the
+      # post-scripts that provision the second shop have finished, so polling /
+      # would let the suite start against a half-provisioned shop. Flashlight
+      # redirects /admin-dev/ to the login page (302) once the container is
+      # really serving.
+      - name: Wait for the shop
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${{ matrix.port }}/admin-dev/" || true)
+            if [ "$code" = "302" ] || [ "$code" = "200" ]; then
+              echo "back office answers $code — shop is up"; exit 0
+            fi
+            echo "back office answers ${code:-000}, waiting..."
+            sleep 5
+          done
+          echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
+
+      - name: Run the smoke suite
+        env:
+          PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
+          PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
+          PRESTAFLOW_BO_EMAIL: admin@prestashop.com
+          PRESTAFLOW_BO_PASSWD: prestashop
+          PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
+          PRESTAFLOW_THEME: ${{ matrix.theme }}
+          PRESTAFLOW_LOCALE: en
+        run: php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.ps }}
+          path: prestaflow/screens/
+          if-no-files-found: ignore
