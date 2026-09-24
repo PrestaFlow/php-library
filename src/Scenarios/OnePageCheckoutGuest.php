@@ -30,6 +30,9 @@ class OnePageCheckoutGuest extends Scenario
         // id_product_attribute, unlike the demo t-shirt this used to point to.
         'productUrl' => '6-mug-the-best-is-yet-to-come.html',
         'cartQuantity' => 1,
+        // Which shop the back-office settings are written for. The checkout
+        // layout is stored per shop, so a multistore run must say which one.
+        'shopId' => 1,
     ];
 
     public function steps($testSuite)
@@ -73,14 +76,14 @@ class OnePageCheckoutGuest extends Scenario
             // Not restored on purpose: each scenario sets the state it requires up
             // front so scenarios stay independent of execution order; restoring
             // costs time and guarantees nothing if the run dies midway.
-            $backOfficeOrderSettingsPage->goTo();
+            $backOfficeOrderSettingsPage->goTo((int) $this->getParam('shopId'));
             $backOfficeOrderSettingsPage->setGuestCheckout(true);
 
             Expect::that($backOfficeOrderSettingsPage->isGuestCheckoutEnabled())->equals(true);
         })
         ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
             // Same rationale as above: set up front, never restored.
-            $backOfficeCheckoutLayoutPage->goTo();
+            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
             $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
 
             Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);

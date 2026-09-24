@@ -62,7 +62,7 @@ final class FourPageCheckoutPreconditionTest extends TestCase
         }
 
         $this->assertStringContainsString(
-            'requireFourPageCheckout($testSuite)',
+            'requireFourPageCheckout($testSuite',
             $source,
             $name . " imports FrontOffice\\Checkout but never calls requireFourPageCheckout(),"
                 . " so it walks the four-page tunnel on whatever layout the previous scenario left behind."

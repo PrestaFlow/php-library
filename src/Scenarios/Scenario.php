@@ -64,8 +64,15 @@ class Scenario
      * would only turn a silent failure into a loud one; setting it keeps the
      * scenarios independent of execution order, which is the point.
      */
-    protected function requireFourPageCheckout($testSuite): void
+    protected function requireFourPageCheckout($testSuite, ?int $shopId = null): void
     {
+        // The layout is stored per shop, and Configuration resolves shop, then
+        // shop group, then global. A shop with no row of its own inherits the
+        // global one, so setting shop 1 and testing shop 2 silently walks the
+        // wrong tunnel — the exact failure this precondition exists to prevent,
+        // one level up. Scenarios carry a shopId param; the argument overrides.
+        $shopId ??= (int) ($this->params['shopId'] ?? 1);
+
         // Before 9.2 there is no ps_onepagecheckout module, so no setting could
         // have moved the shop off the four-page tunnel. Nothing to do, and the
         // back-office page we would need does not exist.
@@ -81,13 +88,13 @@ class Scenario
 
         $testSuite->it(
             'ensure the shop uses the four-page checkout',
-            function () use ($backOfficeLoginPage, $backOfficeCheckoutLayoutPage) {
+            function () use ($backOfficeLoginPage, $backOfficeCheckoutLayoutPage, $shopId) {
                 $backOfficeLoginPage->goToPage('login');
                 $backOfficeLoginPage->login();
 
                 Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
 
-                $backOfficeCheckoutLayoutPage->goTo();
+                $backOfficeCheckoutLayoutPage->goTo($shopId);
 
                 // Only pay for the switch when the shop is actually on the wrong
                 // layout; the assertion below covers both branches, so it states

@@ -16,6 +16,9 @@ class CheckoutOrder extends Scenario
         // Canonical product path — friendly URLs can't be rebuilt from an id.
         'productUrl' => '1-1-hummingbird-printed-t-shirt.html',
         'cartQuantity' => 1,
+        // Which shop the back-office settings are written for. The checkout
+        // layout is stored per shop, so a multistore run must say which one.
+        'shopId' => 1,
     ];
 
     public function steps($testSuite)

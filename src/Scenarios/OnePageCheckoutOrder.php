@@ -38,6 +38,9 @@ class OnePageCheckoutOrder extends Scenario
         'addressPostcode' => '75002',
         'addressCountry' => 'France',
         'addressPhone' => '0102030405',
+        // Which shop the back-office settings are written for. The checkout
+        // layout is stored per shop, so a multistore run must say which one.
+        'shopId' => 1,
     ];
 
     public function steps($testSuite)
@@ -78,7 +81,7 @@ class OnePageCheckoutOrder extends Scenario
             Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
-            $backOfficeCheckoutLayoutPage->goTo();
+            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
             $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
 
             Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);

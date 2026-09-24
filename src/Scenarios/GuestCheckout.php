@@ -21,6 +21,9 @@ class GuestCheckout extends Scenario
         'addressPostcode' => '75002',
         'addressCountry' => 'France',
         'addressPhone' => '0102030405',
+        // Which shop the back-office settings are written for. The checkout
+        // layout is stored per shop, so a multistore run must say which one.
+        'shopId' => 1,
     ];
 
     public function steps($testSuite)

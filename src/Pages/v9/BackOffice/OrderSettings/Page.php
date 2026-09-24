@@ -36,8 +36,18 @@ class Page extends BasePage
         ];
     }
 
-    public function goTo(): void
+    /**
+     * @param int $idShop the shop the setting is written for
+     *
+     * Configuration in PrestaShop resolves shop, then shop group, then global,
+     * so a value saved while the back office is on "all shops" does not land
+     * where a single-shop read will look for it. Pinning the context makes the
+     * write land on a named shop instead of wherever the session happened to be.
+     */
+    public function goTo(int $idShop = 1): void
     {
+        $this->setSingleShopContext($idShop);
+
         $this->goToSubMenu($this->parentMenuSelector, $this->menuSelector);
     }
 
