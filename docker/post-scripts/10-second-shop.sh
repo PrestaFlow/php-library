@@ -9,7 +9,7 @@ require_once '/var/www/html/config/config.inc.php';
 
 $src = 1;
 
-// A second shop, its group, and its URL on a virtual URI.
+// A second shop, its group, and its URL on a dedicated port.
 $group = new ShopGroup();
 $group->name = 'Group2';
 $group->active = true;
@@ -25,9 +25,21 @@ $shop->add();
 
 $url = new ShopUrl();
 $url->id_shop = (int) $shop->id;
-$url->domain = $url->domain_ssl = Configuration::get('PS_SHOP_DOMAIN');
+$secondPort = getenv('SECOND_SHOP_PORT') ?: '8093';
+$host = preg_replace('/:\d+$/', '', (string) Configuration::get('PS_SHOP_DOMAIN'));
+$url->domain = $url->domain_ssl = $host . ':' . $secondPort;
+// A DEDICATED PORT, not a virtual URI. PrestaShop discriminates shops by
+// domain including the port, so localhost:8093 is a distinct shop — and its
+// assets resolve at the root, needing no rewrite at all.
+//
+// The virtual-URI approach this replaced cannot work here: it relies on
+// Tools::generateHtaccess(), and every Flashlight tag we use is -nginx, which
+// never reads .htaccess. Verified 2026-09-24: /shop2/themes/...css returned
+// 404 while the same file at the root returned 200. There is no -apache tag
+// for 1.7.8.11, 8.2.8 or 9.2.0 (only 9.0.3 has one), so switching flavour is
+// not an option either.
 $url->physical_uri = '/';
-$url->virtual_uri = 'shop2/';
+$url->virtual_uri = '';
 $url->main = true;
 $url->active = true;
 $url->add();
@@ -71,8 +83,7 @@ Db::getInstance()->execute(
     'UPDATE ' . _DB_PREFIX_ . "tab SET active = 1 WHERE class_name IN ('AdminShopGroup','AdminShopUrl')"
 );
 
-// A virtual URI serves no theme assets until the rewrite rules exist.
-Tools::generateHtaccess();
+// Nothing to rewrite: the second shop lives at the root of its own port.
 
 echo 'second shop id=' . (int) $shop->id . PHP_EOL;
 PHP

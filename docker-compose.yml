@@ -28,6 +28,7 @@ services:
         condition: service_healthy
     environment:
       PS_DOMAIN: localhost:8017
+      SECOND_SHOP_PORT: "8018"
       MYSQL_HOST: db17
       DEBUG_MODE: "false"
       POST_SCRIPTS_DIR: /tmp/post-scripts
@@ -35,6 +36,7 @@ services:
       - ./docker/post-scripts:/tmp/post-scripts:ro
     ports:
       - "8017:80"
+      - "8018:80"   # the second shop
 
   db82:
     image: mariadb:11
@@ -56,6 +58,7 @@ services:
         condition: service_healthy
     environment:
       PS_DOMAIN: localhost:8082
+      SECOND_SHOP_PORT: "8083"
       MYSQL_HOST: db82
       DEBUG_MODE: "false"
       POST_SCRIPTS_DIR: /tmp/post-scripts
@@ -63,6 +66,7 @@ services:
       - ./docker/post-scripts:/tmp/post-scripts:ro
     ports:
       - "8082:80"
+      - "8083:80"   # the second shop
 
   db92:
     image: mariadb:11
@@ -84,6 +88,7 @@ services:
         condition: service_healthy
     environment:
       PS_DOMAIN: localhost:8092
+      SECOND_SHOP_PORT: "8093"
       MYSQL_HOST: db92
       DEBUG_MODE: "false"
       POST_SCRIPTS_DIR: /tmp/post-scripts
@@ -91,3 +96,4 @@ services:
       - ./docker/post-scripts:/tmp/post-scripts:ro
     ports:
       - "8092:80"
+      - "8093:80"   # the second shop, on its own port rather than a virtual URI
