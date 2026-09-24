@@ -1,0 +1,93 @@
+# Throwaway PrestaShop shops from the official Flashlight images.
+#
+# One shop and one database per version. Bring up a single shop at a time:
+#   docker compose up ps92 -d
+# Its database starts with it through depends_on.
+#
+# Tags carry a suffix on purpose. The bare `9.2.0` and `8.2.8` tags do not
+# exist on the registry — a previous attempt at this file pinned `9.0.1` and
+# could never start.
+services:
+  db17:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: prestashop
+      MARIADB_DATABASE: prestashop
+      MARIADB_USER: prestashop
+      MARIADB_PASSWORD: prestashop
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ps17:
+    image: prestashop/prestashop-flashlight:1.7.8.11-nginx
+    depends_on:
+      db17:
+        condition: service_healthy
+    environment:
+      PS_DOMAIN: localhost:8017
+      MYSQL_HOST: db17
+      DEBUG_MODE: "false"
+      POST_SCRIPTS_DIR: /tmp/post-scripts
+    volumes:
+      - ./docker/post-scripts:/tmp/post-scripts:ro
+    ports:
+      - "8017:80"
+
+  db82:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: prestashop
+      MARIADB_DATABASE: prestashop
+      MARIADB_USER: prestashop
+      MARIADB_PASSWORD: prestashop
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ps82:
+    image: prestashop/prestashop-flashlight:8.2.8-nginx
+    depends_on:
+      db82:
+        condition: service_healthy
+    environment:
+      PS_DOMAIN: localhost:8082
+      MYSQL_HOST: db82
+      DEBUG_MODE: "false"
+      POST_SCRIPTS_DIR: /tmp/post-scripts
+    volumes:
+      - ./docker/post-scripts:/tmp/post-scripts:ro
+    ports:
+      - "8082:80"
+
+  db92:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: prestashop
+      MARIADB_DATABASE: prestashop
+      MARIADB_USER: prestashop
+      MARIADB_PASSWORD: prestashop
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ps92:
+    image: prestashop/prestashop-flashlight:9.2.0-nginx
+    depends_on:
+      db92:
+        condition: service_healthy
+    environment:
+      PS_DOMAIN: localhost:8092
+      MYSQL_HOST: db92
+      DEBUG_MODE: "false"
+      POST_SCRIPTS_DIR: /tmp/post-scripts
+    volumes:
+      - ./docker/post-scripts:/tmp/post-scripts:ro
+    ports:
+      - "8092:80"
