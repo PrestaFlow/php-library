@@ -68,25 +68,28 @@ class BackOfficeSmoke extends TestsSuite
             Expect::that($backOfficeDashboardPage->getPageTitle())
                 ->contains($backOfficeDashboardPage->pageTitle());
         })
-        // Assert we are back on the login FORM, not merely that some block is
-        // present: a logout that silently did nothing would still leave a
-        // rendered back office behind.
+        // Cross-check that the runner is pointed where it thinks it is. It runs
+        // HERE, between login and logout, because #shop_version is written by
+        // the back-office header and no login page of 1.7, 8 or 9 carries a
+        // version at all. Reading it from the login page is what the previous
+        // version of this step did, and it could only ever have been answered
+        // by something that was not a version.
+        ->it('the shop reports the version the runner was pointed at', function () use ($backOfficeLoginPage) {
+            Expect::that($backOfficeLoginPage->getPrestashopVersion())
+                ->contains($backOfficeLoginPage->getGlobal('PS_VERSION'));
+        })
+        // Assert the session is GONE, not merely that a login form is on
+        // screen: a logout that silently did nothing used to leave a rendered
+        // back office behind, and on 1.7 and 8 it did exactly that.
         ->it('log out again', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->logout();
 
+            Expect::that($backOfficeLoginPage->isLoggedIn())->equals(false);
+            Expect::that($backOfficeLoginPage->getPrestashopVersion())->isNull();
             Expect::that($backOfficeLoginPage->elementIsVisible(
                 $backOfficeLoginPage->getSelector('emailInput'),
                 5000
             ))->equals(true);
-        })
-        // Cheap cross-check that the runner is pointed where it thinks it is.
-        // Navigates for itself rather than trusting the previous step to have
-        // left the login page on screen.
-        ->it('the shop reports the version the runner was pointed at', function () use ($backOfficeLoginPage) {
-            $backOfficeLoginPage->goToPage('index');
-
-            Expect::that($backOfficeLoginPage->getPrestashopVersion())
-                ->contains($backOfficeLoginPage->getGlobal('PS_VERSION'));
         });
     }
 }

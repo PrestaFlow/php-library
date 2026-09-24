@@ -9,7 +9,15 @@ class Page extends BasePage
     public function defineSelectors()
     {
         return [
-            'pageTitle' => '#js-product-list-header',
+            // The heading, not the header block. `#js-product-list-header` is a
+            // container: on Classic it also holds the category description, and
+            // on hummingbird the subcategory nav as well, so reading it returned
+            // a whitespace blob ("Home Clothes Accessories Art") that satisfied
+            // any non-emptiness check while naming nothing. The `h1` inside it
+            // is the category name on 1.7.8, 8.2 and 9.2, Classic and
+            // hummingbird alike — which is why Category already overrode this
+            // selector with exactly this value.
+            'pageTitle' => '#js-product-list-header h1',
             'productArticle' => '#js-product-list .products div:nth-child(${index}) article',
             // The whole path down to the anchor, on purpose: appending the link
             // part in PHP would put it out of reach of the theme layer, and the

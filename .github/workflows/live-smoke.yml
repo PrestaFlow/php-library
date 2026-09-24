@@ -4,18 +4,24 @@ name: Live smoke
 # PrestaShop version. Both suites run in every job, and a red in either one
 # fails the job.
 #
-# Several rows are EXPECTED TO FAIL today. The v7 and v8 page objects are
-# nine-line stubs inheriting the v9 selectors, so the matrix reports an absence
-# of support rather than a regression. They are deliberately not skipped and
-# not `continue-on-error` — the failures are the inventory of what differs per
-# version. `fail-fast: false` keeps one red row from cancelling the others.
+# Every row is expected to be GREEN. That was not true when this workflow
+# landed: BackOfficeSmoke was red everywhere on the version cross-check and
+# additionally red on 1.7 and 8.2 for the login-error read and logout. Those
+# three were page-object defects, not absences of support, and they are fixed —
+# see the commit that touched src/Pages/BackOfficePage.php. A red row is now a
+# regression and should be read as one.
 #
-# Measured 2026-09-24 against Flashlight (see the commit that added
-# BackOfficeSmoke for the full table):
+# `fail-fast: false` still keeps one red row from cancelling the others: the
+# point of the matrix is to say WHICH versions diverged, not merely that one
+# did. Nothing here is `continue-on-error`.
 #
-#   FrontOfficeSmoke  green on all of 1.7 / 8.2 / 9.2, classic and hummingbird.
-#   BackOfficeSmoke   red everywhere on the version cross-check; additionally
-#                     red on 1.7 and 8.2 for the login-error read and logout.
+# Measured 2026-09-24 against Flashlight, 7 runs per combination:
+#
+#   FrontOfficeSmoke  7/7 green on 1.7.8.11, 8.2.8 and 9.2.0, classic and
+#                     hummingbird.
+#   BackOfficeSmoke   7/7 green on the same four combinations. The bad-password
+#                     step, which used to land both ways on 1.7 and 8.2, was
+#                     green in all 28 runs.
 
 on:
   push:

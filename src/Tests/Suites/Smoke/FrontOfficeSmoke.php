@@ -40,10 +40,19 @@ class FrontOfficeSmoke extends TestsSuite
 
             Expect::that($frontOfficeHomePage->isDisplayed())->equals(true);
         })
+        // notEquals('') was satisfied by anything at all, including the home
+        // page and the whitespace blob the listing header used to return on
+        // hummingbird. Cross-checking the heading against the document title
+        // is locale-agnostic and comes from an independent server-side render
+        // (meta title vs. rendered h1), so it fails both when the heading
+        // selector drifts back to the container and when we never left home.
         ->it('reach the product listing from the home page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
             $frontOfficeHomePage->goToAllProducts();
 
-            Expect::that($frontOfficeListingPage->getListingTitle())->notEquals('');
+            $title = $frontOfficeListingPage->getListingTitle();
+
+            Expect::that($title)->isNotEmpty();
+            Expect::that($frontOfficeListingPage->getMetaTitle())->contains($title);
         })
         ->it('open a product and read its price', function () use ($frontOfficeListingPage, $frontOfficeProductPage) {
             $frontOfficeListingPage->goToProduct(1);
@@ -72,7 +81,10 @@ class FrontOfficeSmoke extends TestsSuite
         ->it('reach a category listing by id', function () use ($frontOfficeCategoryPage) {
             $frontOfficeCategoryPage->goToPage('category', 3);
 
-            Expect::that($frontOfficeCategoryPage->getListingTitle())->notEquals('');
+            $title = $frontOfficeCategoryPage->getListingTitle();
+
+            Expect::that($title)->isNotEmpty();
+            Expect::that($frontOfficeCategoryPage->getMetaTitle())->contains($title);
         })
         ->it('open a product from the category listing', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
             $frontOfficeCategoryPage->goToProduct(1);
