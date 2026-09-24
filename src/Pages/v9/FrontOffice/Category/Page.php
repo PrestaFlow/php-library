@@ -8,14 +8,8 @@ class Page extends BasePage
 {
     public string $url = '{index}-category';
 
-    public function defineSelectors()
-    {
-        $selectors = parent::defineSelectors();
-
-        $pageSelectors = [
-            'pageTitle' => '#js-product-list-header h1',
-        ];
-
-        return [...$selectors, ...$pageSelectors];
-    }
+    // No selector overrides: Category used to re-declare `pageTitle` as
+    // `#js-product-list-header h1` because Listing pointed at the surrounding
+    // container. Listing now declares the heading itself, so repeating it here
+    // would only be a second copy to keep in sync.
 }

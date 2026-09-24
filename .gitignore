@@ -11,3 +11,4 @@ prestaflow/
 .vscode/settings.json
 datas/.broswer
 .phpunit.cache/
+.env.flashlight

@@ -22,6 +22,10 @@ class BackOfficePage extends CommonPage
         $this->initLocale(locale: $locale);
 
         $selectors = [
+            // Present on every authenticated back-office page of 1.7, 8 and 9
+            // alike, and on none of their login pages. See
+            // getPrestashopVersion() for why that asymmetry is the whole point.
+            'shopVersionBlock' => '#shop_version',
         ];
 
         $this->selectors = $this->getSelectors(selectors: $selectors);
@@ -94,6 +98,44 @@ class BackOfficePage extends CommonPage
      * session, so one call covers every page visited afterwards. On a shop
      * without multistore it is simply ignored.
      */
+    /**
+     * The version the shop reports about itself, or null when it does not.
+     *
+     * `#shop_version` is the only node that actually holds a version across
+     * 1.7.8, 8.2 and 9.2 — the header info bar writes it on every
+     * authenticated back-office page, and 9 additionally repeats it in the
+     * menu logo block. No login page carries it on 8 or 9 (1.7's does, in
+     * `#login-header > div.text-center`, but reading version-dependent nodes
+     * is what produced the defect this replaces), so a caller that has not
+     * logged in yet gets null rather than whatever text happens to sit nearby.
+     *
+     * Null is a real answer here: "this page does not state a version". The
+     * previous implementation read `#login_form h4` and returned the login
+     * form's required-field marker on 9 ("* PrestaShop") or the shop name on
+     * 8 and 1.7 ("PrestaShop") — non-empty strings that satisfied every
+     * isNotEmpty() guard pointed at them while stating nothing about the
+     * version. A method that cannot answer must not answer falsely.
+     */
+    public function getPrestashopVersion(): ?string
+    {
+        $value = $this->getTextContent($this->getSelector('shopVersionBlock'), 1, true, 2000);
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $value = ltrim(trim($value), 'vV');
+
+        // Structural guard, not a format check: anything that does not begin
+        // like a version number ("9.2.0", "1.7.8.11", "9.0.0-rc.1.test") is a
+        // label that drifted into the node, and a label is not an answer.
+        if (!preg_match('/^\d+\.\d+/', $value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
     public function setSingleShopContext(int $idShop = 1): void
     {
         $url = $this->getGlobals()['BO']['URL'];

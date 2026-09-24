@@ -10,7 +10,12 @@ class GuestCheckout extends Scenario
         // French demo shop: locale drives the friendly URLs (connexion/panier/
         // commande) resolved from src/Urls/fr.json.
         'locale' => 'fr',
-        // Canonical product path — friendly URLs can't be rebuilt from an id.
+        // A canonical product path. An id would work too — PrestaShop
+        // canonicalises on the id and ignores the slug (/1-anything redirects to
+        // the real URL), and goToPage('product', $id) now substitutes the
+        // {index} placeholder for scalar params. The path is kept because it
+        // pins this exact product *and* combination (id_product 1,
+        // id_product_attribute 1), which an id alone cannot express.
         'productUrl' => '1-1-hummingbird-printed-t-shirt.html',
         'cartQuantity' => 1,
         'guestEmail' => 'pf-guest@example.com',

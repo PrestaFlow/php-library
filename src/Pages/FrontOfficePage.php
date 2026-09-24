@@ -118,6 +118,15 @@ class FrontOfficePage extends CommonPage
             }
         }
 
+        // A scalar $params is the common call shape — goToPage('category', 3),
+        // goToPage('product', $productId) — and means the single placeholder the
+        // default templates carry: {index}. Substitution used to be gated on
+        // is_array(), so every scalar call left '{index}' in the URL and it got
+        // percent-encoded into %7Bindex%7D. Normalise to the array form first.
+        if (is_scalar($params) && $params !== '') {
+            $params = ['index' => $params];
+        }
+
         if (is_array($params) && count($params) > 0) {
             foreach ($params as $key => $value) {
                 $url = str_replace('{' . $key . '}', $value, $url);

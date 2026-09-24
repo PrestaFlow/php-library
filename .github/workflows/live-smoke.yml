@@ -1,0 +1,130 @@
+name: Live smoke
+
+# Runs the smoke suites against a throwaway Flashlight shop, one job per
+# PrestaShop version. Both suites run in every job, and a red in either one
+# fails the job.
+#
+# Every row is expected to be GREEN. That was not true when this workflow
+# landed: BackOfficeSmoke was red everywhere on the version cross-check and
+# additionally red on 1.7 and 8.2 for the login-error read and logout. Those
+# three were page-object defects, not absences of support, and they are fixed —
+# see the commit that touched src/Pages/BackOfficePage.php. A red row is now a
+# regression and should be read as one.
+#
+# `fail-fast: false` still keeps one red row from cancelling the others: the
+# point of the matrix is to say WHICH versions diverged, not merely that one
+# did. Nothing here is `continue-on-error`.
+#
+# Measured 2026-09-24 against Flashlight, 7 runs per combination:
+#
+#   FrontOfficeSmoke  7/7 green on 1.7.8.11, 8.2.8 and 9.2.0, classic and
+#                     hummingbird.
+#   BackOfficeSmoke   7/7 green on the same four combinations. The bad-password
+#                     step, which used to land both ways on 1.7 and 8.2, was
+#                     green in all 28 runs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    name: Smoke (PrestaShop ${{ matrix.ps }}, ${{ matrix.theme }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ps: '1.7.8.11'
+            service: ps17
+            port: 8017
+            theme: classic
+          - ps: '8.2.8'
+            service: ps82
+            port: 8082
+            theme: classic
+          - ps: '9.2.0'
+            service: ps92
+            port: 8092
+            theme: hummingbird
+          # Shop 2 of the same container, on its own port and its own theme.
+          # Without this row "9.2 passes" would only ever mean "hummingbird
+          # passes", and a theme-aware selector that silently matched on one
+          # theme would never be caught.
+          - ps: '9.2.0'
+            service: ps92
+            port: 8093
+            theme: classic
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Start the shop
+        run: docker compose up ${{ matrix.service }} -d
+
+      # Probe /admin-dev/, not /. The front office answers 200 well before the
+      # post-scripts that provision the second shop have finished, so polling /
+      # would let the suite start against a half-provisioned shop. Flashlight
+      # redirects /admin-dev/ to the login page (302) once the container is
+      # really serving.
+      - name: Wait for the shop
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${{ matrix.port }}/admin-dev/" || true)
+            if [ "$code" = "302" ] || [ "$code" = "200" ]; then
+              echo "back office answers $code — shop is up"; exit 0
+            fi
+            echo "back office answers ${code:-000}, waiting..."
+            sleep 5
+          done
+          echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
+
+      # Both suites run even when the first one is red, so one job reports the
+      # whole inventory rather than stopping at the front office. Each command's
+      # status is captured separately and the step exits non-zero if either
+      # failed, so neither suite can hide the other's result.
+      - name: Run the smoke suites
+        env:
+          PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
+          PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
+          PRESTAFLOW_BO_EMAIL: admin@prestashop.com
+          PRESTAFLOW_BO_PASSWD: prestashop
+          PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
+          PRESTAFLOW_THEME: ${{ matrix.theme }}
+          PRESTAFLOW_LOCALE: en
+        run: |
+          status=0
+          php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php || status=1
+          php bin/prestaflow run src/Tests/Suites/Smoke/BackOfficeSmoke.php || status=1
+          exit $status
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.ps }}-${{ matrix.theme }}
+          path: prestaflow/screens/
+          if-no-files-found: ignore
