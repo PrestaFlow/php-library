@@ -36,6 +36,7 @@ final class ExtraHeadersFromEnvTest extends TestCase
             }
         }
         TestsSuite::$extraHttpHeaders = $this->headersBackup;
+        putenv('PRESTAFLOW_EXTRA_HEADERS');
     }
 
     private function invoke(): void
@@ -123,5 +124,19 @@ final class ExtraHeadersFromEnvTest extends TestCase
         $_ENV['PRESTAFLOW_EXTRA_HEADERS'] = '{"":"empty-key","X-Ok":"v"}';
         $this->invoke();
         $this->assertSame(['X-Ok' => 'v'], TestsSuite::$extraHttpHeaders);
+    }
+
+    /**
+     * CI runners set env vars on the process; with a variables_order without
+     * "E" they never reach $_ENV, only getenv() sees them.
+     */
+    public function testProcessEnvironmentIsReadWhenAbsentFromSuperglobal(): void
+    {
+        unset($_ENV['PRESTAFLOW_EXTRA_HEADERS']);
+        putenv('PRESTAFLOW_EXTRA_HEADERS={"X-CI-Bypass":"from-process"}');
+
+        $this->invoke();
+
+        $this->assertSame(['X-CI-Bypass' => 'from-process'], TestsSuite::$extraHttpHeaders);
     }
 }

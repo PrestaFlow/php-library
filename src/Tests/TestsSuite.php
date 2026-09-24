@@ -635,7 +635,7 @@ class TestsSuite implements OutputStates
      */
     protected function presetExtraHeadersFromEnv(): void
     {
-        $raw = $_ENV['PRESTAFLOW_EXTRA_HEADERS'] ?? null;
+        $raw = Env::get('PRESTAFLOW_EXTRA_HEADERS');
         if ($raw === null || $raw === '') {
             return;
         }
