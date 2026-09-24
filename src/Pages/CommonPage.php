@@ -125,8 +125,23 @@ class CommonPage
         $page = $this->getPage();
 
         if (!is_null($page) && method_exists($page, $name)) {
-            call_user_func_array([$page, $name], $arguments);
+            return call_user_func_array([$page, $name], $arguments);
         }
+
+        // No browser page yet: keep the historical no-op for real chrome-php
+        // methods, but never for a name nobody defines.
+        if (is_null($page) && method_exists(DomPage::class, $name)) {
+            return null;
+        }
+
+        // A typo or a method that lives elsewhere (e.g. waitForNavigation(), which
+        // belongs to PageNavigation, not Page) used to be swallowed silently, so
+        // the step "passed" without doing anything.
+        throw new \BadMethodCallException(sprintf(
+            'Call to undefined method %s::%s() (not defined on the page object nor on the chrome-php page).',
+            static::class,
+            $name
+        ));
     }
 
     public function setGlobals($globals)
@@ -558,9 +573,27 @@ class CommonPage
         $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
     }
 
-    public function waitForPageLoaded()
+    /**
+     * Wait until the current document has been parsed (DOMContentLoaded, i.e.
+     * readyState "interactive" or "complete") and has a <body>.
+     *
+     * This polls the page state; it does not observe a navigation. Right after
+     * an action that triggers one, the previous document may still report
+     * itself as ready, so prefer waiting on navigate()->waitForNavigation() or
+     * on an element of the next page when you have one.
+     *
+     * @throws TimeoutException when the page is still loading after $timeout ms
+     */
+    public function waitForPageLoaded(int $timeout = 30000): void
     {
-        $this->waitForNavigation(DomPage::DOM_CONTENT_LOADED, 10000);
+        $loaded = $this->waitForJsCondition(
+            "document.readyState !== 'loading' && !!document.body",
+            $timeout
+        );
+
+        if (!$loaded) {
+            throw new TimeoutException(sprintf('Page did not finish loading within %d ms.', $timeout));
+        }
     }
 
     public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
