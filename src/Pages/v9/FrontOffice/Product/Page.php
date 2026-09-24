@@ -33,7 +33,7 @@ class Page extends BasePage
     {
         $this->goToPage('product', $productId);
 
-        $this->waitForNavigation();
+        $this->waitForPageLoaded();
     }
 
     /**

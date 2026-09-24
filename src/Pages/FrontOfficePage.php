@@ -75,12 +75,12 @@ class FrontOfficePage extends CommonPage
             if ($hasDebugMoved) {
                 Expect::setWarning('debug-mode');
                 $this->click('a');
-                $this->waitForNavigation();
+                $this->waitForPageLoaded();
             }
         } catch (OperationTimedOut | Exception $e) {
             Expect::setWarning('debug-mode');
             $this->click('a');
-            $this->waitForNavigation();
+            $this->waitForPageLoaded();
         }
     }
 
