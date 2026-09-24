@@ -28,7 +28,7 @@ final class SuitesFilterTest extends TestCase
             mkdir($this->root . '/' . $dir, 0777, true);
         }
         foreach (['Top.php', 'BackOffice/Login.php', 'FrontOffice/Home.php', 'FrontOffice/Checkout/Guest.php'] as $file) {
-            file_put_contents($this->root . '/' . $file, '<?php');
+            file_put_contents($this->root . '/' . $file, "<?php\nnamespace Fixture;\n");
         }
 
         $this->previousCwd = getcwd();
@@ -149,14 +149,34 @@ final class SuitesFilterTest extends TestCase
     {
         putenv('PRESTAFLOW_SUITES=Nope');
 
-        // Empty/ holds no suite: the run succeeds with "Tests folder is empty",
-        // which proves the unknown name from the environment was ignored.
-        $exitCode = $this->tester()->run(
+        $tester = $this->tester();
+        $tester->run(
+            ['command' => 'run', 'folder' => $this->root, '--suites' => 'BackOffice'],
+            ['capture_stderr_separately' => true]
+        );
+
+        // The unknown name from the environment was never looked at.
+        $this->assertStringNotContainsString('Nope', $tester->getErrorOutput());
+    }
+
+    public function testAFilteredRunThatSelectsNoSuiteFails(): void
+    {
+        $tester = $this->tester();
+        $exitCode = $tester->run(
             ['command' => 'run', 'folder' => $this->root, '--suites' => 'Empty'],
             ['capture_stderr_separately' => true]
         );
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Suites filter [Empty] selected no suite', $tester->getErrorOutput());
+    }
+
+    public function testAnUnfilteredEmptyFolderStillSucceeds(): void
+    {
+        $this->assertSame(0, $this->tester()->run(
+            ['command' => 'run', 'folder' => $this->root . '/Empty'],
+            ['capture_stderr_separately' => true]
+        ));
     }
 
     public function testCliOptionAloneFailsOnAnUnknownFolder(): void

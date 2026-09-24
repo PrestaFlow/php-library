@@ -45,6 +45,8 @@ PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run te
 - A name that matches no folder fails the run (non-zero exit code), listing the
   missing names and the available sub-folders. A typo never becomes a green
   job that ran zero tests.
+- A filtered run that ends up with no suite at all (an empty folder, or
+  nothing left after `--group` / `--draft`) fails too, for the same reason.
 - Absolute paths and `..` are refused: the filter can only narrow `<path>`.
 - `--group` and `--draft` still apply, on the suites of the selected folders.
 - Unset or empty: every suite under `<path>` runs, as before.
