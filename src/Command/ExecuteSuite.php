@@ -154,6 +154,7 @@ class ExecuteSuite extends Command implements OutputStates
             $this->sections['progressIndicator']->finish('Finished');
             $this->sections['progressBar']->clear();
 
+            $this->failOnEmptyFilteredRun($suitesFilter, (string) $input->getArgument('folder'));
             $this->success('Tests folder is empty', newLine: true);
             return Command::SUCCESS;
         };
@@ -260,6 +261,7 @@ class ExecuteSuite extends Command implements OutputStates
         }
 
         if (!$nbSuites) {
+            $this->failOnEmptyFilteredRun($suitesFilter, (string) $input->getArgument('folder'));
             $this->success('Tests folder is empty', newLine: true);
             return Command::SUCCESS;
         };
@@ -512,6 +514,24 @@ class ExecuteSuite extends Command implements OutputStates
         }
 
         return array_values(array_unique($names));
+    }
+
+    /**
+     * A run narrowed by --suites / PRESTAFLOW_SUITES that ends up with no suite
+     * is a mistake in the filter, not an empty project: fail it rather than
+     * report a green run of zero tests. Unfiltered, an empty folder still passes.
+     *
+     * @throws Error when $suitesFilter is not empty
+     */
+    protected function failOnEmptyFilteredRun(array $suitesFilter, string $root): void
+    {
+        if ($suitesFilter !== []) {
+            throw new Error(sprintf(
+                'Suites filter [%s] selected no suite under [%s]',
+                implode(', ', $suitesFilter),
+                $root
+            ));
+        }
     }
 
     /**
