@@ -28,6 +28,27 @@ Resolution priority: fluent `onVersion()` → `$psVersion` property → `PRESTAF
 
 `onVersion()` throws `InvalidArgumentException` on malformed input (expected format: `1.7`, `1.7.8`, `1.7.8.11`, `9`, `9.0`, `9.0.1`, etc.).
 
+## Run only some suite folders
+
+`prestaflow run <path>` runs every suite under `<path>`. To run only some of
+its sub-folders, list them, comma-separated, relative to `<path>`:
+
+```bash
+./vendor/bin/prestaflow run tests --suites=BackOffice,FrontOffice/Checkout
+PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run tests
+```
+
+- Each name is a sub-folder of `<path>`, scanned recursively; nested paths such
+  as `FrontOffice/Checkout` are allowed. The run takes the union of the folders.
+- `--suites` wins over `PRESTAFLOW_SUITES`. The GitHub Action sets
+  `PRESTAFLOW_SUITES` from its `suites` input.
+- A name that matches no folder fails the run (non-zero exit code), listing the
+  missing names and the available sub-folders. A typo never becomes a green
+  job that ran zero tests.
+- Absolute paths and `..` are refused: the filter can only narrow `<path>`.
+- `--group` and `--draft` still apply, on the suites of the selected folders.
+- Unset or empty: every suite under `<path>` runs, as before.
+
 ## Run a suite against a throwaway shop
 
 `docker-compose.yml` boots a disposable PrestaShop from the official

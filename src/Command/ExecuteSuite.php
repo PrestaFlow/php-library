@@ -55,6 +55,7 @@ class ExecuteSuite extends Command implements OutputStates
             ->addOption('visual-report', null, InputOption::VALUE_OPTIONAL, 'Écrit un rapport de régression visuelle (HTML)', false)
             ->addOption('visual-report-tz', null, InputOption::VALUE_REQUIRED, 'Fuseau horaire du stamp du rapport visuel (ex. Europe/Brussels). Défaut : env PRESTAFLOW_TZ ou UTC.')
             ->addOption('draft', 'd', InputOption::VALUE_NEGATABLE, 'Draft mode')
+            ->addOption('suites', null, InputOption::VALUE_REQUIRED, 'Comma-separated sub-folders of the suites path to run (e.g. BackOffice,FrontOffice/Checkout). Overrides env PRESTAFLOW_SUITES.')
             ->addArgument('folder', InputArgument::OPTIONAL, 'The folder name', 'tests')
             ->addOption(
                 'group',
@@ -138,7 +139,11 @@ class ExecuteSuite extends Command implements OutputStates
         $junitPath = ($junitOption === false) ? null : ($junitOption ?: 'prestaflow/junit.xml');
 
         try {
-            $testSuites = $this->resolveSuitePaths((string) $input->getArgument('folder'));
+            // --suites wins over PRESTAFLOW_SUITES (set by the GitHub Action).
+            $suitesFilter = $this->parseSuitesFilter(
+                $input->getOption('suites') ?? Env::get('PRESTAFLOW_SUITES')
+            );
+            $testSuites = $this->resolveSuitePaths((string) $input->getArgument('folder'), $suitesFilter);
         } catch (Error $e) {
             $this->sections['progressIndicator']->finish('Finished');
             $this->sections['progressBar']->clear();
@@ -443,14 +448,24 @@ class ExecuteSuite extends Command implements OutputStates
      *
      * @throws Error when the argument matches neither a directory nor a suite file
      */
-    public function resolveSuitePaths(string $argument): array
+    public function resolveSuitePaths(string $argument, array $subFolders = []): array
     {
         foreach ($this->candidatePaths($argument) as $path) {
             if (is_dir($path)) {
-                return $this->getTestsSuites($path);
+                return $subFolders === []
+                    ? $this->getTestsSuites($path)
+                    : $this->getTestsSuitesIn($path, $subFolders);
             }
 
             if (is_file($path)) {
+                if ($subFolders !== []) {
+                    throw new Error(sprintf(
+                        '[%s] is a single suite file: a suites filter (%s) needs a folder',
+                        $path,
+                        implode(', ', $subFolders)
+                    ));
+                }
+
                 if (!str_ends_with($path, '.php')) {
                     throw new Error(sprintf('[%s] is not a PHP suite file', $path));
                 }
@@ -460,6 +475,79 @@ class ExecuteSuite extends Command implements OutputStates
         }
 
         throw new Error(sprintf('The suites path [%s] doesn\'t seem to exist', $argument));
+    }
+
+    /**
+     * Parse a suites filter (--suites or PRESTAFLOW_SUITES): comma-separated
+     * sub-folders of the suites path, nested ones allowed (FrontOffice/Checkout).
+     * Names are trimmed, empty ones dropped, duplicates removed.
+     *
+     * @return array<int, string> an empty array means "no filter"
+     *
+     * @throws Error on an absolute path or a `..` segment: the filter may only
+     *               narrow the suites path, never leave it
+     */
+    public function parseSuitesFilter(?string $raw): array
+    {
+        $names = [];
+        foreach (explode(',', (string) $raw) as $name) {
+            $name = trim(str_replace('\\', '/', $name));
+            if ($name === '') {
+                continue;
+            }
+
+            if (str_starts_with($name, '/') || preg_match('#^[A-Za-z]:#', $name)) {
+                throw new Error(sprintf('Suites filter [%s]: absolute paths are not allowed, name a sub-folder of the suites path', $name));
+            }
+
+            $segments = array_values(array_filter(explode('/', $name), fn ($segment) => $segment !== '' && $segment !== '.'));
+            if (in_array('..', $segments, true)) {
+                throw new Error(sprintf('Suites filter [%s]: ".." is not allowed, name a sub-folder of the suites path', $name));
+            }
+            if ($segments === []) {
+                continue;
+            }
+
+            $names[] = implode('/', $segments);
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    /**
+     * Suites of the given sub-folders of $root (the union, without duplicates).
+     *
+     * @return array<int, string>
+     *
+     * @throws Error when a name matches no folder, so that a filter typo never
+     *               turns into a green run of zero tests
+     */
+    public function getTestsSuitesIn(string $root, array $subFolders): array
+    {
+        $missing = array_values(array_filter($subFolders, fn ($name) => !is_dir($root . '/' . $name)));
+        if ($missing !== []) {
+            $available = array_values(array_filter(
+                scandir($root) ?: [],
+                fn ($entry) => $entry !== '.' && $entry !== '..' && is_dir($root . '/' . $entry)
+            ));
+            sort($available);
+
+            throw new Error(sprintf(
+                'Suites filter: no folder [%s] under [%s]. Available sub-folders: %s',
+                implode(', ', $missing),
+                $root,
+                $available === [] ? '(none)' : implode(', ', $available)
+            ));
+        }
+
+        $testSuites = [];
+        foreach ($subFolders as $name) {
+            foreach ($this->getTestsSuites($root . '/' . $name) as $suitePath) {
+                $testSuites[] = $suitePath;
+            }
+        }
+
+        return array_values(array_unique($testSuites));
     }
 
     public function getTestsSuites($folderPath)
