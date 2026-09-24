@@ -1,0 +1,245 @@
+<?php
+
+/*
+ * Theme overrides used to be keyed on the CONCRETE page class alone, so a page
+ * that extends a SIBLING page (Category extends Listing, PricesDrop extends
+ * Listing, ...) silently ignored every override its parent declared. The
+ * fixtures below reproduce that shape with real classes -- the resolution walks
+ * class_parents(), so a fake getPageName() would prove nothing.
+ *
+ * They live under a v99 namespace on purpose: the resolver only recognises
+ * classes under Pages\v{N}\ or Pages\Common\, and v99 is the one version that
+ * cannot collide with a page the library actually ships.
+ */
+
+namespace PrestaFlow\Library\Pages\v99\FrontOffice {
+
+    use PrestaFlow\Library\Pages\CommonPage;
+
+    /**
+     * The area base. Strips to the two-segment chain "FrontOffice\Page", which
+     * is trap 1: its walk lands on the FrontOffice node, a map of PAGE NAMES.
+     */
+    class Page extends CommonPage
+    {
+        public array $baseSelectors = [];
+
+        public function __construct(array $globals = [], array $baseSelectors = [])
+        {
+            $this->globals = $globals;
+            $this->baseSelectors = $baseSelectors;
+            $this->customs = ['selectors' => []];
+        }
+
+        public function defineSelectors()
+        {
+            return $this->baseSelectors;
+        }
+
+        public function getPageName(): string
+        {
+            return str_replace('PrestaFlow\\Library\\Pages\\v99\\', '', static::class);
+        }
+    }
+}
+
+namespace PrestaFlow\Library\Pages\v99\FrontOffice\Listing {
+
+    class Page extends \PrestaFlow\Library\Pages\v99\FrontOffice\Page
+    {
+    }
+}
+
+namespace PrestaFlow\Library\Pages\v99\FrontOffice\Category {
+
+    /** The defect in one line: a page whose parent is a sibling page. */
+    class Page extends \PrestaFlow\Library\Pages\v99\FrontOffice\Listing\Page
+    {
+    }
+}
+
+namespace PrestaFlow\Library\Pages\v99\FrontOffice\Product {
+
+    class Page extends \PrestaFlow\Library\Pages\v99\FrontOffice\Page
+    {
+    }
+}
+
+namespace PrestaFlow\Tests\Unit\Pages {
+
+    use PHPUnit\Framework\TestCase;
+    use PrestaFlow\Library\Pages\v99\FrontOffice\Category\Page as CategoryPage;
+    use PrestaFlow\Library\Pages\v99\FrontOffice\Listing\Page as ListingPage;
+    use PrestaFlow\Library\Pages\v99\FrontOffice\Product\Page as ProductPage;
+
+    final class ThemeInheritanceTest extends TestCase
+    {
+        private string $tmpThemes = '';
+
+        protected function tearDown(): void
+        {
+            if ($this->tmpThemes !== '' && is_dir($this->tmpThemes)) {
+                foreach (glob($this->tmpThemes . '/*.json') as $file) {
+                    @unlink($file);
+                }
+                @rmdir($this->tmpThemes);
+            }
+        }
+
+        private function writeTheme(string $theme, array $catalog): string
+        {
+            if ($this->tmpThemes === '') {
+                $this->tmpThemes = sys_get_temp_dir() . '/pf-theme-inherit-' . bin2hex(random_bytes(6));
+                mkdir($this->tmpThemes, 0777, true);
+            }
+
+            file_put_contents($this->tmpThemes . '/' . $theme . '.json', json_encode($catalog));
+
+            return $this->tmpThemes;
+        }
+
+        /** THE defect: an override on Listing must reach Category. */
+        public function testAnOverrideOnTheParentPageReachesTheChildPage(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Listing' => ['productArticleLink' => '.product-miniature__title'],
+                ],
+            ]);
+
+            $page = new CategoryPage(
+                ['THEME' => 'hummingbird'],
+                ['productArticleLink' => '.product-title a']
+            );
+            $page->themeDirs = [$dir];
+
+            $this->assertSame(
+                '.product-miniature__title',
+                $page->getSelectors()['productArticleLink'],
+                'an override declared on Listing must apply to Category, which extends it'
+            );
+        }
+
+        /** The parent block must not beat the child's own block. */
+        public function testTheConcretePageStillWinsOverItsParent(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Listing' => ['pageHeading' => '.from-listing'],
+                    'Category' => ['pageHeading' => '.from-category'],
+                ],
+            ]);
+
+            $page = new CategoryPage(['THEME' => 'hummingbird'], ['pageHeading' => '.base']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.from-category', $page->getSelectors()['pageHeading']);
+        }
+
+        /** Keys only the parent declares survive alongside the child's own. */
+        public function testParentAndChildBlocksAreMergedNotReplaced(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Listing' => ['productArticle' => '.from-listing', 'sortBy' => '.sort'],
+                    'Category' => ['productArticle' => '.from-category'],
+                ],
+            ]);
+
+            $page = new CategoryPage(
+                ['THEME' => 'hummingbird'],
+                ['productArticle' => '.base-article', 'sortBy' => '.base-sort']
+            );
+            $page->themeDirs = [$dir];
+
+            $selectors = $page->getSelectors();
+
+            $this->assertSame('.from-category', $selectors['productArticle']);
+            $this->assertSame('.sort', $selectors['sortBy']);
+        }
+
+        /** Inheritance must not leak sideways: Product does not extend Listing. */
+        public function testASiblingPageDoesNotInheritAnotherPagesOverrides(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Listing' => ['productArticle' => '.from-listing'],
+                ],
+            ]);
+
+            $page = new ProductPage(['THEME' => 'hummingbird'], ['productArticle' => '.base-article']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.base-article', $page->getSelectors()['productArticle']);
+        }
+
+        /** The parent page itself keeps resolving its own block. */
+        public function testTheParentPageStillResolvesItsOwnBlock(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Listing' => ['productArticle' => '.from-listing'],
+                ],
+            ]);
+
+            $page = new ListingPage(['THEME' => 'hummingbird'], ['productArticle' => '.base-article']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.from-listing', $page->getSelectors()['productArticle']);
+        }
+
+        /**
+         * Trap 1: the area base strips to "FrontOffice\Page", whose walk lands on
+         * the FrontOffice node -- a map of PAGE NAMES. Those names must never be
+         * merged in as if they were selector keys.
+         */
+        public function testPageNamesFromTheAreaNodeDoNotLeakIntoSelectors(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Product' => ['addToCartButton' => '.product__add-to-cart-button'],
+                    'Listing' => ['productArticle' => '.from-listing'],
+                    'Category' => ['productArticle' => '.from-category'],
+                ],
+            ]);
+
+            $page = new CategoryPage(['THEME' => 'hummingbird'], ['base' => '.base']);
+            $page->themeDirs = [$dir];
+
+            $selectors = $page->getSelectors();
+
+            $this->assertArrayNotHasKey('Product', $selectors);
+            $this->assertArrayNotHasKey('Listing', $selectors);
+            $this->assertArrayNotHasKey('Category', $selectors);
+            $this->assertSame(
+                [],
+                array_filter($selectors, fn ($value) => !is_string($value)),
+                'no selector value may be an array'
+            );
+        }
+
+        /**
+         * Trap 2, on its own: even when a walk DOES land on a node holding nested
+         * blocks, only flat string values are taken.
+         */
+        public function testNestedArraysAreNeverMergedAsSelectors(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    'Category' => [
+                        'productArticle' => '.from-category',
+                        'Nested' => ['productArticle' => '.too-deep'],
+                    ],
+                ],
+            ]);
+
+            $page = new CategoryPage(['THEME' => 'hummingbird'], []);
+            $page->themeDirs = [$dir];
+
+            $selectors = $page->getSelectors();
+
+            $this->assertSame('.from-category', $selectors['productArticle']);
+            $this->assertArrayNotHasKey('Nested', $selectors);
+        }
+    }
+}

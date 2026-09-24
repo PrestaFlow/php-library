@@ -223,7 +223,10 @@ class CommonPage
         $selectors = [];
         $found = false;
 
-        foreach ($this->themeDirectories() as $dir) {
+        $directories = $this->themeDirectories();
+        $catalogs = [];
+
+        foreach ($directories as $dir) {
             $path = rtrim($dir, '/') . '/' . $theme . '.json';
             if (!file_exists($path)) {
                 continue;
@@ -235,17 +238,14 @@ class CommonPage
                 continue;
             }
 
-            // Same walk as the locale catalog: descend one level per page-name
-            // segment, skipping the trailing "Page".
-            foreach ($pageNames as $pageName) {
-                if ($pageName === 'Page') {
-                    continue;
-                }
-                $decoded = is_array($decoded) && isset($decoded[$pageName]) ? $decoded[$pageName] : [];
-            }
+            $catalogs[] = $decoded;
+        }
 
-            if (is_array($decoded)) {
-                $selectors = [...$selectors, ...$decoded];
+        // Least specific first: a block declared on an ancestor page applies to
+        // every page that inherits from it, and the concrete page still wins.
+        foreach ($this->themePageChains($pageNames) as $chain) {
+            foreach ($catalogs as $catalog) {
+                $selectors = [...$selectors, ...$this->walkThemeCatalog($catalog, $chain)];
             }
         }
 
@@ -259,6 +259,90 @@ class CommonPage
         }
 
         return $selectors;
+    }
+
+    /**
+     * The page-name chains whose theme blocks apply to this page, least
+     * specific first.
+     *
+     * Theme overrides used to be keyed on the CONCRETE class alone, so a page
+     * that extends a sibling page (Category extends Listing, PricesDrop extends
+     * Listing, ...) never saw its parent's overrides even though it inherits
+     * every selector the parent defines. Walking class_parents() fixes that.
+     *
+     * The concrete page keeps going through getPageName() so a subclass that
+     * overrides it (tests do) still steers its own lookup.
+     *
+     * @param array $pageNames the concrete page's chain, as computed by the caller
+     * @return array<int, array<int, string>>
+     */
+    protected function themePageChains(array $pageNames): array
+    {
+        $chains = [];
+
+        // array_reverse puts the furthest ancestor first, which is the order we
+        // want to merge in.
+        foreach (array_reverse(array_values(class_parents($this) ?: [])) as $class) {
+            $name = preg_replace(
+                '#^PrestaFlow\\\\Library\\\\Pages\\\\(?:v\\d+|Common)\\\\#',
+                '',
+                $class
+            );
+
+            if ($name === null || $name === $class) {
+                // Not a page class under Pages\v{N}\ or Pages\Common\.
+                continue;
+            }
+
+            $chains[] = explode('\\', $name);
+        }
+
+        $chains[] = $pageNames;
+
+        // Trap 1: "Common\FrontOffice\Page" strips to "FrontOffice\Page". Its
+        // walk descends FrontOffice, skips the trailing "Page" and lands on the
+        // FrontOffice node -- a map of PAGE NAMES, not selectors. Merging that
+        // would inject "Product", "Listing", ... as if they were selector keys.
+        // A usable chain names an area AND a page, so anything shorter is dropped.
+        $chains = array_values(array_filter(
+            $chains,
+            fn (array $chain): bool => count(array_filter($chain, fn ($s) => $s !== 'Page')) >= 2
+        ));
+
+        // A parent may resolve to the same chain as the child (same names under
+        // two version namespaces); merging it twice is harmless but pointless.
+        $unique = [];
+        foreach ($chains as $chain) {
+            $unique[implode('\\', $chain)] = $chain;
+        }
+
+        return array_values($unique);
+    }
+
+    /**
+     * Descend the theme catalog one level per page-name segment, skipping the
+     * trailing "Page", and return the selectors found there.
+     *
+     * Trap 2: only flat string values are selectors. Filtering to strings is the
+     * belt to the chain-length braces above -- if a walk ever lands on a node of
+     * page blocks again, nested arrays are dropped instead of polluting the map.
+     */
+    protected function walkThemeCatalog(array $catalog, array $chain): array
+    {
+        $node = $catalog;
+
+        foreach ($chain as $pageName) {
+            if ($pageName === 'Page') {
+                continue;
+            }
+            $node = is_array($node) && isset($node[$pageName]) ? $node[$pageName] : [];
+        }
+
+        if (!is_array($node)) {
+            return [];
+        }
+
+        return array_filter($node, fn ($value): bool => is_string($value));
     }
 
     public function getGlobal($index)
