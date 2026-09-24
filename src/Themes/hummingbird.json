@@ -11,7 +11,12 @@
             "modalTitle": ".blockcart-modal__title"
         },
         "Listing": {
-            "productArticle": "#js-product-list .products article:nth-child(${index})"
+            "productArticle": "#js-product-list .products article:nth-child(${index})",
+            "productArticleLink": "#js-product-list .products article:nth-child(${index}) a.product-miniature__title"
+        },
+        "Category": {
+            "productArticle": "#js-product-list .products article:nth-child(${index})",
+            "productArticleLink": "#js-product-list .products article:nth-child(${index}) a.product-miniature__title"
         },
         "Login": {
             "alertDangerTextBlock": ".login__form-wrapper .help-block .alert-danger",
