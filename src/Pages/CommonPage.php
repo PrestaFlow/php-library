@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use HeadlessChromium\Exception\TargetDestroyed;
 use HeadlessChromium\Page as DomPage;
 use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
@@ -857,6 +858,11 @@ class CommonPage
             if (get_class($elem->dom()) instanceof \HeadlessChromium\Dom) {
                 return true;
             }
+        } catch (TargetDestroyed $e) {
+            // The browser or the page went away (closed by another process,
+            // crashed). That is not "the element is missing": answering false
+            // would turn a lost browser into a failed assertion on the shop.
+            throw $e;
         } catch (ElementNotFoundException | OperationTimedOut | Exception $e) {
             return false;
         }
