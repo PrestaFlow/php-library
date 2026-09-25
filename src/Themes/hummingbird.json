@@ -1,8 +1,12 @@
 {
     "FrontOffice": {
+        "_common": {
+            "desktopLogo": ".header-bottom__logo",
+            "userInfoLink": ".ps-customersignin",
+            "accountLink": ".ps-customersignin a[href*=\"my-account\"]"
+        },
         "Home": {
             "homePageSection": "#content.page-content--home",
-            "desktopLogo": ".header-bottom__logo",
             "allProductsLink": ".ps-featuredproducts .module-products__buttons a"
         },
         "Product": {

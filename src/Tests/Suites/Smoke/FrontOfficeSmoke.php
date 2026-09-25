@@ -30,6 +30,10 @@ class FrontOfficeSmoke extends TestsSuite
         $this->importPage('FrontOffice\Product');
         $this->importPage('FrontOffice\Cart');
         $this->importPage('FrontOffice\Category');
+        // A page with no selectors of its own: everything it resolves comes
+        // from the area base, which is exactly what the theme _common block
+        // has to reach.
+        $this->importPage('FrontOffice\Stores');
 
         extract($this->pages);
 
@@ -90,6 +94,44 @@ class FrontOfficeSmoke extends TestsSuite
             $frontOfficeCategoryPage->goToProduct(1);
 
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
+        })
+        /*
+         * The header chrome is declared once on FrontOfficePage and inherited
+         * by all 31 front-office pages, so nothing page-specific ever asserted
+         * it. Measured on a live 9.2 shop, both selectors miss on hummingbird
+         * on every page -- a whole theme's worth of markup that no suite
+         * touched. Asserting them here puts the area-wide selectors under the
+         * same matrix as everything else, on a page that declares none of its
+         * own.
+         */
+        ->it('the shared header chrome resolves on this theme', function () use ($frontOfficeStoresPage) {
+            $frontOfficeStoresPage->goToPage('stores');
+
+            Expect::that($frontOfficeStoresPage->elementIsVisible($frontOfficeStoresPage->getSelector('desktopLogo'), 5000))->equals(true);
+            Expect::that($frontOfficeStoresPage->elementIsVisible($frontOfficeStoresPage->getSelector('userInfoLink'), 5000))->equals(true);
+        })
+        /*
+         * accountLink only exists once a session is open, so every anonymous
+         * probe reported it missing on BOTH themes -- the one shape that looks
+         * like "no divergence" and hides one. Measured against a logged-in
+         * session it misses on hummingbird and matches on Classic, which is why
+         * it needs the scenario below rather than another anonymous step.
+         *
+         * Registration, not EnsureTestAccount: the latter logs in with the
+         * FO_EMAIL / FO_PASSWD defaults, which match PrestaShop's demo customer
+         * (pub@prestashop.com / 123456789) and therefore only work on a shop
+         * that carries demo data. Its register-if-missing fallback cannot stand
+         * in, because 9.2 rejects that same password -- the shop answers "The
+         * minimum score must be: Strong" -- so on a shop without the fixture,
+         * such as a duplicated second shop, both branches fail. Registration
+         * creates its own account with a unique address and a policy-compliant
+         * password, so it needs nothing from the shop's fixtures.
+         */
+        ->scenario(\PrestaFlow\Library\Scenarios\Registration::class)
+        ->it('the logged-in header chrome resolves on this theme', function () use ($frontOfficeStoresPage) {
+            $frontOfficeStoresPage->goToPage('stores');
+
+            Expect::that($frontOfficeStoresPage->elementIsVisible($frontOfficeStoresPage->getSelector('accountLink'), 5000))->equals(true);
         });
     }
 }
