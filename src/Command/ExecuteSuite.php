@@ -118,6 +118,7 @@ class ExecuteSuite extends Command implements OutputStates
 
     public function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->beginRun();
         $this->handleDir(dirname($this->file));
         $this->cli = true;
         $this->output = $output;
@@ -302,14 +303,36 @@ class ExecuteSuite extends Command implements OutputStates
             $this->success('Rapport visuel écrit dans ' . $visualPath, newLine: true, force: true);
         }
 
+        $this->releaseBrowser();
+
+        return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Give this run a browser of its own.
+     *
+     * The run ends by closing its browser (releaseBrowser()), so it must never
+     * pick up one another PrestaFlow process is driving, nor let that process
+     * find and close its own. Scoping the socket file to this run does both.
+     */
+    public function beginRun(): void
+    {
+        \PrestaFlow\Library\Tests\TestsSuite::scopeBrowserFilesTo(
+            'run-' . getmypid() . '-' . bin2hex(random_bytes(4))
+        );
+    }
+
+    /**
+     * Close the browser this run launched and forget its socket file.
+     */
+    public function releaseBrowser(): void
+    {
         try {
             \PrestaFlow\Library\Tests\TestsSuite::getBrowser(force: false)?->close();
         } catch (\Throwable $e) {
         }
         @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser'));
         @unlink(\PrestaFlow\Library\Tests\TestsSuite::getFilePath('.browser-options'));
-
-        return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
     }
 
     protected function handleDir($path)

@@ -154,6 +154,11 @@ class TestsSuite implements OutputStates
     protected static $browserInstance = null;
     protected static ?string $browserInstanceSocket = null;
 
+    /**
+     * Owner of the keepAlive browser files, see scopeBrowserFilesTo().
+     */
+    protected static ?string $browserFilesScope = null;
+
     protected $draft = false;
     protected $groups = 'all';
 
@@ -316,8 +321,30 @@ class TestsSuite implements OutputStates
         return $this->groups;
     }
 
+    /**
+     * Scope the keepAlive browser files (socket, options) to one run.
+     *
+     * Without a scope they sit at one path per machine, which every PrestaFlow
+     * process shares: a run would reconnect to the Chrome another run is
+     * driving, and ExecuteSuite, which closes that browser and deletes the file
+     * when it ends, would tear it down under the other run ("The page was
+     * closed and is not available anymore"). A run scopes the files to itself
+     * so it only ever finds, and releases, the browser it launched.
+     *
+     * Null restores the shared path, for callers outside ExecuteSuite that
+     * rely on reconnecting to an existing browser.
+     */
+    public static function scopeBrowserFilesTo(?string $scope): void
+    {
+        self::$browserFilesScope = ($scope === null || $scope === '') ? null : $scope;
+    }
+
     public static function getFilePath($filename = '.browser')
     {
+        if (self::$browserFilesScope !== null) {
+            $filename = self::$browserFilesScope.'-'.$filename;
+        }
+
         if (function_exists('storage_path')) {
             $dir = storage_path().'/datas';
             if (!is_dir($dir)) {
