@@ -280,6 +280,18 @@ class CommonPage
     {
         $chains = [];
 
+        // The area's shared block, least specific of all. A selector declared
+        // on the area base (FrontOfficePage's desktopLogo, userInfoLink, ...)
+        // is inherited by every page in the area, but its own chain --
+        // "FrontOffice\Page" -- is dropped by the guard below, so there was
+        // nowhere to theme it once. The alternative was repeating it in all 31
+        // page blocks. "_common" cannot collide with a page name: page segments
+        // come from class namespaces and never start with an underscore.
+        $area = $pageNames[0] ?? '';
+        if (is_string($area) && $area !== '' && $area !== 'Page') {
+            $chains[] = [$area, '_common'];
+        }
+
         // array_reverse puts the furthest ancestor first, which is the order we
         // want to merge in.
         foreach (array_reverse(array_values(class_parents($this) ?: [])) as $class) {

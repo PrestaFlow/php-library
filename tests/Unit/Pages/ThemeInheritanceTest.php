@@ -241,5 +241,127 @@ namespace PrestaFlow\Tests\Unit\Pages {
             $this->assertSame('.from-category', $selectors['productArticle']);
             $this->assertArrayNotHasKey('Nested', $selectors);
         }
+
+        /*
+         * A selector declared on the AREA base (FrontOfficePage: desktopLogo,
+         * userInfoLink, ...) is inherited by every page in that area, but the
+         * catalog had nowhere to express it: the chain "FrontOffice\\Page"
+         * strips to a single usable segment and is dropped by trap 1, so the
+         * only way to theme such a selector was to repeat it in all 31 page
+         * blocks. Measured on a real 9.2 shop, desktopLogo and userInfoLink
+         * miss on hummingbird on every one of 18 front-office pages, which is
+         * exactly the shape that duplication would have to cover.
+         *
+         * "_common" is the reserved block for that. It cannot collide with a
+         * page name: page segments come from class namespaces and never start
+         * with an underscore.
+         */
+        public function testACommonBlockAppliesToAPageWithNoBlockOfItsOwn(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    '_common' => ['desktopLogo' => '.header-bottom__logo'],
+                ],
+            ]);
+
+            $page = new ProductPage(['THEME' => 'hummingbird'], ['desktopLogo' => '#_desktop_logo']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.header-bottom__logo', $page->getSelectors()['desktopLogo']);
+        }
+
+        /** The common block is the least specific tier: any page block beats it. */
+        public function testAPageBlockBeatsTheCommonBlock(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    '_common' => ['desktopLogo' => '.from-common'],
+                    'Product' => ['desktopLogo' => '.from-product'],
+                ],
+            ]);
+
+            $page = new ProductPage(['THEME' => 'hummingbird'], ['desktopLogo' => '#_desktop_logo']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.from-product', $page->getSelectors()['desktopLogo']);
+        }
+
+        /** ... and a parent PAGE block beats it too, not just the concrete one. */
+        public function testAParentPageBlockBeatsTheCommonBlock(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    '_common' => ['productArticle' => '.from-common'],
+                    'Listing' => ['productArticle' => '.from-listing'],
+                ],
+            ]);
+
+            $page = new CategoryPage(['THEME' => 'hummingbird'], ['productArticle' => '.base']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('.from-listing', $page->getSelectors()['productArticle']);
+        }
+
+        /** Keys the page block does not mention still come through. */
+        public function testCommonAndPageBlocksAreMergedNotReplaced(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    '_common' => ['desktopLogo' => '.logo', 'userInfoLink' => '.user'],
+                    'Product' => ['desktopLogo' => '.product-logo'],
+                ],
+            ]);
+
+            $page = new ProductPage(
+                ['THEME' => 'hummingbird'],
+                ['desktopLogo' => '#_desktop_logo', 'userInfoLink' => '#_desktop_user_info']
+            );
+            $page->themeDirs = [$dir];
+
+            $selectors = $page->getSelectors();
+
+            $this->assertSame('.product-logo', $selectors['desktopLogo']);
+            $this->assertSame('.user', $selectors['userInfoLink']);
+        }
+
+        /**
+         * A common block belongs to its area. Without this the reserved key
+         * would become a global, and a BackOffice override would start
+         * rewriting FrontOffice selectors.
+         */
+        public function testACommonBlockDoesNotLeakAcrossAreas(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'BackOffice' => [
+                    '_common' => ['desktopLogo' => '.back-office-logo'],
+                ],
+            ]);
+
+            $page = new ProductPage(['THEME' => 'hummingbird'], ['desktopLogo' => '#_desktop_logo']);
+            $page->themeDirs = [$dir];
+
+            $this->assertSame('#_desktop_logo', $page->getSelectors()['desktopLogo']);
+        }
+
+        /** Trap 2 still applies inside the reserved block. */
+        public function testNestedArraysInTheCommonBlockAreNotMergedAsSelectors(): void
+        {
+            $dir = $this->writeTheme('hummingbird', [
+                'FrontOffice' => [
+                    '_common' => [
+                        'desktopLogo' => '.logo',
+                        'Nested' => ['desktopLogo' => '.too-deep'],
+                    ],
+                ],
+            ]);
+
+            $page = new ProductPage(['THEME' => 'hummingbird'], []);
+            $page->themeDirs = [$dir];
+
+            $selectors = $page->getSelectors();
+
+            $this->assertSame('.logo', $selectors['desktopLogo']);
+            $this->assertArrayNotHasKey('Nested', $selectors);
+        }
     }
 }
