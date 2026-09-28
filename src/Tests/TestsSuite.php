@@ -162,6 +162,12 @@ class TestsSuite implements OutputStates
     /** Overrides posés par l'app (matrice visuelle) avant la création du navigateur. */
     protected static ?array $browserOptionOverrides = null;
 
+    /**
+     * Ne s'applique qu'à la PROCHAINE création de navigateur (dans getBrowser(),
+     * quand aucun socket vivant n'est réutilisé) : un navigateur déjà lancé garde
+     * sa taille/UA d'origine tant qu'on ne l'a pas fermé. Pour appliquer un nouvel
+     * override à un navigateur déjà en cours, appeler resetBrowser() juste après.
+     */
     public static function useBrowserOptions(?int $width, ?int $height, ?string $userAgent): void
     {
         self::$browserOptionOverrides = ($width === null && $height === null && $userAgent === null)
@@ -174,29 +180,55 @@ class TestsSuite implements OutputStates
     {
         $o = self::$browserOptionOverrides ?? [];
 
+        $width = (int) (($o['width'] ?? null) ?: Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH'));
+        if ($width <= 0) {
+            $width = 1920;
+        }
+
+        $height = (int) (($o['height'] ?? null) ?: Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT'));
+        if ($height <= 0) {
+            $height = 1080;
+        }
+
         return [
-            'windowSize' => [
-                (int) ($o['width'] ?? null ?: (Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH') ?: 1920)),
-                (int) ($o['height'] ?? null ?: (Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT') ?: 1080)),
-            ],
-            'userAgent' => (string) ($o['userAgent'] ?? null ?: Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow')),
+            'windowSize' => [$width, $height],
+            'userAgent' => (string) (($o['userAgent'] ?? null) ?: Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow')),
         ];
     }
 
     /**
      * Ferme le navigateur partagé et oublie son socket : le prochain getBrowser()
      * en relancera un neuf (nécessaire quand la taille de fenêtre change).
+     *
+     * Si ce process n'a pas de navigateur en cache (self::$browserInstance) mais
+     * qu'un fichier socket existe, on tente de s'y connecter pour le fermer quand
+     * même : sinon un navigateur keepAlive lancé par un process précédent (ou
+     * après un crash) resterait orphelin en arrière-plan.
+     *
+     * Hypothèse : un seul process possède le navigateur partagé à la fois (le
+     * fichier socket est global, pas process-local). Des runs concurrents sur la
+     * même machine/storage peuvent donc se fermer mutuellement leur navigateur.
      */
     public static function resetBrowser(): void
     {
+        $socketFile = self::getFilePath('.browser');
+
         try {
-            self::$browserInstance?->close();
+            if (self::$browserInstance !== null) {
+                self::$browserInstance->close();
+            } elseif (file_exists($socketFile)) {
+                $socket = trim((string) file_get_contents($socketFile));
+                if ($socket !== '') {
+                    BrowserFactory::connectToBrowser($socket)->close();
+                }
+            }
         } catch (\Throwable) {
-            // navigateur déjà mort : rien à faire
+            // navigateur déjà mort / injoignable : rien à faire
         }
+
         self::$browserInstance = null;
         self::$browserInstanceSocket = null;
-        @unlink(self::getFilePath('.browser'));
+        @unlink($socketFile);
         @unlink(self::getFilePath('.browser-options'));
     }
 

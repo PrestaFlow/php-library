@@ -10,9 +10,6 @@ final class BrowserOptionsTest extends TestCase
     protected function tearDown(): void
     {
         TestsSuite::useBrowserOptions(null, null, null);
-        putenv('PRESTAFLOW_WINDOW_SIZE_WIDTH');
-        putenv('PRESTAFLOW_WINDOW_SIZE_HEIGHT');
-        putenv('PRESTAFLOW_USER_AGENT');
         unset($_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'], $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'], $_ENV['PRESTAFLOW_USER_AGENT']);
     }
 
@@ -46,5 +43,26 @@ final class BrowserOptionsTest extends TestCase
 
         $this->assertFileDoesNotExist($socket);
         $this->assertFileDoesNotExist($options);
+    }
+
+    public function test_reset_browser_twice_in_a_row_does_not_throw(): void
+    {
+        TestsSuite::resetBrowser();
+        TestsSuite::resetBrowser();
+
+        $this->assertFileDoesNotExist(TestsSuite::getFilePath('.browser'));
+        $this->assertFileDoesNotExist(TestsSuite::getFilePath('.browser-options'));
+    }
+
+    public function test_partial_override_falls_back_to_default_height_and_user_agent(): void
+    {
+        TestsSuite::useBrowserOptions(390, null, null);
+        $this->assertSame(['windowSize' => [390, 1080], 'userAgent' => 'PrestaFlow'], TestsSuite::browserOptions());
+    }
+
+    public function test_invalid_env_width_falls_back_to_default(): void
+    {
+        $_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'] = 'abc';
+        $this->assertSame(['windowSize' => [1920, 1080], 'userAgent' => 'PrestaFlow'], TestsSuite::browserOptions());
     }
 }
