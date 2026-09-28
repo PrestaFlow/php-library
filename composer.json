@@ -3,6 +3,9 @@
     "description": "PrestaFlow is an open-source set of prebuilt tests components, ready-to-use examples made for the PrestaShop E-commerce software.",
     "type": "library",
     "license": "MIT",
+    "bin": [
+        "bin/prestaflow"
+    ],
     "autoload": {
         "psr-4": {
             "PrestaFlow\\Library\\": "src/",
@@ -32,9 +35,9 @@
         "chrome-php/chrome": "^1.10",
         "sapientpro/image-comparator": "^1.0",
         "inceddy/image-compare": "^1.0",
-        "symfony/console": "^6.0",
+        "symfony/console": "^6.0 || ^7.0",
         "vlucas/phpdotenv": "^5.6",
-        "symfony/event-dispatcher": "^6.0",
+        "symfony/event-dispatcher": "^6.0 || ^7.0",
         "smalot/pdfparser": "^2.11"
     },
     "config": {

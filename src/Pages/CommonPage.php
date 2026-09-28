@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
+use HeadlessChromium\Exception\TargetDestroyed;
 use HeadlessChromium\Page as DomPage;
 use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
@@ -125,8 +126,23 @@ class CommonPage
         $page = $this->getPage();
 
         if (!is_null($page) && method_exists($page, $name)) {
-            call_user_func_array([$page, $name], $arguments);
+            return call_user_func_array([$page, $name], $arguments);
         }
+
+        // No browser page yet: keep the historical no-op for real chrome-php
+        // methods, but never for a name nobody defines.
+        if (is_null($page) && method_exists(DomPage::class, $name)) {
+            return null;
+        }
+
+        // A typo or a method that lives elsewhere (e.g. waitForNavigation(), which
+        // belongs to PageNavigation, not Page) used to be swallowed silently, so
+        // the step "passed" without doing anything.
+        throw new \BadMethodCallException(sprintf(
+            'Call to undefined method %s::%s() (not defined on the page object nor on the chrome-php page).',
+            static::class,
+            $name
+        ));
     }
 
     public function setGlobals($globals)
@@ -413,6 +429,65 @@ class CommonPage
         }
     }
 
+    private function applyVisualMasks(array $masks): void
+    {
+        $masks = array_values(array_filter(array_map('trim', $masks)));
+        if ($masks === []) {
+            return;
+        }
+        // Une règle CSS par sélecteur : un sélecteur invalide ne doit pas faire
+        // échouer le bloc entier et désactiver le masquage des autres.
+        $css = json_encode(
+            implode("\n", array_map(fn ($m) => $m.' { visibility: hidden !important; }', $masks)),
+            JSON_THROW_ON_ERROR
+        );
+        $this->getPage()->evaluate(
+            "(function(){var s=document.createElement('style');s.id='pf-visual-masks';s.textContent={$css};document.head.appendChild(s);})()"
+        )->getReturnValue();
+    }
+
+    private function removeVisualMasks(array $masks): void
+    {
+        if (array_filter(array_map('trim', $masks)) === []) {
+            return;
+        }
+        try {
+            $this->getPage()->evaluate(
+                "(function(){var s=document.getElementById('pf-visual-masks');if(s){s.remove();}})()"
+            )->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : ne doit jamais masquer l'exception d'origine de la capture
+        }
+    }
+
+    /** Scrolle juste sous l'élément (ex. header) : le viewport commence au contenu utile. */
+    public function scrollBelow(string $selector, int $settleMs = 400): void
+    {
+        try {
+            $sel = json_encode($selector, JSON_THROW_ON_ERROR);
+            $this->getPage()->evaluate(
+                "(function(){window.scrollTo(0, 0);var e=document.querySelector({$sel});if(!e){return;}var r=e.getBoundingClientRect();window.scrollTo(0, r.bottom + window.scrollY);})()"
+            )->getReturnValue();
+            usleep($settleMs * 1000);
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le scroll a échoué
+        }
+    }
+
+    /** Attend le chargement complet + polices + images (y compris lazy sous le pli), sans lever si le délai expire. */
+    public function waitForStable(int $timeout = 10000): void
+    {
+        try {
+            $this->waitForJsCondition(
+                "document.readyState === 'complete' && (!document.fonts || document.fonts.status === 'loaded') "
+                . "&& Array.from(document.images).every(function(i){return i.complete || (i.loading === 'lazy' && i.getBoundingClientRect().top > window.innerHeight);})",
+                $timeout
+            );
+        } catch (\Throwable $e) {
+            // best-effort : ne doit jamais lever, même en cas d'échec du polling
+        }
+    }
+
     /**
      * Best-effort : dimensions du viewport courant via le navigateur. `null`
      * pour un des deux (ou les deux) si l'info n'est pas disponible (page
@@ -458,7 +533,7 @@ class CommonPage
      * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
      * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto'): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
     {
         $rawMajorVersion = $this->getMajorVersion();
         $majorVersion = (is_string($rawMajorVersion) || is_int($rawMajorVersion))
@@ -482,21 +557,26 @@ class CommonPage
 
         $page = $this->getPage();
 
-        if ($selector !== null) {
-            $node = $page->dom()->querySelector($selector);
-            if ($node === null) {
-                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+        $this->applyVisualMasks($masks);
+        try {
+            if ($selector !== null) {
+                $node = $page->dom()->querySelector($selector);
+                if ($node === null) {
+                    throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+                }
+                $page->screenshotElement($node)->saveToFile($actualPath);
+            } elseif ($fullPage) {
+                $page->screenshot([
+                    'captureBeyondViewport' => true,
+                    'clip' => $page->getFullPageClip(),
+                    'format' => 'png',
+                ])->saveToFile($actualPath);
+            } else {
+                // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
+                $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
             }
-            $page->screenshotElement($node)->saveToFile($actualPath);
-        } elseif ($fullPage) {
-            $page->screenshot([
-                'captureBeyondViewport' => true,
-                'clip' => $page->getFullPageClip(),
-                'format' => 'png',
-            ])->saveToFile($actualPath);
-        } else {
-            // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
-            $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
+        } finally {
+            $this->removeVisualMasks($masks);
         }
 
         if (!is_file($refPath)) {
@@ -558,9 +638,27 @@ class CommonPage
         $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
     }
 
-    public function waitForPageLoaded()
+    /**
+     * Wait until the current document has been parsed (DOMContentLoaded, i.e.
+     * readyState "interactive" or "complete") and has a <body>.
+     *
+     * This polls the page state; it does not observe a navigation. Right after
+     * an action that triggers one, the previous document may still report
+     * itself as ready, so prefer waiting on navigate()->waitForNavigation() or
+     * on an element of the next page when you have one.
+     *
+     * @throws TimeoutException when the page is still loading after $timeout ms
+     */
+    public function waitForPageLoaded(int $timeout = 30000): void
     {
-        $this->waitForNavigation(DomPage::DOM_CONTENT_LOADED, 10000);
+        $loaded = $this->waitForJsCondition(
+            "document.readyState !== 'loading' && !!document.body",
+            $timeout
+        );
+
+        if (!$loaded) {
+            throw new TimeoutException(sprintf('Page did not finish loading within %d ms.', $timeout));
+        }
     }
 
     public function getTextContent($selector, $index = 1, $waitForSelector = true, $timeout = 3000)
@@ -824,6 +922,11 @@ class CommonPage
             if (get_class($elem->dom()) instanceof \HeadlessChromium\Dom) {
                 return true;
             }
+        } catch (TargetDestroyed $e) {
+            // The browser or the page went away (closed by another process,
+            // crashed). That is not "the element is missing": answering false
+            // would turn a lost browser into a failed assertion on the shop.
+            throw $e;
         } catch (ElementNotFoundException | OperationTimedOut | Exception $e) {
             return false;
         }
