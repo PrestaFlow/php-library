@@ -30,9 +30,42 @@ final class VisualTestsSuiteTest extends TestCase
         return $suite;
     }
 
+    private array $envBackup = [];
+    private array $serverBackup = [];
+
+    protected function setUp(): void
+    {
+        $this->envBackup = $_ENV;
+        $this->serverBackup = $_SERVER;
+    }
+
     protected function tearDown(): void
     {
         TestsSuite::useBrowserOptions(null, null, null);
+        $_ENV = $this->envBackup;
+        $_SERVER = $this->serverBackup;
+    }
+
+    /** Suite construite avec loadGlobals: true (chemin CLI), sans navigateur. */
+    private function cliSuite(): VisualTestsSuite
+    {
+        return new class (loadGlobals: true, getBrowser: false) extends VisualTestsSuite {
+            protected array $devices = ['desktop'];
+            protected array $locales = ['fr', 'en'];
+            protected array $checkpoints = [];
+            protected function importVisualPage(): void {}
+        };
+    }
+
+    /** Expose la logique de décision du preset (pas de navigateur réel). */
+    private function presetProbe(): string
+    {
+        $probe = new class (loadGlobals: false, getBrowser: false) extends VisualTestsSuite {
+            protected function importVisualPage(): void {}
+            public static function apply(string $device): bool { return static::applyDevicePreset($device); }
+        };
+
+        return $probe::class;
     }
 
     public function test_resolve_path(): void
@@ -68,6 +101,82 @@ final class VisualTestsSuiteTest extends TestCase
         $this->assertArrayNotHasKey('skip', $tests[0]);
         $this->assertTrue($tests[1]['skip'] ?? false);   // footer exclu sur mobile
         $this->assertTrue($tests[2]['skip'] ?? false);   // promos sautée en EN
+    }
+
+    public function test_cli_locale_defaults_to_first_declared_locale(): void
+    {
+        unset($_ENV['PRESTAFLOW_LOCALE'], $_SERVER['PRESTAFLOW_LOCALE']);
+        putenv('PRESTAFLOW_LOCALE');
+
+        $this->assertSame('fr', $this->cliSuite()->currentLocale());
+    }
+
+    public function test_cli_locale_env_wins_over_declared_locales(): void
+    {
+        $_ENV['PRESTAFLOW_LOCALE'] = 'en';
+
+        $this->assertSame('en', $this->cliSuite()->currentLocale());
+    }
+
+    public function test_init_rejects_undeclared_device(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('tablet');
+        $this->suite(['DEVICE' => 'tablet'])->init();
+    }
+
+    public function test_init_rejects_undeclared_locale(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('de');
+        $this->suite(['LOCALE' => 'de'])->init();
+    }
+
+    public function test_default_title_is_short_class_name(): void
+    {
+        $s = $this->suite();
+        $s->init();
+        $this->assertStringNotContainsString('\\', $s->title);
+        $this->assertSame(substr(strrchr('\\'.$s::class, '\\'), 1), $s->title);
+    }
+
+    public function test_normalize_clamps_threshold(): void
+    {
+        $this->assertSame(0.5, VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 0.1])['threshold']);
+        $this->assertSame(1.0, VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 3])['threshold']);
+        $this->assertSame(0.9, VisualTestsSuite::normalize(['name' => 'x', 'threshold' => '0.9'])['threshold']);
+    }
+
+    public function test_device_preset_applied_and_resets_browser_when_options_differ(): void
+    {
+        $probe = $this->presetProbe();
+        $socket = TestsSuite::getFilePath('.browser');
+        file_put_contents($socket, 'ws://127.0.0.1:1/devtools/browser/nope');
+
+        $this->assertTrue($probe::apply('mobile'));
+        $this->assertFileDoesNotExist($socket);
+        $this->assertSame([390, 844], TestsSuite::browserOptions()['windowSize']);
+
+        // même device : options déjà bonnes → pas de reset, socket réutilisable
+        file_put_contents($socket, 'ws://127.0.0.1:1/devtools/browser/nope');
+        $this->assertFalse($probe::apply('mobile'));
+        $this->assertFileExists($socket);
+        @unlink($socket);
+
+        // device différent, preset posé par nous → on le remplace
+        $this->assertTrue($probe::apply('tablet'));
+        $this->assertSame([768, 1024], TestsSuite::browserOptions()['windowSize']);
+    }
+
+    public function test_device_preset_never_overrides_app_options(): void
+    {
+        $probe = $this->presetProbe();
+        $probe::apply('mobile');
+
+        // l'app pose ses propres options (matrice) → intouchables
+        TestsSuite::useBrowserOptions(1280, 720, 'AppUA');
+        $this->assertFalse($probe::apply('desktop'));
+        $this->assertSame(['windowSize' => [1280, 720], 'userAgent' => 'AppUA'], TestsSuite::browserOptions());
     }
 
     public function test_normalize_defaults(): void

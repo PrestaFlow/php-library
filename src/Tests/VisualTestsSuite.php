@@ -17,14 +17,54 @@ abstract class VisualTestsSuite extends TestsSuite
     protected array $locales = [];
     protected array $checkpoints = [];
 
+    /**
+     * Dernier override posé par applyDevicePreset(). Tant que les overrides
+     * courants lui sont identiques, ils « nous appartiennent » et peuvent être
+     * remplacés (suite visuelle suivante, autre device). Si l'app a posé les
+     * siens entre-temps, ils diffèrent → on n'y touche jamais.
+     */
+    private static ?array $appliedPreset = null;
+
     public function __construct(bool $loadGlobals = true, bool $getBrowser = true)
     {
-        // CLI : aucun override posé par l'app → preset du device (env ou 1er déclaré).
-        if ($getBrowser && self::$browserOptionOverrides === null) {
-            $preset = VisualDevices::get($this->deviceFromEnv() ?? ($this->devices[0] ?? 'desktop'));
-            self::useBrowserOptions($preset['width'], $preset['height'], $preset['userAgent']);
+        // CLI : preset du device (env ou 1er déclaré), sauf si l'app a posé ses options.
+        if ($getBrowser) {
+            static::applyDevicePreset($this->deviceFromEnv() ?? ($this->devices[0] ?? 'desktop'));
         }
+
         parent::__construct(loadGlobals: $loadGlobals, getBrowser: $getBrowser);
+
+        // loadGlobals() pose toujours LOCALE (défaut 'en') : sans PRESTAFLOW_LOCALE
+        // explicite, la locale par défaut d'une suite visuelle est sa 1re déclarée.
+        if ($loadGlobals && $this->locales !== [] && (string) Env::get('PRESTAFLOW_LOCALE', '') === '') {
+            $this->setGlobals(['LOCALE' => $this->locales[0]]);
+        }
+    }
+
+    /**
+     * Applique le preset du device si les options navigateur ne sont pas déjà
+     * pilotées par l'app. Retourne true si le navigateur partagé a été réinitialisé
+     * (options différentes → un navigateur keepAlive réutilisé garderait sinon
+     * l'ancienne taille / UA).
+     */
+    protected static function applyDevicePreset(string $device): bool
+    {
+        $overrides = self::$browserOptionOverrides;
+        if ($overrides !== null && $overrides !== self::$appliedPreset) {
+            return false; // options posées par l'app : intouchables
+        }
+
+        $preset = VisualDevices::get($device);
+        $wanted = ['windowSize' => [$preset['width'], $preset['height']], 'userAgent' => $preset['userAgent']];
+        if (TestsSuite::browserOptions() === $wanted) {
+            return false;
+        }
+
+        self::useBrowserOptions($preset['width'], $preset['height'], $preset['userAgent']);
+        self::$appliedPreset = self::$browserOptionOverrides;
+        TestsSuite::resetBrowser();
+
+        return true;
     }
 
     public function devices(): array { return $this->devices; }
@@ -33,16 +73,23 @@ abstract class VisualTestsSuite extends TestsSuite
 
     public static function normalize(array $cp): array
     {
-        return array_merge([
+        $cp = array_merge([
             'path' => '', 'paths' => [], 'zone' => 'viewport', 'selector' => null,
             'waitFor' => null, 'scrollBelow' => null, 'threshold' => 0.98,
             'excludeDevices' => [], 'masks' => [],
         ], $cp);
+        $cp['threshold'] = max(0.5, min(1.0, (float) $cp['threshold']));
+
+        return $cp;
     }
 
     public function currentDevice(): string
     {
-        $globals = $this->globals ?? [];
+        try {
+            $globals = $this->getGlobals();
+        } catch (\Throwable) {
+            $globals = [];
+        }
 
         return $globals['DEVICE'] ?? $this->deviceFromEnv() ?? ($this->devices[0] ?? 'desktop');
     }
@@ -79,7 +126,14 @@ abstract class VisualTestsSuite extends TestsSuite
         $device = $this->currentDevice();
         $locale = $this->currentLocale();
 
-        $this->describe($this->title ?: static::class);
+        if (!in_array($device, $this->devices, true)) {
+            throw new \InvalidArgumentException(sprintf('%s : device « %s » non déclaré (%s)', static::class, $device, implode(', ', $this->devices)));
+        }
+        if ($this->locales !== [] && !in_array($locale, $this->locales, true)) {
+            throw new \InvalidArgumentException(sprintf('%s : locale « %s » non déclarée (%s)', static::class, $locale, implode(', ', $this->locales)));
+        }
+
+        $this->describe($this->title ?: substr(strrchr('\\'.static::class, '\\'), 1));
 
         foreach ($this->checkpoints() as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
