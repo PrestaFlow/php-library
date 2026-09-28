@@ -159,6 +159,79 @@ class TestsSuite implements OutputStates
      */
     protected static ?string $browserFilesScope = null;
 
+    /** Overrides posés par l'app (matrice visuelle) avant la création du navigateur. */
+    protected static ?array $browserOptionOverrides = null;
+
+    /**
+     * Ne s'applique qu'à la PROCHAINE création de navigateur (dans getBrowser(),
+     * quand aucun socket vivant n'est réutilisé) : un navigateur déjà lancé garde
+     * sa taille/UA d'origine tant qu'on ne l'a pas fermé. Pour appliquer un nouvel
+     * override à un navigateur déjà en cours, appeler resetBrowser() juste après.
+     */
+    public static function useBrowserOptions(?int $width, ?int $height, ?string $userAgent): void
+    {
+        self::$browserOptionOverrides = ($width === null && $height === null && $userAgent === null)
+            ? null
+            : ['width' => $width, 'height' => $height, 'userAgent' => $userAgent];
+    }
+
+    /** @return array{windowSize: array{0:int,1:int}, userAgent: string} */
+    public static function browserOptions(): array
+    {
+        $o = self::$browserOptionOverrides ?? [];
+
+        $width = (int) (($o['width'] ?? null) ?: Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH'));
+        if ($width <= 0) {
+            $width = 1920;
+        }
+
+        $height = (int) (($o['height'] ?? null) ?: Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT'));
+        if ($height <= 0) {
+            $height = 1080;
+        }
+
+        return [
+            'windowSize' => [$width, $height],
+            'userAgent' => (string) (($o['userAgent'] ?? null) ?: Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow')),
+        ];
+    }
+
+    /**
+     * Ferme le navigateur partagé et oublie son socket : le prochain getBrowser()
+     * en relancera un neuf (nécessaire quand la taille de fenêtre change).
+     *
+     * Si ce process n'a pas de navigateur en cache (self::$browserInstance) mais
+     * qu'un fichier socket existe, on tente de s'y connecter pour le fermer quand
+     * même : sinon un navigateur keepAlive lancé par un process précédent (ou
+     * après un crash) resterait orphelin en arrière-plan.
+     *
+     * Hypothèse : un seul process possède le navigateur partagé à la fois (le
+     * fichier socket est global, pas process-local). Des runs concurrents sur la
+     * même machine/storage peuvent donc se fermer mutuellement leur navigateur.
+     */
+    public static function resetBrowser(): void
+    {
+        $socketFile = self::getFilePath('.browser');
+
+        try {
+            if (self::$browserInstance !== null) {
+                self::$browserInstance->close();
+            } elseif (file_exists($socketFile)) {
+                $socket = trim((string) file_get_contents($socketFile));
+                if ($socket !== '') {
+                    BrowserFactory::connectToBrowser($socket)->close();
+                }
+            }
+        } catch (\Throwable) {
+            // navigateur déjà mort / injoignable : rien à faire
+        }
+
+        self::$browserInstance = null;
+        self::$browserInstanceSocket = null;
+        @unlink($socketFile);
+        @unlink(self::getFilePath('.browser-options'));
+    }
+
     protected $draft = false;
     protected $groups = 'all';
 
@@ -473,15 +546,16 @@ class TestsSuite implements OutputStates
                 return null;
             }
 
-            // Dimensions de la fenêtre : PRESTAFLOW_WINDOW_SIZE_WIDTH/HEIGHT en
-            // env (utile pour émuler mobile/tablet/desktop). Défaut FHD 1920×1080.
-            $winWidth  = (int) (Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH')  ?: 1920);
-            $winHeight = (int) (Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT') ?: 1080);
+            // Dimensions de la fenêtre et user agent : overrides posés par
+            // useBrowserOptions() sinon PRESTAFLOW_WINDOW_SIZE_WIDTH/HEIGHT /
+            // PRESTAFLOW_USER_AGENT en env (utile pour émuler mobile/tablet/desktop).
+            // Défaut FHD 1920×1080.
+            $opts = self::browserOptions();
 
             $options = [
-                'userAgent' => Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow'),
+                'userAgent' => $opts['userAgent'],
                 'keepAlive' => true,
-                'windowSize' => [$winWidth, $winHeight],
+                'windowSize' => $opts['windowSize'],
                 'headless' => (bool) $headless,
                 'ignoreCertificateErrors' => true,
             ];
@@ -969,8 +1043,8 @@ class TestsSuite implements OutputStates
             'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),
             'BROWSER' => [
                 'HEADLESS' => (bool) Env::get('PRESTAFLOW_HEADLESS', true),
-                'WINDOW_SIZE_HEIGHT' => Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT', 1920),
-                'WINDOW_SIZE_WIDTH' => Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH', 1000),
+                'WINDOW_SIZE_HEIGHT' => Env::get('PRESTAFLOW_WINDOW_SIZE_HEIGHT', 1080),
+                'WINDOW_SIZE_WIDTH' => Env::get('PRESTAFLOW_WINDOW_SIZE_WIDTH', 1920),
                 'USER_AGENT' => Env::get('PRESTAFLOW_USER_AGENT', 'PrestaFlow'),
             ],
         ];
