@@ -105,7 +105,12 @@ final class VisualTestsSuiteTest extends TestCase
 
     public function test_cli_locale_defaults_to_first_declared_locale(): void
     {
-        unset($_ENV['PRESTAFLOW_LOCALE'], $_SERVER['PRESTAFLOW_LOCALE']);
+        // Défini mais vide, pas absent : loadGlobals() charge aussi les .env* du
+        // dépôt de la lib (et non du seul répertoire courant), et un
+        // PRESTAFLOW_LOCALE=en dans un .env.local local reviendrait par là.
+        // Dotenv immutable ne réécrit pas une variable déjà définie.
+        $_ENV['PRESTAFLOW_LOCALE'] = '';
+        unset($_SERVER['PRESTAFLOW_LOCALE']);
         putenv('PRESTAFLOW_LOCALE');
 
         $this->assertSame('fr', $this->cliSuite()->currentLocale());
