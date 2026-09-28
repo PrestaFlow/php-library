@@ -1049,7 +1049,9 @@ class TestsSuite implements OutputStates
             ],
         ];
 
-        $this->exctractVersions(Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'));
+        // Not the environment alone: a suite may pin its version through
+        // $psVersion or onVersion(), which resolveVersion() lets win.
+        $this->resolveVersion();
         $this->setLocale(Env::get('PRESTAFLOW_LOCALE', 'en'));
     }
 
