@@ -429,6 +429,47 @@ class CommonPage
         }
     }
 
+    private function applyVisualMasks(array $masks): void
+    {
+        $masks = array_values(array_filter(array_map('trim', $masks)));
+        if ($masks === []) {
+            return;
+        }
+        $css = json_encode(implode(', ', $masks).' { visibility: hidden !important; }');
+        $this->getPage()->evaluate(
+            "(function(){var s=document.createElement('style');s.id='pf-visual-masks';s.textContent={$css};document.head.appendChild(s);})()"
+        );
+    }
+
+    private function removeVisualMasks(array $masks): void
+    {
+        if (array_filter(array_map('trim', $masks)) === []) {
+            return;
+        }
+        $this->getPage()->evaluate(
+            "(function(){var s=document.getElementById('pf-visual-masks');if(s){s.remove();}})()"
+        );
+    }
+
+    /** Scrolle juste sous l'élément (ex. header) : le viewport commence au contenu utile. */
+    public function scrollBelow(string $selector, int $settleMs = 400): void
+    {
+        $sel = json_encode($selector);
+        $this->getPage()->evaluate(
+            "(function(){var e=document.querySelector({$sel});if(!e){return;}window.scrollTo(0, e.getBoundingClientRect().bottom + window.scrollY);})()"
+        );
+        usleep($settleMs * 1000);
+    }
+
+    /** Attend le chargement complet + images, sans lever si le délai expire. */
+    public function waitForStable(int $timeout = 10000): void
+    {
+        $this->waitForJsCondition(
+            "document.readyState === 'complete' && Array.from(document.images).every(function(i){return i.complete;})",
+            $timeout
+        );
+    }
+
     /**
      * Best-effort : dimensions du viewport courant via le navigateur. `null`
      * pour un des deux (ou les deux) si l'info n'est pas disponible (page
@@ -474,7 +515,7 @@ class CommonPage
      * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
      * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto'): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
     {
         $rawMajorVersion = $this->getMajorVersion();
         $majorVersion = (is_string($rawMajorVersion) || is_int($rawMajorVersion))
@@ -498,21 +539,26 @@ class CommonPage
 
         $page = $this->getPage();
 
-        if ($selector !== null) {
-            $node = $page->dom()->querySelector($selector);
-            if ($node === null) {
-                throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+        $this->applyVisualMasks($masks);
+        try {
+            if ($selector !== null) {
+                $node = $page->dom()->querySelector($selector);
+                if ($node === null) {
+                    throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
+                }
+                $page->screenshotElement($node)->saveToFile($actualPath);
+            } elseif ($fullPage) {
+                $page->screenshot([
+                    'captureBeyondViewport' => true,
+                    'clip' => $page->getFullPageClip(),
+                    'format' => 'png',
+                ])->saveToFile($actualPath);
+            } else {
+                // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
+                $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
             }
-            $page->screenshotElement($node)->saveToFile($actualPath);
-        } elseif ($fullPage) {
-            $page->screenshot([
-                'captureBeyondViewport' => true,
-                'clip' => $page->getFullPageClip(),
-                'format' => 'png',
-            ])->saveToFile($actualPath);
-        } else {
-            // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
-            $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
+        } finally {
+            $this->removeVisualMasks($masks);
         }
 
         if (!is_file($refPath)) {
