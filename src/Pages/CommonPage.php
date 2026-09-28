@@ -435,10 +435,15 @@ class CommonPage
         if ($masks === []) {
             return;
         }
-        $css = json_encode(implode(', ', $masks).' { visibility: hidden !important; }');
+        // Une règle CSS par sélecteur : un sélecteur invalide ne doit pas faire
+        // échouer le bloc entier et désactiver le masquage des autres.
+        $css = json_encode(
+            implode("\n", array_map(fn ($m) => $m.' { visibility: hidden !important; }', $masks)),
+            JSON_THROW_ON_ERROR
+        );
         $this->getPage()->evaluate(
             "(function(){var s=document.createElement('style');s.id='pf-visual-masks';s.textContent={$css};document.head.appendChild(s);})()"
-        );
+        )->getReturnValue();
     }
 
     private function removeVisualMasks(array $masks): void
@@ -446,28 +451,41 @@ class CommonPage
         if (array_filter(array_map('trim', $masks)) === []) {
             return;
         }
-        $this->getPage()->evaluate(
-            "(function(){var s=document.getElementById('pf-visual-masks');if(s){s.remove();}})()"
-        );
+        try {
+            $this->getPage()->evaluate(
+                "(function(){var s=document.getElementById('pf-visual-masks');if(s){s.remove();}})()"
+            )->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : ne doit jamais masquer l'exception d'origine de la capture
+        }
     }
 
     /** Scrolle juste sous l'élément (ex. header) : le viewport commence au contenu utile. */
     public function scrollBelow(string $selector, int $settleMs = 400): void
     {
-        $sel = json_encode($selector);
-        $this->getPage()->evaluate(
-            "(function(){var e=document.querySelector({$sel});if(!e){return;}window.scrollTo(0, e.getBoundingClientRect().bottom + window.scrollY);})()"
-        );
-        usleep($settleMs * 1000);
+        try {
+            $sel = json_encode($selector, JSON_THROW_ON_ERROR);
+            $this->getPage()->evaluate(
+                "(function(){window.scrollTo(0, 0);var e=document.querySelector({$sel});if(!e){return;}var r=e.getBoundingClientRect();window.scrollTo(0, r.bottom + window.scrollY);})()"
+            )->getReturnValue();
+            usleep($settleMs * 1000);
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le scroll a échoué
+        }
     }
 
-    /** Attend le chargement complet + images, sans lever si le délai expire. */
+    /** Attend le chargement complet + polices + images (y compris lazy sous le pli), sans lever si le délai expire. */
     public function waitForStable(int $timeout = 10000): void
     {
-        $this->waitForJsCondition(
-            "document.readyState === 'complete' && Array.from(document.images).every(function(i){return i.complete;})",
-            $timeout
-        );
+        try {
+            $this->waitForJsCondition(
+                "document.readyState === 'complete' && (!document.fonts || document.fonts.status === 'loaded') "
+                . "&& Array.from(document.images).every(function(i){return i.complete || (i.loading === 'lazy' && i.getBoundingClientRect().top > window.innerHeight);})",
+                $timeout
+            );
+        } catch (\Throwable $e) {
+            // best-effort : ne doit jamais lever, même en cas d'échec du polling
+        }
     }
 
     /**
