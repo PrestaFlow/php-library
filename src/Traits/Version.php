@@ -37,6 +37,12 @@ trait Version
 
         $this->psVersionOverride = $version;
 
+        // Once the globals are loaded, the version has already been resolved:
+        // resolve it again so the pages imported next use this one.
+        if (!empty($this->globals)) {
+            $this->resolveVersion();
+        }
+
         return $this;
     }
 
