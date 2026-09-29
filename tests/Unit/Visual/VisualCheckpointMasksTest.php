@@ -103,14 +103,45 @@ final class VisualCheckpointMasksTest extends TestCase
         $this->assertStringContainsString('pf-visual-masks', $js);
         // Une règle CSS par sélecteur, pas un sélecteur groupé : un sélecteur
         // invalide ne doit pas désactiver le masquage des autres.
-        $this->assertStringContainsString('.carousel { visibility: hidden', $js);
-        $this->assertStringContainsString('.price { visibility: hidden', $js);
+        $this->assertStringContainsString(':is(.carousel), :is(.carousel) * { visibility: hidden', $js);
+        $this->assertStringContainsString(':is(.price), :is(.price) * { visibility: hidden', $js);
         $this->assertStringContainsString("getElementById('pf-visual-masks')", $js);
         $inject = array_key_first(array_filter($page->evaluatedLog, fn ($s) => str_contains($s, 'visibility: hidden')));
         $remove = array_key_first(array_filter($page->evaluatedLog, fn ($s) => str_contains($s, '.remove()')));
         $this->assertNotNull($inject);
         $this->assertNotNull($remove);
         $this->assertLessThan($remove, $inject);
+    }
+
+    /**
+     * visibility is overridable by descendants (Owl Carousel forces
+     * `.owl-stage { visibility: visible }`): the mask must hide every
+     * descendant too, and a selector list must stay grouped per mask.
+     */
+    public function test_masks_hide_descendants_and_keep_selector_lists_grouped(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, 0.98, false, 'auto', ['#logos', '.a, .b']);
+
+        $js = implode("\n", $page->evaluatedLog);
+        $this->assertStringContainsString(':is(#logos), :is(#logos) * { visibility: hidden !important; }', $js);
+        $this->assertStringContainsString(':is(.a, .b), :is(.a, .b) * { visibility: hidden !important; }', $js);
+    }
+
+    /**
+     * Animated backgrounds (e.g. an infinite `bgmoveleft` on a 404 page) never
+     * render twice the same: animations are settled before the capture.
+     */
+    public function test_animations_are_settled_before_the_capture_even_without_masks(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, 0.98, false);
+
+        $freeze = array_key_first(array_filter($page->evaluatedLog, fn ($s) => str_contains($s, 'getAnimations')));
+        $this->assertNotNull($freeze);
+        $js = $page->evaluatedLog[$freeze];
+        $this->assertStringContainsString('.cancel()', $js);
+        $this->assertStringContainsString('.finish()', $js);
     }
 
     public function test_no_mask_js_without_masks(): void
