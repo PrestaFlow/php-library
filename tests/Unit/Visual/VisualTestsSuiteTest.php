@@ -188,7 +188,8 @@ final class VisualTestsSuiteTest extends TestCase
     {
         $cp = VisualTestsSuite::normalize(['name' => 'x', 'path' => '']);
         $this->assertSame('viewport', $cp['zone']);
-        $this->assertSame(0.98, $cp['threshold']);
+        $this->assertNull($cp['threshold']);
+        $this->assertSame(100, $cp['maxDiffPixels']);
         $this->assertSame([], $cp['masks']);
         $this->assertSame([], $cp['excludeDevices']);
     }
@@ -198,13 +199,22 @@ final class VisualTestsSuiteTest extends TestCase
     {
         return new class {
             public array $calls = [];
-            public function goToUrl(string $url): void {}
-            public function waitForStable(): void {}
+            public array $log = [];
+            public array $rules = [];
+            public bool $stable = true;
+            public ?string $failOn = null;
+            public function goToUrl(string $url): void { $this->log[] = 'goto '.$url; }
+            public function waitForStable(): bool { $this->log[] = 'stable'; return $this->stable; }
             public function waitVisible(string $s): void {}
-            public function scrollBelow(string $s): void {}
-            public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
+            public function scrollBelow(string $s): void { $this->log[] = 'scrollBelow '.$s; }
+            public function scrollToTop(): void { $this->log[] = 'top'; }
+            public function visualCheckpoint(string $name, ?string $selector = null, ?float $threshold = null, bool $fullPage = true, string $tag = 'auto', array $masks = [], ?int $maxDiffPixels = null): void
             {
                 $this->calls[] = $name;
+                $this->rules[$name] = [$threshold, $maxDiffPixels];
+                if ($this->failOn === $name) {
+                    throw new \RuntimeException('capture ratée');
+                }
             }
         };
     }
@@ -304,5 +314,106 @@ final class VisualTestsSuiteTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $suite->init(); // desktop n'est plus déclaré après useDefinition()
+    }
+
+    /** Suite factice à checkpoints libres (même URL enchaînée, etc.). */
+    private function sequenceSuite(object $page, array $checkpoints): VisualTestsSuite
+    {
+        $suite = $this->scopedSuite($page, 'scene');
+        $suite->useDefinition(['desktop'], ['fr'], $checkpoints);
+        $suite->init();
+
+        return $suite;
+    }
+
+    private function runSteps(VisualTestsSuite $suite): void
+    {
+        foreach (array_values($suite->tests) as $t) {
+            try {
+                ($t['steps'])();
+            } catch (\RuntimeException $e) {
+                // un checkpoint en échec ne doit pas stopper la séquence
+            }
+        }
+    }
+
+    public function test_consecutive_checkpoints_on_same_url_navigate_once(): void
+    {
+        $page = $this->recordingPage();
+        $this->runSteps($this->sequenceSuite($page, [
+            ['name' => 'header', 'path' => '', 'scrollBelow' => null],
+            ['name' => 'footer', 'path' => '', 'zone' => 'element', 'selector' => '#footer'],
+            ['name' => 'home', 'path' => '', 'scrollBelow' => '#header'],
+            ['name' => 'login', 'path' => 'connexion'],
+            ['name' => 'login-bis', 'path' => 'connexion'],
+        ]));
+
+        $this->assertSame([
+            'goto https://shop.test/', 'stable',
+            'stable', 'top',
+            'stable', 'scrollBelow #header',
+            'goto https://shop.test/connexion', 'stable',
+            'stable', 'top',
+        ], $page->log);
+        $this->assertSame(['scene.header', 'scene.footer', 'scene.home', 'scene.login', 'scene.login-bis'], $page->calls);
+    }
+
+    public function test_failed_checkpoint_forces_navigation_on_next_one(): void
+    {
+        $page = $this->recordingPage();
+        $page->failOn = 'scene.header';
+        $this->runSteps($this->sequenceSuite($page, [
+            ['name' => 'header', 'path' => ''],
+            ['name' => 'home', 'path' => ''],
+        ]));
+
+        $this->assertSame(['goto https://shop.test/', 'stable', 'goto https://shop.test/', 'stable'], $page->log);
+    }
+
+    public function test_unstable_page_records_a_warning_without_throwing(): void
+    {
+        \PrestaFlow\Library\Expects\Expect::setWarning('');
+        $page = $this->recordingPage();
+        $page->stable = false;
+        $suite = $this->sequenceSuite($page, [['name' => 'home', 'path' => '']]);
+        $this->runSteps($suite);
+
+        $this->assertSame(['scene.home'], $page->calls);
+        $this->assertSame(VisualTestsSuite::UNSTABLE_WARNING, \PrestaFlow\Library\Expects\Expect::$latestWarning);
+        $this->assertStringContainsString('Page non stabilisée', VisualTestsSuite::UNSTABLE_WARNING);
+
+        // le checkpoint suivant, stable, ne doit pas hériter de l'avertissement
+        $page->stable = true;
+        $next = $this->sequenceSuite($page, [['name' => 'login', 'path' => 'connexion']]);
+        $this->runSteps($next);
+        $this->assertSame('', \PrestaFlow\Library\Expects\Expect::$latestWarning);
+    }
+
+    public function test_normalize_legacy_threshold_only_when_explicit(): void
+    {
+        $legacy = VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 0.98]);
+        $this->assertSame(0.98, $legacy['threshold']);
+        $this->assertNull($legacy['maxDiffPixels']);
+
+        $both = VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 0.98, 'maxDiffPixels' => 250]);
+        $this->assertSame(0.98, $both['threshold']);
+        $this->assertSame(250, $both['maxDiffPixels']);
+
+        $this->assertSame(0, VisualTestsSuite::normalize(['name' => 'x', 'maxDiffPixels' => -5])['maxDiffPixels']);
+        $this->assertSame(100, VisualTestsSuite::normalize(['name' => 'x', 'threshold' => null])['maxDiffPixels']);
+    }
+
+    public function test_init_passes_threshold_only_when_explicit_and_the_budget(): void
+    {
+        $page = $this->recordingPage();
+        $this->runSteps($this->sequenceSuite($page, [
+            ['name' => 'a', 'path' => ''],
+            ['name' => 'b', 'path' => 'x', 'threshold' => 0.99],
+            ['name' => 'c', 'path' => 'y', 'maxDiffPixels' => 500],
+        ]));
+
+        $this->assertSame([null, 100], $page->rules['scene.a']);
+        $this->assertSame([0.99, null], $page->rules['scene.b']);
+        $this->assertSame([null, 500], $page->rules['scene.c']);
     }
 }

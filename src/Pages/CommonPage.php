@@ -19,6 +19,9 @@ class CommonPage
     use Translations;
     use Locale;
 
+    /** Budget par défaut de pixels changés tolérés par un checkpoint visuel. */
+    public const DEFAULT_MAX_DIFF_PIXELS = 100;
+
     protected $customs = [
         'selectors' => [],
         'messages' => [],
@@ -460,6 +463,19 @@ class CommonPage
         }
     }
 
+    /** Remet le scroll en haut de page (best-effort). */
+    public function scrollToTop(int $settleMs = 0): void
+    {
+        try {
+            $this->getPage()->evaluate('window.scrollTo(0, 0)')->getReturnValue();
+            if ($settleMs > 0) {
+                usleep($settleMs * 1000);
+            }
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le scroll a échoué
+        }
+    }
+
     /** Scrolle juste sous l'élément (ex. header) : le viewport commence au contenu utile. */
     public function scrollBelow(string $selector, int $settleMs = 400): void
     {
@@ -474,17 +490,34 @@ class CommonPage
         }
     }
 
-    /** Attend le chargement complet + polices + images (y compris lazy sous le pli), sans lever si le délai expire. */
-    public function waitForStable(int $timeout = 10000): void
+    /**
+     * Attend le chargement complet + polices + images visibles, sans lever si
+     * le délai expire. Sont ignorées : les images sans boîte de rendu (masquées
+     * par CSS — display:none, bloc caché sur mobile… — elles ne se chargent
+     * jamais) et les images lazy hors du viewport. Une image de taille 0×0 mais
+     * rendue n'est PAS ignorée : c'est l'état d'une image sans dimensions
+     * explicites encore en cours de chargement.
+     *
+     * @return bool true = page stable, false = délai expiré (capture à prendre quand même)
+     */
+    public function waitForStable(int $timeout = 5000): bool
     {
         try {
-            $this->waitForJsCondition(
+            return $this->waitForJsCondition(
                 "document.readyState === 'complete' && (!document.fonts || document.fonts.status === 'loaded') "
-                . "&& Array.from(document.images).every(function(i){return i.complete || (i.loading === 'lazy' && i.getBoundingClientRect().top > window.innerHeight);})",
+                . "&& Array.from(document.images).every(function(i){"
+                . "if (i.complete) { return true; }"
+                . "if (i.getClientRects().length === 0) { return true; }"
+                . "if (!i.offsetParent && getComputedStyle(i).position !== 'fixed') { return true; }"
+                . "var r = i.getBoundingClientRect();"
+                . "var outside = r.bottom <= 0 || r.top >= window.innerHeight || r.right <= 0 || r.left >= window.innerWidth;"
+                . "return i.loading === 'lazy' && outside;"
+                . "})",
                 $timeout
             );
         } catch (\Throwable $e) {
             // best-effort : ne doit jamais lever, même en cas d'échec du polling
+            return false;
         }
     }
 
@@ -519,7 +552,17 @@ class CommonPage
     /**
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
-     * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
+     * - référence présente => compare pixel à pixel (PASS, sinon FAIL + attaches actual/diff).
+     *
+     * Règle de passage :
+     * - budget de pixels (défaut) : PASS si le nombre de pixels changés
+     *   <= $maxDiffPixels (défaut self::DEFAULT_MAX_DIFF_PIXELS = 100). Un
+     *   budget absolu, car un % reste aveugle à une ligne de texte modifiée sur
+     *   une grande capture (≈ 0,03 % d'une 1920×1080) ;
+     * - ratio historique : seulement si $threshold est fourni SANS
+     *   $maxDiffPixels => PASS si score >= $threshold.
+     * Un pixel est « changé » quand l'écart RGB cumulé dépasse 40 (marge
+     * d'anticrénelage). Score = 1 - pixels changés / pixels totaux.
      *
      * Modes de capture :
      * - $selector non null => capture de l'élément ;
@@ -533,8 +576,11 @@ class CommonPage
      * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
      * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
+    public function visualCheckpoint(string $name, ?string $selector = null, ?float $threshold = null, bool $fullPage = true, string $tag = 'auto', array $masks = [], ?int $maxDiffPixels = null): void
     {
+        $legacyRatio = $threshold !== null && $maxDiffPixels === null;
+        $budget = $legacyRatio ? null : max(0, $maxDiffPixels ?? self::DEFAULT_MAX_DIFF_PIXELS);
+
         // globals PS_VERSION d'abord (vérité de la suite courante ; le cache statique
         // de Version peut venir d'une suite précédente du worker), puis le cache.
         // '1.7' / '1.6' sont des majeures valides (auparavant rejetées → « v? »).
@@ -585,22 +631,28 @@ class CommonPage
 
         if (!is_file($refPath)) {
             copy($actualPath, $refPath);
+            $size = @getimagesize($actualPath);
+            $total = $size ? $size[0] * $size[1] : null;
             \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-                'name' => $name, 'tag' => $resolvedTag, 'status' => 'baseline', 'score' => null, 'threshold' => $threshold,
+                'name' => $name, 'tag' => $resolvedTag, 'status' => 'baseline', 'score' => null,
+                'threshold' => self::effectiveThreshold($threshold, $budget, $total),
+                'changed_pixels' => null, 'total_pixels' => $total, 'max_diff_pixels' => $budget,
                 'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
             ]);
             \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
             return;
         }
 
-        $comparator = new \PrestaFlow\Library\Visual\VisualComparator();
-        $score = $comparator->compare($refPath, $actualPath);
+        // Un seul passage pixel à pixel : score, compte de pixels et image de diff cohérents.
         $diffPath = \PrestaFlow\Library\Utils\Screenshots::diffPath($file, create: true);
-        $comparator->generateDiff($refPath, $actualPath, $diffPath);
+        $result = (new \PrestaFlow\Library\Visual\VisualComparator())->compareAndDiff($refPath, $actualPath, $diffPath);
 
-        $status = $score >= $threshold ? 'pass' : 'fail';
+        $passed = $legacyRatio ? $result->score >= $threshold : $result->changedPixels <= $budget;
+        $status = $passed ? 'pass' : 'fail';
         \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
-            'name' => $name, 'tag' => $resolvedTag, 'status' => $status, 'score' => $score, 'threshold' => $threshold,
+            'name' => $name, 'tag' => $resolvedTag, 'status' => $status, 'score' => $result->score,
+            'threshold' => self::effectiveThreshold($threshold, $budget, $result->totalPixels),
+            'changed_pixels' => $result->changedPixels, 'total_pixels' => $result->totalPixels, 'max_diff_pixels' => $budget,
             'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
         ]);
 
@@ -611,7 +663,24 @@ class CommonPage
             ]);
         }
 
-        \PrestaFlow\Library\Expects\Expect::that($score >= $threshold)->isTheSameAs(true);
+        \PrestaFlow\Library\Expects\Expect::that($passed)->isTheSameAs(true);
+    }
+
+    /**
+     * Seuil toujours numérique pour le bloc results.json (exigé par l'API) :
+     * le seuil explicite en mode ratio, sinon le ratio équivalent au budget
+     * (1 - budget / pixels totaux, borné à 0..1 ; 1.0 si la taille est inconnue).
+     */
+    private static function effectiveThreshold(?float $threshold, ?int $budget, ?int $totalPixels): float
+    {
+        if ($budget === null) {
+            return (float) $threshold;
+        }
+        if (!$totalPixels) {
+            return 1.0;
+        }
+
+        return max(0.0, min(1.0, 1.0 - $budget / $totalPixels));
     }
 
     public function pageTitle()

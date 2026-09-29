@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Tests;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Visual\VisualDevices;
 
@@ -24,6 +25,19 @@ abstract class VisualTestsSuite extends TestsSuite
      * nom court de la classe (NouvelleScene → nouvelle-scene). Doit matcher [a-z0-9-]+.
      */
     protected string $visualScope = '';
+
+    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
+    /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
+    public const DEFAULT_MAX_DIFF_PIXELS = \PrestaFlow\Library\Pages\CommonPage::DEFAULT_MAX_DIFF_PIXELS;
+
+    public const UNSTABLE_WARNING = 'Page non stabilisée après 5 s (images/polices encore en chargement) : capture prise quand même.';
+
+    /**
+     * URL sur laquelle le dernier checkpoint exécuté (et réussi) a capturé :
+     * le suivant sur la même URL (header / footer / home = '') ne recharge pas
+     * la page. Remis à null dès qu'un checkpoint lève.
+     */
+    private ?string $lastVisualUrl = null;
 
     /**
      * Dernier override posé par applyDevicePreset(). Tant que les overrides
@@ -119,14 +133,27 @@ abstract class VisualTestsSuite extends TestsSuite
     public function locales(): array { return $this->locales; }
     public function checkpoints(): array { return array_map([self::class, 'normalize'], $this->checkpoints); }
 
+    /**
+     * Valeurs par défaut d'un checkpoint. Règle de passage : budget de pixels
+     * changés `maxDiffPixels` (défaut 100). `threshold` (ratio 0.5–1) n'est
+     * qu'un mode historique : présent SANS `maxDiffPixels` dans la définition,
+     * il s'applique seul (maxDiffPixels normalisé à null) ; sinon il est null.
+     */
     public static function normalize(array $cp): array
     {
+        $hasThreshold = array_key_exists('threshold', $cp) && $cp['threshold'] !== null;
+        $hasBudget = array_key_exists('maxDiffPixels', $cp) && $cp['maxDiffPixels'] !== null;
+
         $cp = array_merge([
             'path' => '', 'paths' => [], 'zone' => 'viewport', 'selector' => null,
-            'waitFor' => null, 'scrollBelow' => null, 'threshold' => 0.98,
+            'waitFor' => null, 'scrollBelow' => null, 'threshold' => null,
+            'maxDiffPixels' => self::DEFAULT_MAX_DIFF_PIXELS,
             'excludeDevices' => [], 'masks' => [],
         ], $cp);
-        $cp['threshold'] = max(0.5, min(1.0, (float) $cp['threshold']));
+        $cp['threshold'] = $hasThreshold ? max(0.5, min(1.0, (float) $cp['threshold'])) : null;
+        $cp['maxDiffPixels'] = $hasBudget
+            ? max(0, (int) $cp['maxDiffPixels'])
+            : ($hasThreshold ? null : self::DEFAULT_MAX_DIFF_PIXELS);
 
         return $cp;
     }
@@ -184,6 +211,7 @@ abstract class VisualTestsSuite extends TestsSuite
         $this->describe($this->title ?: substr(strrchr('\\'.static::class, '\\'), 1));
 
         $scope = $this->visualScope();
+        $this->lastVisualUrl = null;
 
         foreach ($this->checkpoints() as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
@@ -196,22 +224,40 @@ abstract class VisualTestsSuite extends TestsSuite
 
             $url = $this->resolveUrl($path, $locale);
             $this->it($title, function () use ($page, $cp, $url, $scope) {
-                $page->goToUrl($url);
-                $page->waitForStable();
+                // Un avertissement de stabilisation ne concerne que son propre checkpoint
+                // (Expect::$latestWarning est global et persistant).
+                if (Expect::$latestWarning === self::UNSTABLE_WARNING) {
+                    Expect::setWarning('');
+                }
+
+                $sameUrl = $this->lastVisualUrl === $url;
+                $this->lastVisualUrl = null; // invalidé tant que ce checkpoint n'a pas abouti
+
+                if (!$sameUrl) {
+                    $page->goToUrl($url);
+                }
+                if ($page->waitForStable() === false) {
+                    Expect::setWarning(self::UNSTABLE_WARNING);
+                }
                 if ($cp['waitFor']) {
                     $page->waitVisible($cp['waitFor']);
                 }
                 if ($cp['scrollBelow'] && $cp['zone'] === 'viewport') {
-                    $page->scrollBelow($cp['scrollBelow']);
+                    $page->scrollBelow($cp['scrollBelow']); // remet d'abord le scroll en haut
+                } elseif ($sameUrl) {
+                    $page->scrollToTop(); // ne pas hériter du scroll du checkpoint précédent
                 }
                 $page->visualCheckpoint(
                     $scope.'.'.$cp['name'],
                     $cp['zone'] === 'element' ? $cp['selector'] : null,
-                    (float) $cp['threshold'],
+                    $cp['threshold'],
                     $cp['zone'] === 'full',
                     'auto',
                     $cp['masks'],
+                    $cp['maxDiffPixels'],
                 );
+
+                $this->lastVisualUrl = $url;
             });
         }
 
