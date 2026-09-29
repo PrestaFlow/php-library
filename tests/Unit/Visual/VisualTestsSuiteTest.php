@@ -286,6 +286,17 @@ final class VisualTestsSuiteTest extends TestCase
     }
 
     /**
+     * Checkpoints are independent captures: one visual difference must not skip
+     * the remaining ones (TestsSuite skips everything after a failure by default).
+     */
+    public function test_a_failed_checkpoint_does_not_skip_the_following_ones(): void
+    {
+        $suite = $this->scopedSuite($this->recordingPage(), 'scene');
+
+        $this->assertFalse($suite->isSkipWhenFailed());
+    }
+
+    /**
      * run() executes each step with `$test['steps']->call($this)`, which rebinds the
      * closure's scope to the concrete (sub)class: anything the step touches must be
      * visible from a subclass, not private to VisualTestsSuite.
