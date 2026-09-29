@@ -97,4 +97,34 @@ final class ResultsJsonVisualBlockTest extends TestCase
         $this->assertNull($visual['actual_relpath']);
         $this->assertNull($visual['diff_relpath']);
     }
+
+    public function testSuiteScopedNameFlowsIntoVisualBlockAndRelpaths(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+
+        $suite->title = 'Scoped visual suite';
+
+        $suite->it('capture visuelle : header', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'nouvelle-scene.header',
+                'tag' => 'auto-v1.7-390x844-fr',
+                'status' => 'fail',
+                'score' => 0.9,
+                'threshold' => 0.98,
+                'reference' => '/tmp/visual-baseline/nouvelle-scene.header--auto-v1.7-390x844-fr.png',
+                'actual' => '/tmp/prestaflow/screens/actual/nouvelle-scene.header--auto-v1.7-390x844-fr.png',
+                'diff' => '/tmp/prestaflow/screens/diff/nouvelle-scene.header--auto-v1.7-390x844-fr.png',
+            ]);
+        });
+
+        $suite->run();
+
+        $visual = $suite->results(false)['tests'][0]['visual'][0];
+
+        $this->assertSame('nouvelle-scene.header', $visual['name']);
+        $this->assertSame('auto-v1.7-390x844-fr', $visual['tag']);
+        $this->assertSame('prestaflow/screens/actual/nouvelle-scene.header--auto-v1.7-390x844-fr.png', $visual['actual_relpath']);
+        $this->assertSame('prestaflow/screens/diff/nouvelle-scene.header--auto-v1.7-390x844-fr.png', $visual['diff_relpath']);
+    }
 }
