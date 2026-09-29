@@ -432,6 +432,26 @@ class CommonPage
         }
     }
 
+    /**
+     * Fige les animations avant la capture, comme Playwright
+     * (`animations: 'disabled'`) : une animation finie est amenée à son état
+     * final (un fondu d'apparition reste visible), une animation infinie est
+     * annulée et revient à son état de départ (fond animé, loader…). Couvre
+     * les animations et transitions CSS via l'API Web Animations. Best-effort.
+     */
+    private function settleAnimations(): void
+    {
+        try {
+            $this->getPage()->evaluate(
+                "(function(){if(!document.getAnimations){return;}document.getAnimations().forEach(function(a){"
+                . "try{var t=a.effect&&a.effect.getComputedTiming();if(t&&t.endTime===Infinity){a.cancel();}else{a.finish();}}catch(e){}"
+                . "});})()"
+            )->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le gel a échoué
+        }
+    }
+
     private function applyVisualMasks(array $masks): void
     {
         $masks = array_values(array_filter(array_map('trim', $masks)));
@@ -610,6 +630,7 @@ class CommonPage
 
         $page = $this->getPage();
 
+        $this->settleAnimations();
         $this->applyVisualMasks($masks);
         try {
             if ($selector !== null) {

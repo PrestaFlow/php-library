@@ -128,6 +128,22 @@ final class VisualCheckpointMasksTest extends TestCase
         $this->assertStringContainsString(':is(.a, .b), :is(.a, .b) * { visibility: hidden !important; }', $js);
     }
 
+    /**
+     * Animated backgrounds (e.g. an infinite `bgmoveleft` on a 404 page) never
+     * render twice the same: animations are settled before the capture.
+     */
+    public function test_animations_are_settled_before_the_capture_even_without_masks(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, 0.98, false);
+
+        $freeze = array_key_first(array_filter($page->evaluatedLog, fn ($s) => str_contains($s, 'getAnimations')));
+        $this->assertNotNull($freeze);
+        $js = $page->evaluatedLog[$freeze];
+        $this->assertStringContainsString('.cancel()', $js);
+        $this->assertStringContainsString('.finish()', $js);
+    }
+
     public function test_no_mask_js_without_masks(): void
     {
         $page = $this->makePage();
