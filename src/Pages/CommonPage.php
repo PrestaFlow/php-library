@@ -440,8 +440,11 @@ class CommonPage
         }
         // Une règle CSS par sélecteur : un sélecteur invalide ne doit pas faire
         // échouer le bloc entier et désactiver le masquage des autres.
+        // Les descendants sont masqués aussi : `visibility` se ré-ouvre sur un
+        // enfant (ex. Owl Carousel force `.owl-stage { visibility: visible }`).
+        // :is() garde groupée une liste « .a, .b » saisie comme un seul masque.
         $css = json_encode(
-            implode("\n", array_map(fn ($m) => $m.' { visibility: hidden !important; }', $masks)),
+            implode("\n", array_map(fn ($m) => ":is({$m}), :is({$m}) * { visibility: hidden !important; }", $masks)),
             JSON_THROW_ON_ERROR
         );
         $this->getPage()->evaluate(
