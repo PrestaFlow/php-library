@@ -491,8 +491,8 @@ class CommonPage
     /**
      * Best-effort : dimensions du viewport courant via le navigateur. `null`
      * pour un des deux (ou les deux) si l'info n'est pas disponible (page
-     * absente, evaluate en échec, etc.) — VisualTag::resolve() sait gérer
-     * les segments manquants avec un placeholder `?`.
+     * absente, evaluate en échec, etc.) — VisualTag::resolve() remplace
+     * les segments manquants par un jeton filename-safe.
      *
      * @return array{0: ?int, 1: ?int} [width, height]
      */
@@ -510,7 +510,7 @@ class CommonPage
                 ];
             }
         } catch (\Throwable $e) {
-            // best-effort : le tag auto retombera sur des placeholders `?`
+            // best-effort : le tag auto retombera sur des jetons filename-safe
         }
 
         return [null, null];
@@ -535,11 +535,15 @@ class CommonPage
      */
     public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
     {
+        // globals PS_VERSION d'abord (vérité de la suite courante ; le cache statique
+        // de Version peut venir d'une suite précédente du worker), puis le cache.
+        // '1.7' / '1.6' sont des majeures valides (auparavant rejetées → « v? »).
         $rawMajorVersion = $this->getMajorVersion();
-        $majorVersion = (is_string($rawMajorVersion) || is_int($rawMajorVersion))
-            && ctype_digit((string) $rawMajorVersion)
-            ? (int) $rawMajorVersion
-            : null;
+        $majorVersion = \PrestaFlow\Library\Visual\VisualTag::majorFromVersion(
+            is_string($this->globals['PS_VERSION'] ?? null) ? $this->globals['PS_VERSION'] : null
+        ) ?? \PrestaFlow\Library\Visual\VisualTag::majorFromVersion(
+            is_scalar($rawMajorVersion) ? (string) $rawMajorVersion : null
+        );
 
         [$viewportWidth, $viewportHeight] = $this->getViewportSize();
 

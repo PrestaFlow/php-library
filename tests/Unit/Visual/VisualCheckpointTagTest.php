@@ -38,9 +38,9 @@ final class VisualCheckpointTagTest extends TestCase
         imagedestroy($img);
     }
 
-    private function makePage(): CommonPage
+    private function makePage(array $globals = [], ?string $major = '9'): CommonPage
     {
-        $page = new class ('en', '8.1.0', []) extends CommonPage {
+        $page = new class ('en', '8.1.0', $globals) extends CommonPage {
             public function getPage()
             {
                 return new class {
@@ -75,7 +75,9 @@ final class VisualCheckpointTagTest extends TestCase
             }
         };
 
-        $page->setMajorVersion('9');
+        if ($major !== null) {
+            $page->setMajorVersion($major);
+        }
         $page->setLocale('fr');
 
         return $page;
@@ -108,5 +110,38 @@ final class VisualCheckpointTagTest extends TestCase
         $this->assertSame('my-custom', $result['tag']);
         $this->assertStringContainsString('home--my-custom.png', $result['actual']);
         $this->assertStringContainsString('home--my-custom.png', $result['reference']);
+    }
+
+    public function testPs17MajorVersionIsNotRenderedAsQuestionMark(): void
+    {
+        // Régression : getMajorVersion() vaut '1.7' en 1.7.x → rejeté par ctype_digit → « v? ».
+        $page = $this->makePage(['PS_VERSION' => '1.7.8.11'], '1.7');
+
+        $page->visualCheckpoint('scene.header');
+
+        $this->assertSame('auto-v1.7-1280x720-fr', TestsSuite::$visualResults[0]['tag']);
+    }
+
+    public function testMajorVersionDerivesFromGlobalsPsVersionFirst(): void
+    {
+        // Le cache statique de version peut être périmé (suite précédente du worker).
+        $page = $this->makePage(['PS_VERSION' => '8.1.0'], '1.7');
+
+        $page->visualCheckpoint('home');
+
+        $this->assertSame('auto-v8-1280x720-fr', TestsSuite::$visualResults[0]['tag']);
+    }
+
+    public function testDottedScopedNameIsKeptInResultAndFileName(): void
+    {
+        $page = $this->makePage();
+
+        $page->visualCheckpoint('nouvelle-scene.header');
+
+        $result = TestsSuite::$visualResults[0];
+        $this->assertSame('nouvelle-scene.header', $result['name']);
+        $this->assertStringEndsWith('/nouvelle-scene.header--auto-v9-1280x720-fr.png', $result['actual']);
+        $this->assertStringEndsWith('/nouvelle-scene.header--auto-v9-1280x720-fr.png', $result['reference']);
+        $this->assertFileExists($result['reference']);
     }
 }
