@@ -23,7 +23,7 @@ class VisualComparator
     /** Score de similarité 0–1 (1 = identiques), pixel à pixel. Accepte des chemins de fichiers. */
     public function compare(string $referencePath, string $actualPath, int $tolerance = 40): float
     {
-        return $this->compareAndDiff($referencePath, $actualPath, null, $tolerance);
+        return $this->compareAndDiff($referencePath, $actualPath, null, $tolerance)->score;
     }
 
     /** PNG de diff : actuelle grisée, pixels différant de la référence peints en rouge. BC : délègue à compareAndDiff(). */
@@ -33,14 +33,14 @@ class VisualComparator
     }
 
     /**
-     * Un seul passage : calcule le score et, si $diffPath est fourni, écrit le
+     * Un seul passage : calcule le score et le nombre de pixels changés et, si $diffPath est fourni, écrit le
      * PNG de diff (actuelle grisée/éclaircie, pixels changés en rouge).
      *
      * Tailles différentes : la comparaison porte sur l'union des deux tailles,
      * la zone hors recouvrement compte comme changée (pas de ré-échantillonnage,
      * qui masquerait les écarts) ; le diff a la taille de l'union.
      */
-    public function compareAndDiff(string $referencePath, string $actualPath, ?string $diffPath, int $tolerance = 40): float
+    public function compareAndDiff(string $referencePath, string $actualPath, ?string $diffPath, int $tolerance = 40): VisualDiffResult
     {
         $ref = $this->load($referencePath);
         $act = $this->load($actualPath);
@@ -108,7 +108,7 @@ class VisualComparator
             imagedestroy($out);
         }
 
-        return $total > 0 ? 1.0 - $changed / $total : 1.0;
+        return new VisualDiffResult($total > 0 ? 1.0 - $changed / $total : 1.0, $changed, $total);
     }
 
     /**

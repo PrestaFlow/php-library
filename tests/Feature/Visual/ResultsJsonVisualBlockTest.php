@@ -127,4 +127,50 @@ final class ResultsJsonVisualBlockTest extends TestCase
         $this->assertSame('prestaflow/screens/actual/nouvelle-scene.header--auto-v1.7-390x844-fr.png', $visual['actual_relpath']);
         $this->assertSame('prestaflow/screens/diff/nouvelle-scene.header--auto-v1.7-390x844-fr.png', $visual['diff_relpath']);
     }
+
+    public function testVisualBlockCarriesPixelBudgetFields(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+        $suite->title = 'Budget visual suite';
+
+        $suite->it('capture visuelle : login', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'login', 'tag' => 'auto-v1.7-1920x1080-fr', 'status' => 'fail',
+                'score' => 0.99967, 'threshold' => 1 - 100 / 2073600,
+                'changed_pixels' => 686, 'total_pixels' => 2073600, 'max_diff_pixels' => 100,
+                'reference' => '/tmp/visual-baseline/login--auto-v1.7-1920x1080-fr.png',
+                'actual' => '/tmp/prestaflow/screens/actual/login--auto-v1.7-1920x1080-fr.png',
+                'diff' => '/tmp/prestaflow/screens/diff/login--auto-v1.7-1920x1080-fr.png',
+            ]);
+        });
+        $suite->run();
+
+        $visual = json_decode(json_encode($suite->results(false)), true)['tests'][0]['visual'][0];
+
+        $this->assertSame(686, $visual['changed_pixels']);
+        $this->assertSame(2073600, $visual['total_pixels']);
+        $this->assertSame(100, $visual['max_diff_pixels']);
+        $this->assertIsFloat($visual['threshold']);
+        $this->assertSame(0.99967, $visual['score']);
+    }
+
+    public function testLegacyResultsWithoutPixelFieldsStillSerialise(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+        $suite->it('legacy', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'home', 'tag' => null, 'status' => 'pass', 'score' => 1.0, 'threshold' => 0.98,
+                'reference' => null, 'actual' => null, 'diff' => null,
+            ]);
+        });
+        $suite->run();
+
+        $visual = $suite->results(false)['tests'][0]['visual'][0];
+        $this->assertNull($visual['changed_pixels']);
+        $this->assertNull($visual['total_pixels']);
+        $this->assertNull($visual['max_diff_pixels']);
+        $this->assertSame(0.98, $visual['threshold']);
+    }
 }

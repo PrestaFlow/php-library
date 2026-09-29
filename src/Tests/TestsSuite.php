@@ -107,7 +107,11 @@ class TestsSuite implements OutputStates
      * `fail` (seul cas où l'action CI a besoin d'uploader ces fichiers) ;
      * `null` pour `baseline`/`pass`.
      *
-     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, actual_relpath: ?string, diff_relpath: ?string}>
+     * `threshold` reste toujours numérique (exigé par l'API) : en mode budget
+     * de pixels, c'est le ratio équivalent 1 - max_diff_pixels / total_pixels.
+     * `max_diff_pixels` est null en mode ratio historique (seuil explicite seul).
+     *
+     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, changed_pixels: ?int, total_pixels: ?int, max_diff_pixels: ?int, actual_relpath: ?string, diff_relpath: ?string}>
      */
     private static function buildVisualBlock(int $startIndex): array
     {
@@ -122,6 +126,9 @@ class TestsSuite implements OutputStates
                 'status' => $raw['status'],
                 'score' => $raw['score'],
                 'threshold' => $raw['threshold'],
+                'changed_pixels' => $raw['changed_pixels'] ?? null,
+                'total_pixels' => $raw['total_pixels'] ?? null,
+                'max_diff_pixels' => $raw['max_diff_pixels'] ?? null,
                 'actual_relpath' => ($needsFiles && !empty($raw['actual']))
                     ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', basename($raw['actual']))
                     : null,

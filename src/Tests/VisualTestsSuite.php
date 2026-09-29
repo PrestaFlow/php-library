@@ -27,6 +27,9 @@ abstract class VisualTestsSuite extends TestsSuite
     protected string $visualScope = '';
 
     /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
+    /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
+    public const DEFAULT_MAX_DIFF_PIXELS = \PrestaFlow\Library\Pages\CommonPage::DEFAULT_MAX_DIFF_PIXELS;
+
     public const UNSTABLE_WARNING = 'Page non stabilisée après 5 s (images/polices encore en chargement) : capture prise quand même.';
 
     /**
@@ -130,14 +133,27 @@ abstract class VisualTestsSuite extends TestsSuite
     public function locales(): array { return $this->locales; }
     public function checkpoints(): array { return array_map([self::class, 'normalize'], $this->checkpoints); }
 
+    /**
+     * Valeurs par défaut d'un checkpoint. Règle de passage : budget de pixels
+     * changés `maxDiffPixels` (défaut 100). `threshold` (ratio 0.5–1) n'est
+     * qu'un mode historique : présent SANS `maxDiffPixels` dans la définition,
+     * il s'applique seul (maxDiffPixels normalisé à null) ; sinon il est null.
+     */
     public static function normalize(array $cp): array
     {
+        $hasThreshold = array_key_exists('threshold', $cp) && $cp['threshold'] !== null;
+        $hasBudget = array_key_exists('maxDiffPixels', $cp) && $cp['maxDiffPixels'] !== null;
+
         $cp = array_merge([
             'path' => '', 'paths' => [], 'zone' => 'viewport', 'selector' => null,
-            'waitFor' => null, 'scrollBelow' => null, 'threshold' => 0.999,
+            'waitFor' => null, 'scrollBelow' => null, 'threshold' => null,
+            'maxDiffPixels' => self::DEFAULT_MAX_DIFF_PIXELS,
             'excludeDevices' => [], 'masks' => [],
         ], $cp);
-        $cp['threshold'] = max(0.5, min(1.0, (float) $cp['threshold']));
+        $cp['threshold'] = $hasThreshold ? max(0.5, min(1.0, (float) $cp['threshold'])) : null;
+        $cp['maxDiffPixels'] = $hasBudget
+            ? max(0, (int) $cp['maxDiffPixels'])
+            : ($hasThreshold ? null : self::DEFAULT_MAX_DIFF_PIXELS);
 
         return $cp;
     }
@@ -234,10 +250,11 @@ abstract class VisualTestsSuite extends TestsSuite
                 $page->visualCheckpoint(
                     $scope.'.'.$cp['name'],
                     $cp['zone'] === 'element' ? $cp['selector'] : null,
-                    (float) $cp['threshold'],
+                    $cp['threshold'],
                     $cp['zone'] === 'full',
                     'auto',
                     $cp['masks'],
+                    $cp['maxDiffPixels'],
                 );
 
                 $this->lastVisualUrl = $url;

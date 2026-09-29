@@ -188,7 +188,8 @@ final class VisualTestsSuiteTest extends TestCase
     {
         $cp = VisualTestsSuite::normalize(['name' => 'x', 'path' => '']);
         $this->assertSame('viewport', $cp['zone']);
-        $this->assertSame(0.999, $cp['threshold']);
+        $this->assertNull($cp['threshold']);
+        $this->assertSame(100, $cp['maxDiffPixels']);
         $this->assertSame([], $cp['masks']);
         $this->assertSame([], $cp['excludeDevices']);
     }
@@ -199,6 +200,7 @@ final class VisualTestsSuiteTest extends TestCase
         return new class {
             public array $calls = [];
             public array $log = [];
+            public array $rules = [];
             public bool $stable = true;
             public ?string $failOn = null;
             public function goToUrl(string $url): void { $this->log[] = 'goto '.$url; }
@@ -206,9 +208,10 @@ final class VisualTestsSuiteTest extends TestCase
             public function waitVisible(string $s): void {}
             public function scrollBelow(string $s): void { $this->log[] = 'scrollBelow '.$s; }
             public function scrollToTop(): void { $this->log[] = 'top'; }
-            public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.999, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
+            public function visualCheckpoint(string $name, ?string $selector = null, ?float $threshold = null, bool $fullPage = true, string $tag = 'auto', array $masks = [], ?int $maxDiffPixels = null): void
             {
                 $this->calls[] = $name;
+                $this->rules[$name] = [$threshold, $maxDiffPixels];
                 if ($this->failOn === $name) {
                     throw new \RuntimeException('capture ratée');
                 }
@@ -384,5 +387,33 @@ final class VisualTestsSuiteTest extends TestCase
         $next = $this->sequenceSuite($page, [['name' => 'login', 'path' => 'connexion']]);
         $this->runSteps($next);
         $this->assertSame('', \PrestaFlow\Library\Expects\Expect::$latestWarning);
+    }
+
+    public function test_normalize_legacy_threshold_only_when_explicit(): void
+    {
+        $legacy = VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 0.98]);
+        $this->assertSame(0.98, $legacy['threshold']);
+        $this->assertNull($legacy['maxDiffPixels']);
+
+        $both = VisualTestsSuite::normalize(['name' => 'x', 'threshold' => 0.98, 'maxDiffPixels' => 250]);
+        $this->assertSame(0.98, $both['threshold']);
+        $this->assertSame(250, $both['maxDiffPixels']);
+
+        $this->assertSame(0, VisualTestsSuite::normalize(['name' => 'x', 'maxDiffPixels' => -5])['maxDiffPixels']);
+        $this->assertSame(100, VisualTestsSuite::normalize(['name' => 'x', 'threshold' => null])['maxDiffPixels']);
+    }
+
+    public function test_init_passes_threshold_only_when_explicit_and_the_budget(): void
+    {
+        $page = $this->recordingPage();
+        $this->runSteps($this->sequenceSuite($page, [
+            ['name' => 'a', 'path' => ''],
+            ['name' => 'b', 'path' => 'x', 'threshold' => 0.99],
+            ['name' => 'c', 'path' => 'y', 'maxDiffPixels' => 500],
+        ]));
+
+        $this->assertSame([null, 100], $page->rules['scene.a']);
+        $this->assertSame([0.99, null], $page->rules['scene.b']);
+        $this->assertSame([null, 500], $page->rules['scene.c']);
     }
 }

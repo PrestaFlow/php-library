@@ -104,7 +104,7 @@ final class VisualComparatorTest extends TestCase
         $a = $this->page('p7.png');
         $b = $this->page('p8.png', changedLine: true);
         $out = $this->dir . '/sub/diff2.png';
-        $score = (new VisualComparator())->compareAndDiff($a, $b, $out);
+        $score = (new VisualComparator())->compareAndDiff($a, $b, $out)->score;
         $this->assertEqualsWithDelta(1 - 4000 / (1920 * 1080), $score, 1e-9);
         $this->assertFileExists($out);
         $img = imagecreatefrompng($out);
@@ -127,12 +127,22 @@ final class VisualComparatorTest extends TestCase
         $a = $this->png('s1.png', fn ($img) => null, 100, 100);
         $b = $this->png('s2.png', fn ($img) => null, 100, 120);
         $out = $this->dir . '/diff3.png';
-        $score = (new VisualComparator())->compareAndDiff($a, $b, $out);
+        $score = (new VisualComparator())->compareAndDiff($a, $b, $out)->score;
         $this->assertEqualsWithDelta(1 - 2000 / 12000, $score, 1e-9);
         $img = imagecreatefrompng($out);
         $this->assertSame([100, 120], [imagesx($img), imagesy($img)]);
         $this->assertGreaterThan(150, (imagecolorat($img, 50, 110) >> 16) & 0xFF);
         $this->assertLessThan(120, (imagecolorat($img, 50, 110) >> 8) & 0xFF);
         imagedestroy($img);
+    }
+
+    public function testDiffResultExposesChangedPixelCount(): void
+    {
+        $a = $this->page('q1.png');
+        $b = $this->page('q2.png', changedLine: true);
+        $result = (new VisualComparator())->compareAndDiff($a, $b, null);
+        $this->assertSame(4000, $result->changedPixels);
+        $this->assertSame(1920 * 1080, $result->totalPixels);
+        $this->assertEqualsWithDelta(1 - 4000 / (1920 * 1080), $result->score, 1e-12);
     }
 }
