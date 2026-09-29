@@ -37,7 +37,7 @@ abstract class VisualTestsSuite extends TestsSuite
      * le suivant sur la même URL (header / footer / home = '') ne recharge pas
      * la page. Remis à null dès qu'un checkpoint lève.
      */
-    private ?string $lastVisualUrl = null;
+    protected ?string $lastVisualUrl = null;
 
     /**
      * Dernier override posé par applyDevicePreset(). Tant que les overrides
