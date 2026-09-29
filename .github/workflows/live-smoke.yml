@@ -27,11 +27,12 @@ name: Live smoke
 # then on 9.2.0 hummingbird only (runs 36429401318, 36553975925, 36555659821).
 # The password strength feedback appeared asynchronously and moved the submit
 # button under the mouse click; Registration::register() now waits for it.
-# Measured 2026-09-29 on PR #77, run 36564596092, both suites per job:
+# Measured 2026-09-29 on PR #77, runs 36564596092 (10 attempts) and
+# 36567081351, both suites per job:
 #
-#   9.2.0 hummingbird  10/10 green (1 initial run, 7 job-only reruns,
-#                      2 full-matrix reruns).
-#   9.2.0 classic, 8.2.8 classic, 1.7.8.11 classic  3/3 green each.
+#   9.2.0 hummingbird  11/11 green (1 initial run, 7 job-only reruns,
+#                      2 full-matrix reruns, 1 run on the next commit).
+#   9.2.0 classic, 8.2.8 classic, 1.7.8.11 classic  4/4 green each.
 
 on:
   push:
