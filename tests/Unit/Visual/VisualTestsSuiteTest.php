@@ -285,6 +285,32 @@ final class VisualTestsSuiteTest extends TestCase
         $this->assertSame(['nouvelle-scene.header', 'nouvelle-scene.footer'], $page->calls);
     }
 
+    /**
+     * run() executes each step with `$test['steps']->call($this)`, which rebinds the
+     * closure's scope to the concrete (sub)class: anything the step touches must be
+     * visible from a subclass, not private to VisualTestsSuite.
+     */
+    public function test_steps_run_when_bound_to_the_concrete_subclass_like_run_does(): void
+    {
+        $page = $this->recordingPage();
+        $suite = $this->scopedSuite($page, 'scene');
+        $suite->init();
+
+        // Host apps (Laravel) turn warnings into exceptions: fail on any of them too.
+        set_error_handler(static function (int $no, string $message): never {
+            throw new \ErrorException($message, 0, $no);
+        });
+        try {
+            foreach (array_values($suite->tests) as $t) {
+                $t['steps']->call($suite);
+            }
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame(['scene.header', 'scene.footer'], $page->calls);
+    }
+
     public function test_use_definition_overrides_literal_properties_for_init(): void
     {
         $page = $this->recordingPage();
