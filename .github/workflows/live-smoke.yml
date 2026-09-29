@@ -115,30 +115,36 @@ jobs:
           PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
           PRESTAFLOW_THEME: ${{ matrix.theme }}
           PRESTAFLOW_LOCALE: en
+        # Every `prestaflow run` empties prestaflow/ when it starts, so the back
+        # office run used to delete the front office's error screenshots before
+        # the upload could see them — which is why red rows printed a PNG path
+        # and still uploaded nothing. Each suite's output is copied aside as
+        # soon as it finishes.
         run: |
           status=0
-          php bin/prestaflow run src/Tests/Suites/Smoke/FrontOfficeSmoke.php || status=1
-          php bin/prestaflow run src/Tests/Suites/Smoke/BackOfficeSmoke.php || status=1
+          for suite in FrontOfficeSmoke BackOfficeSmoke; do
+            php bin/prestaflow run "src/Tests/Suites/Smoke/$suite.php" || status=1
+            if [ -d prestaflow ]; then
+              mkdir -p "smoke-output/$suite"
+              cp -R prestaflow/. "smoke-output/$suite/"
+            fi
+          done
           exit $status
 
       # Says what is on disk before the upload decides there is nothing to
-      # take. A red row on 2026-09-25 printed a screenshot path in the runner
-      # log and still produced an empty artifact, and `if-no-files-found:
-      # ignore` made the upload report success while carrying nothing — so the
-      # one run that needed evidence left none. Locally the capture writes a
-      # valid PNG, including on the flaky failures, so the gap is here rather
-      # than in the library.
+      # take, so an empty artifact can be told apart from a capture that
+      # never happened.
       - name: List what the run captured
         if: failure()
         run: |
           echo "cwd: $(pwd)"
-          ls -laR prestaflow/screens/ 2>&1 || echo "prestaflow/screens/ does not exist"
+          ls -laR smoke-output/ 2>&1 || echo "smoke-output/ does not exist"
 
       - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ matrix.ps }}-${{ matrix.theme }}
-          path: prestaflow/screens/
+          path: smoke-output/
           # `warn`, not `ignore`: an upload that finds nothing has to say so.
           if-no-files-found: warn

@@ -35,6 +35,11 @@ class Page extends BasePage
             // Scoped to the registration page so the footer newsletter block can
             // never be caught by it.
             'requiredConsentCheckbox' => 'body#registration input[type="checkbox"][required]',
+            // Hummingbird's password policy: the wrapper around the password
+            // input, and the strength feedback it un-hides once the score is in.
+            // Classic has neither, which is what makes the wait below a no-op there.
+            'passwordPolicyField' => '[data-ps-ref="password-field"]',
+            'passwordFeedbackContainer' => '[data-ps-ref="password-feedback-container"]',
             'submitButton' => '.form-control-submit, [data-link-action="save-customer"]',
             'errorAlert' => '.alert-danger, .help-block .alert-danger',
         ];
@@ -77,10 +82,42 @@ class Page extends BasePage
             $this->setValueByJs($this->getSelector('birthdayInput'), $customer['birthday']);
         }
 
+        $this->waitForPasswordVerdict();
         $this->acceptRequiredConsents();
 
         $this->click($this->getSelector('submitButton'));
         $this->waitForPageReload();
+    }
+
+    /**
+     * Wait until the theme has rendered its verdict on the password, so the
+     * form stops moving before the submit is clicked.
+     *
+     * On hummingbird the password's input event starts an async score check;
+     * when it resolves, the strength feedback under the field is un-hidden and
+     * pushes everything below it — the consent boxes and the submit button —
+     * down by about 100px. click() is a real mouse click at coordinates read
+     * just before it, so when the feedback lands between that read and the
+     * press/release, the release hits a consent label instead: the click never
+     * reaches the button, the label unticks a required consent, and nothing is
+     * submitted. On a cold browser that race was lost in 5 runs out of 10.
+     *
+     * Returns whether the verdict showed up. A timeout is not an error here —
+     * register() leaves the outcome to the caller — and on a theme without the
+     * policy markup (classic renders its feedback up front) this returns at once.
+     */
+    public function waitForPasswordVerdict(int $timeout = 10000): bool
+    {
+        $condition = sprintf(
+            '(function(){var p=document.querySelector(%s);if(!p||p.value===""){return true;}'
+            . 'var f=p.closest(%s);if(!f){return true;}'
+            . 'var c=f.querySelector(%s);return !!c&&!c.classList.contains("d-none");})()',
+            json_encode($this->getSelector('passwordInput')),
+            json_encode($this->getSelector('passwordPolicyField')),
+            json_encode($this->getSelector('passwordFeedbackContainer'))
+        );
+
+        return $this->waitForJsCondition($condition, $timeout);
     }
 
     /**
