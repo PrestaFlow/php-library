@@ -18,6 +18,14 @@ abstract class VisualTestsSuite extends TestsSuite
     protected array $checkpoints = [];
 
     /**
+     * Préfixe des noms de checkpoint (`{scope}.{name}`) : les noms ne sont uniques
+     * qu'au sein d'une suite, le scope évite que deux suites avec un checkpoint
+     * `header` écrasent mutuellement captures et références. Vide = kebab-case du
+     * nom court de la classe (NouvelleScene → nouvelle-scene). Doit matcher [a-z0-9-]+.
+     */
+    protected string $visualScope = '';
+
+    /**
      * Dernier override posé par applyDevicePreset(). Tant que les overrides
      * courants lui sont identiques, ils « nous appartiennent » et peuvent être
      * remplacés (suite visuelle suivante, autre device). Si l'app a posé les
@@ -65,6 +73,46 @@ abstract class VisualTestsSuite extends TestsSuite
         TestsSuite::resetBrowser();
 
         return true;
+    }
+
+    /**
+     * Remplace la définition littérale de la classe par des données fraîchement
+     * parsées : un worker PHP long-vivant qui a déjà chargé la classe ne voit pas
+     * les éditions ultérieures du fichier. À appeler avant init().
+     */
+    public function useDefinition(array $devices, array $locales, array $checkpoints): static
+    {
+        $this->devices = array_values($devices);
+        $this->locales = array_values($locales);
+        $this->checkpoints = array_values($checkpoints);
+
+        return $this;
+    }
+
+    public function visualScope(): string
+    {
+        if ($this->visualScope !== '') {
+            if (preg_match('/^[a-z0-9-]+$/', $this->visualScope) !== 1) {
+                throw new \InvalidArgumentException(sprintf('%s : visualScope « %s » doit matcher [a-z0-9-]+', static::class, $this->visualScope));
+            }
+
+            return $this->visualScope;
+        }
+
+        $class = static::class;
+        if (str_contains($class, '@anonymous')) {
+            $class = get_parent_class($this) ?: 'Visual';
+        }
+
+        return self::slugify(substr(strrchr('\\'.$class, '\\'), 1)) ?: 'visual';
+    }
+
+    /** Kebab-case filename-safe : NouvelleScene → nouvelle-scene, ProdVisual2 → prod-visual2. */
+    public static function slugify(string $name): string
+    {
+        $kebab = preg_replace('/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/', '-', $name);
+
+        return trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower((string) $kebab)), '-');
     }
 
     public function devices(): array { return $this->devices; }
@@ -135,6 +183,8 @@ abstract class VisualTestsSuite extends TestsSuite
 
         $this->describe($this->title ?: substr(strrchr('\\'.static::class, '\\'), 1));
 
+        $scope = $this->visualScope();
+
         foreach ($this->checkpoints() as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
             $path = $this->resolvePath($cp, $locale);
@@ -145,7 +195,7 @@ abstract class VisualTestsSuite extends TestsSuite
             }
 
             $url = $this->resolveUrl($path, $locale);
-            $this->it($title, function () use ($page, $cp, $url) {
+            $this->it($title, function () use ($page, $cp, $url, $scope) {
                 $page->goToUrl($url);
                 $page->waitForStable();
                 if ($cp['waitFor']) {
@@ -155,7 +205,7 @@ abstract class VisualTestsSuite extends TestsSuite
                     $page->scrollBelow($cp['scrollBelow']);
                 }
                 $page->visualCheckpoint(
-                    $cp['name'],
+                    $scope.'.'.$cp['name'],
                     $cp['zone'] === 'element' ? $cp['selector'] : null,
                     (float) $cp['threshold'],
                     $cp['zone'] === 'full',
