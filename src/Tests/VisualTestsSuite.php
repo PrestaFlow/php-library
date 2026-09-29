@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Tests;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Visual\VisualDevices;
 
@@ -24,6 +25,16 @@ abstract class VisualTestsSuite extends TestsSuite
      * nom court de la classe (NouvelleScene → nouvelle-scene). Doit matcher [a-z0-9-]+.
      */
     protected string $visualScope = '';
+
+    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
+    public const UNSTABLE_WARNING = 'Page non stabilisée après 5 s (images/polices encore en chargement) : capture prise quand même.';
+
+    /**
+     * URL sur laquelle le dernier checkpoint exécuté (et réussi) a capturé :
+     * le suivant sur la même URL (header / footer / home = '') ne recharge pas
+     * la page. Remis à null dès qu'un checkpoint lève.
+     */
+    private ?string $lastVisualUrl = null;
 
     /**
      * Dernier override posé par applyDevicePreset(). Tant que les overrides
@@ -123,7 +134,7 @@ abstract class VisualTestsSuite extends TestsSuite
     {
         $cp = array_merge([
             'path' => '', 'paths' => [], 'zone' => 'viewport', 'selector' => null,
-            'waitFor' => null, 'scrollBelow' => null, 'threshold' => 0.98,
+            'waitFor' => null, 'scrollBelow' => null, 'threshold' => 0.999,
             'excludeDevices' => [], 'masks' => [],
         ], $cp);
         $cp['threshold'] = max(0.5, min(1.0, (float) $cp['threshold']));
@@ -184,6 +195,7 @@ abstract class VisualTestsSuite extends TestsSuite
         $this->describe($this->title ?: substr(strrchr('\\'.static::class, '\\'), 1));
 
         $scope = $this->visualScope();
+        $this->lastVisualUrl = null;
 
         foreach ($this->checkpoints() as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
@@ -196,13 +208,28 @@ abstract class VisualTestsSuite extends TestsSuite
 
             $url = $this->resolveUrl($path, $locale);
             $this->it($title, function () use ($page, $cp, $url, $scope) {
-                $page->goToUrl($url);
-                $page->waitForStable();
+                // Un avertissement de stabilisation ne concerne que son propre checkpoint
+                // (Expect::$latestWarning est global et persistant).
+                if (Expect::$latestWarning === self::UNSTABLE_WARNING) {
+                    Expect::setWarning('');
+                }
+
+                $sameUrl = $this->lastVisualUrl === $url;
+                $this->lastVisualUrl = null; // invalidé tant que ce checkpoint n'a pas abouti
+
+                if (!$sameUrl) {
+                    $page->goToUrl($url);
+                }
+                if ($page->waitForStable() === false) {
+                    Expect::setWarning(self::UNSTABLE_WARNING);
+                }
                 if ($cp['waitFor']) {
                     $page->waitVisible($cp['waitFor']);
                 }
                 if ($cp['scrollBelow'] && $cp['zone'] === 'viewport') {
-                    $page->scrollBelow($cp['scrollBelow']);
+                    $page->scrollBelow($cp['scrollBelow']); // remet d'abord le scroll en haut
+                } elseif ($sameUrl) {
+                    $page->scrollToTop(); // ne pas hériter du scroll du checkpoint précédent
                 }
                 $page->visualCheckpoint(
                     $scope.'.'.$cp['name'],
@@ -212,6 +239,8 @@ abstract class VisualTestsSuite extends TestsSuite
                     'auto',
                     $cp['masks'],
                 );
+
+                $this->lastVisualUrl = $url;
             });
         }
 

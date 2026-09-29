@@ -165,4 +165,46 @@ final class WaitForConditionTest extends TestCase
         $this->assertFalse($page->waitForJsCondition('window.ready === true', 150, 20));
         $this->assertGreaterThan(1, $page->calls, 'must have polled at least once successfully and then hit errors');
     }
+
+    public function testWaitForStableReturnsTrueWhenStable(): void
+    {
+        $page = new FakeConditionPage();
+        $page->results = [true];
+
+        $this->assertTrue($page->waitForStable(1000));
+    }
+
+    public function testWaitForStableReturnsFalseOnTimeoutWithoutThrowing(): void
+    {
+        $page = new FakeConditionPage();
+
+        $this->assertFalse($page->waitForStable(250));
+    }
+
+    public function testWaitForStableNeverThrows(): void
+    {
+        $page = new FakeConditionPage();
+        $page->throwAlways = true;
+
+        $this->assertFalse($page->waitForStable(250));
+    }
+
+    /** Images masquées par CSS (jamais chargées) et lazy hors viewport ne bloquent pas la stabilisation. */
+    public function testWaitForStableIgnoresUnrenderedAndOffscreenLazyImages(): void
+    {
+        $page = new FakeConditionPage();
+        $page->results = [true];
+        $page->waitForStable(1000);
+
+        $js = $page->receivedJs[0];
+        $this->assertStringContainsString('getClientRects().length === 0', $js);
+        $this->assertStringContainsString('offsetParent', $js);
+        $this->assertStringContainsString("i.loading === 'lazy'", $js);
+    }
+
+    public function testWaitForStableDefaultTimeoutIsFiveSeconds(): void
+    {
+        $param = (new \ReflectionMethod(CommonPage::class, 'waitForStable'))->getParameters()[0];
+        $this->assertSame(5000, $param->getDefaultValue());
+    }
 }

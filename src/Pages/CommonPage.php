@@ -460,6 +460,19 @@ class CommonPage
         }
     }
 
+    /** Remet le scroll en haut de page (best-effort). */
+    public function scrollToTop(int $settleMs = 0): void
+    {
+        try {
+            $this->getPage()->evaluate('window.scrollTo(0, 0)')->getReturnValue();
+            if ($settleMs > 0) {
+                usleep($settleMs * 1000);
+            }
+        } catch (\Throwable $e) {
+            // best-effort : l'écart de capture tranchera si le scroll a échoué
+        }
+    }
+
     /** Scrolle juste sous l'élément (ex. header) : le viewport commence au contenu utile. */
     public function scrollBelow(string $selector, int $settleMs = 400): void
     {
@@ -474,17 +487,34 @@ class CommonPage
         }
     }
 
-    /** Attend le chargement complet + polices + images (y compris lazy sous le pli), sans lever si le délai expire. */
-    public function waitForStable(int $timeout = 10000): void
+    /**
+     * Attend le chargement complet + polices + images visibles, sans lever si
+     * le délai expire. Sont ignorées : les images sans boîte de rendu (masquées
+     * par CSS — display:none, bloc caché sur mobile… — elles ne se chargent
+     * jamais) et les images lazy hors du viewport. Une image de taille 0×0 mais
+     * rendue n'est PAS ignorée : c'est l'état d'une image sans dimensions
+     * explicites encore en cours de chargement.
+     *
+     * @return bool true = page stable, false = délai expiré (capture à prendre quand même)
+     */
+    public function waitForStable(int $timeout = 5000): bool
     {
         try {
-            $this->waitForJsCondition(
+            return $this->waitForJsCondition(
                 "document.readyState === 'complete' && (!document.fonts || document.fonts.status === 'loaded') "
-                . "&& Array.from(document.images).every(function(i){return i.complete || (i.loading === 'lazy' && i.getBoundingClientRect().top > window.innerHeight);})",
+                . "&& Array.from(document.images).every(function(i){"
+                . "if (i.complete) { return true; }"
+                . "if (i.getClientRects().length === 0) { return true; }"
+                . "if (!i.offsetParent && getComputedStyle(i).position !== 'fixed') { return true; }"
+                . "var r = i.getBoundingClientRect();"
+                . "var outside = r.bottom <= 0 || r.top >= window.innerHeight || r.right <= 0 || r.left >= window.innerWidth;"
+                . "return i.loading === 'lazy' && outside;"
+                . "})",
                 $timeout
             );
         } catch (\Throwable $e) {
             // best-effort : ne doit jamais lever, même en cas d'échec du polling
+            return false;
         }
     }
 
@@ -521,6 +551,9 @@ class CommonPage
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare (score >= seuil = PASS, sinon FAIL + attaches actual/diff).
      *
+     * Score = 1 - part des pixels changés (comparaison pixel à pixel, marge
+     * d'anticrénelage). Seuil par défaut 0.999 = 0,1 % de pixels changés tolérés.
+     *
      * Modes de capture :
      * - $selector non null => capture de l'élément ;
      * - $selector null && $fullPage=true (défaut) => pleine page ;
@@ -533,7 +566,7 @@ class CommonPage
      * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
      * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
+    public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.999, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
     {
         // globals PS_VERSION d'abord (vérité de la suite courante ; le cache statique
         // de Version peut venir d'une suite précédente du worker), puis le cache.
@@ -593,10 +626,9 @@ class CommonPage
             return;
         }
 
-        $comparator = new \PrestaFlow\Library\Visual\VisualComparator();
-        $score = $comparator->compare($refPath, $actualPath);
+        // Un seul passage pixel à pixel : score et image de diff cohérents.
         $diffPath = \PrestaFlow\Library\Utils\Screenshots::diffPath($file, create: true);
-        $comparator->generateDiff($refPath, $actualPath, $diffPath);
+        $score = (new \PrestaFlow\Library\Visual\VisualComparator())->compareAndDiff($refPath, $actualPath, $diffPath);
 
         $status = $score >= $threshold ? 'pass' : 'fail';
         \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
