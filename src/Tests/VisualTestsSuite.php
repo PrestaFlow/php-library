@@ -40,6 +40,12 @@ abstract class VisualTestsSuite extends TestsSuite
     protected ?string $lastVisualUrl = null;
 
     /**
+     * Les checkpoints sont des captures indépendantes : un écart visuel ne doit
+     * pas faire sauter les suivants (TestsSuite saute tout après un échec).
+     */
+    protected $skipWhenFailed = false;
+
+    /**
      * Dernier override posé par applyDevicePreset(). Tant que les overrides
      * courants lui sont identiques, ils « nous appartiennent » et peuvent être
      * remplacés (suite visuelle suivante, autre device). Si l'app a posé les
