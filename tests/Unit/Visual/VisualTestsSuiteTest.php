@@ -192,4 +192,117 @@ final class VisualTestsSuiteTest extends TestCase
         $this->assertSame([], $cp['masks']);
         $this->assertSame([], $cp['excludeDevices']);
     }
+
+    /** Page factice : enregistre les appels à visualCheckpoint() sans navigateur. */
+    private function recordingPage(): object
+    {
+        return new class {
+            public array $calls = [];
+            public function goToUrl(string $url): void {}
+            public function waitForStable(): void {}
+            public function waitVisible(string $s): void {}
+            public function scrollBelow(string $s): void {}
+            public function visualCheckpoint(string $name, ?string $selector = null, float $threshold = 0.98, bool $fullPage = true, string $tag = 'auto', array $masks = []): void
+            {
+                $this->calls[] = $name;
+            }
+        };
+    }
+
+    private function scopedSuite(object $page, string $scope = ''): VisualTestsSuite
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends VisualTestsSuite {
+            public ?object $fakePage = null;
+            protected array $checkpoints = [['name' => 'header', 'path' => ''], ['name' => 'footer', 'path' => 'x']];
+            public function scopeTo(string $scope): static { $this->visualScope = $scope; return $this; }
+            protected function importVisualPage(): void { $this->pages['frontOfficePage'] = $this->fakePage; }
+        };
+        $suite->fakePage = $page;
+        if ($scope !== '') {
+            $suite->scopeTo($scope);
+        }
+        $suite->setGlobals([
+            'PS_VERSION' => '8.1.0', 'LOCALE' => 'fr', 'PREFIX_LOCALE' => false,
+            'FO' => ['URL' => 'https://shop.test', 'EMAIL' => '', 'PASSWD' => ''],
+            'BO' => ['URL' => '', 'EMAIL' => '', 'PASSWD' => ''],
+        ]);
+
+        return $suite;
+    }
+
+    public function test_scope_slug_is_kebab_case_of_short_class_name(): void
+    {
+        $this->assertSame('nouvelle-scene', VisualTestsSuite::slugify('NouvelleScene'));
+        $this->assertSame('prod-visual2', VisualTestsSuite::slugify('ProdVisual2'));
+        $this->assertSame('html-page', VisualTestsSuite::slugify('HTMLPage'));
+        $this->assertSame('home', VisualTestsSuite::slugify('Home'));
+    }
+
+    public function test_default_visual_scope_derives_from_class_name(): void
+    {
+        $suite = new \PrestaFlow\Tests\Unit\Visual\Fixtures\ProdVisual2(loadGlobals: false, getBrowser: false);
+        $this->assertSame('prod-visual2', $suite->visualScope());
+    }
+
+    public function test_anonymous_suite_scope_is_filename_safe(): void
+    {
+        $this->assertMatchesRegularExpression('/^[a-z0-9-]+$/', $this->suite()->visualScope());
+    }
+
+    public function test_visual_scope_property_overrides_slug(): void
+    {
+        $this->assertSame('home-fr', $this->scopedSuite($this->recordingPage(), 'home-fr')->visualScope());
+    }
+
+    public function test_invalid_visual_scope_throws(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->scopedSuite($this->recordingPage(), 'Bad/Scope')->visualScope();
+    }
+
+    public function test_init_passes_suite_scoped_name_but_keeps_unscoped_titles(): void
+    {
+        $page = $this->recordingPage();
+        $suite = $this->scopedSuite($page, 'nouvelle-scene');
+        $suite->init();
+        $tests = array_values($suite->tests);
+
+        $this->assertSame('capture visuelle : header', $tests[0]['title']);
+        $this->assertSame('capture visuelle : footer', $tests[1]['title']);
+        foreach ($tests as $t) {
+            ($t['steps'])();
+        }
+        $this->assertSame(['nouvelle-scene.header', 'nouvelle-scene.footer'], $page->calls);
+    }
+
+    public function test_use_definition_overrides_literal_properties_for_init(): void
+    {
+        $page = $this->recordingPage();
+        $suite = $this->scopedSuite($page, 'scene');
+        $returned = $suite->useDefinition(['mobile'], ['en'], [['name' => 'hero', 'path' => 'home']]);
+
+        $this->assertSame($suite, $returned);
+        $this->assertSame(['mobile'], $suite->devices());
+        $this->assertSame(['en'], $suite->locales());
+        $this->assertSame('hero', $suite->checkpoints()[0]['name']);
+
+        $suite->setGlobals(array_merge($suite->getGlobals(), ['DEVICE' => 'mobile', 'LOCALE' => 'en']));
+        $suite->init();
+        $tests = array_values($suite->tests);
+        $this->assertCount(1, $tests);
+        $this->assertSame('capture visuelle : hero', $tests[0]['title']);
+        ($tests[0]['steps'])();
+        $this->assertSame(['scene.hero'], $page->calls);
+    }
+
+    public function test_use_definition_rejects_device_not_in_new_definition(): void
+    {
+        $suite = $this->scopedSuite($this->recordingPage(), 'scene');
+        $suite->useDefinition(['mobile'], [], [['name' => 'hero', 'path' => '']]);
+
+        $suite->setGlobals(array_merge($suite->getGlobals(), ['DEVICE' => 'desktop']));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $suite->init(); // desktop n'est plus déclaré après useDefinition()
+    }
 }
