@@ -142,6 +142,7 @@ final class PageSnapshotTest extends TestCase
         $this->assertSame([1920, 4000], [$result->width, $result->height]);
         $this->assertSame('body', $result->elements[0]['selector']);
         $this->assertTrue($result->stable);
+        $this->assertSame(200, $result->status);
     }
 
     public function test_height_is_capped_and_clip_covers_the_captured_page(): void
@@ -161,16 +162,13 @@ final class PageSnapshotTest extends TestCase
         $this->assertContains('screenshot', $this->rec['log']);
     }
 
-    public function test_http_error_status_throws_and_closes_the_browser(): void
+    public function test_http_error_page_is_captured_and_status_returned(): void
     {
-        $snapshot = $this->snapshot(['status' => 404]);
+        $result = $this->snapshot(['status' => 404])->take('https://shop.test/x', 'desktop');
 
-        try {
-            $snapshot->take('https://shop.test/x', 'desktop');
-            $this->fail('SnapshotException attendue');
-        } catch (SnapshotException $e) {
-            $this->assertStringContainsString('404', $e->getMessage());
-        }
+        $this->assertSame(404, $result->status);
+        $this->assertContains('screenshot', $this->rec['log']);
+        $this->assertSame('JPEGDATA', $result->image);
         $this->assertTrue($this->rec['closed']);
     }
 

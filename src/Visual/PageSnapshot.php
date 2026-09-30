@@ -71,9 +71,8 @@ class PageSnapshot
             $status = (int) $page->evaluate(
                 "(function(){var n=performance.getEntriesByType('navigation')[0];return n&&n.responseStatus?n.responseStatus:0;})()"
             )->getReturnValue();
-            if ($status >= 400) {
-                throw new SnapshotException(sprintf('La page %s a répondu avec le code HTTP %d.', $url, $status));
-            }
+            // Une page en erreur (404, 500…) est capturée comme les autres : un point de
+            // contrôle peut légitimement cibler une page d'erreur. Le statut est renvoyé.
 
             [$width, $height] = $page->evaluate(
                 '[Math.ceil(document.documentElement.scrollWidth), Math.ceil(document.documentElement.scrollHeight)]'
@@ -92,7 +91,7 @@ class PageSnapshot
                 'clip' => new Clip(0, 0, $width, $height),
             ])->getBase64($timeoutMs), true);
 
-            return new SnapshotResult((string) $image, 'image/jpeg', $width, $height, is_array($elements) ? $elements : [], $stable);
+            return new SnapshotResult((string) $image, 'image/jpeg', $width, $height, is_array($elements) ? $elements : [], $stable, $status);
         } finally {
             try {
                 $browser->close();
