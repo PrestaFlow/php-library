@@ -581,6 +581,8 @@ class CommonPage
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
      * - référence présente => compare pixel à pixel (PASS, sinon FAIL + attaches actual/diff).
+     * - PRESTAFLOW_VISUAL_UPDATE=1 => même capture, mais elle remplace la
+     *   référence (statut baseline, `updated` = une référence existait), PASS.
      *
      * Règle de passage :
      * - budget de pixels (défaut) : PASS si le nombre de pixels changés
@@ -680,8 +682,19 @@ class CommonPage
             $this->removeVisualMasks($masks);
         }
 
-        if (!is_file($refPath)) {
+        $hadReference = is_file($refPath);
+        $updateMode = self::visualUpdateMode();
+        if (!$hadReference || $updateMode) {
+            // auto-baseline (pas de référence) ou PRESTAFLOW_VISUAL_UPDATE :
+            // la capture devient la référence, sans comparaison.
             copy($actualPath, $refPath);
+            if ($updateMode) {
+                // une ancienne diff ne correspond plus à la nouvelle référence
+                $staleDiff = \PrestaFlow\Library\Utils\Screenshots::diffPath($file);
+                if (is_file($staleDiff)) {
+                    @unlink($staleDiff);
+                }
+            }
             $size = @getimagesize($actualPath);
             $total = $size ? $size[0] * $size[1] : null;
             \PrestaFlow\Library\Tests\TestsSuite::recordVisualResult([
@@ -690,6 +703,7 @@ class CommonPage
                 'changed_pixels' => null, 'total_pixels' => $total, 'max_diff_pixels' => $budget,
                 'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
                 'origin' => $origin,
+                'updated' => $hadReference,
             ]);
             \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
             return;
@@ -717,6 +731,17 @@ class CommonPage
         }
 
         \PrestaFlow\Library\Expects\Expect::that($passed)->isTheSameAs(true);
+    }
+
+    /**
+     * PRESTAFLOW_VISUAL_UPDATE=1 : chaque capture remplace la référence
+     * (statut `baseline`, `updated` = une référence existait déjà).
+     */
+    public static function visualUpdateMode(): bool
+    {
+        $raw = \PrestaFlow\Library\Utils\Env::get('PRESTAFLOW_VISUAL_UPDATE');
+
+        return is_scalar($raw) && filter_var($raw, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

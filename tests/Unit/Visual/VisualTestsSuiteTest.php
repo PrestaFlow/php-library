@@ -44,6 +44,7 @@ final class VisualTestsSuiteTest extends TestCase
         TestsSuite::useBrowserOptions(null, null, null);
         $_ENV = $this->envBackup;
         $_SERVER = $this->serverBackup;
+        putenv('PRESTAFLOW_VISUAL_ONLY');
     }
 
     /** Suite construite avec loadGlobals: true (chemin CLI), sans navigateur. */
@@ -452,5 +453,87 @@ final class VisualTestsSuiteTest extends TestCase
         $this->assertSame([null, 100], $page->rules['scene.a']);
         $this->assertSame([0.99, null], $page->rules['scene.b']);
         $this->assertSame([null, 500], $page->rules['scene.c']);
+    }
+
+    private function onlyCheckpoints(): array
+    {
+        return [
+            ['name' => 'header', 'path' => ''],
+            ['name' => 'home', 'path' => ''],
+            ['name' => 'footer', 'path' => '', 'zone' => 'element', 'selector' => '#footer'],
+            ['name' => 'login', 'path' => 'connexion'],
+        ];
+    }
+
+    public function test_visual_only_keeps_listed_checkpoints_in_declaration_order(): void
+    {
+        $_ENV['PRESTAFLOW_VISUAL_ONLY'] = ' footer , header,,unknown ';
+        $page = $this->recordingPage();
+        $suite = $this->sequenceSuite($page, $this->onlyCheckpoints());
+
+        $titles = array_column(array_values($suite->tests), 'title');
+        $this->assertSame(['capture visuelle : header', 'capture visuelle : footer'], $titles);
+        foreach (array_values($suite->tests) as $t) {
+            $this->assertArrayNotHasKey('skip', $t);
+        }
+
+        $this->runSteps($suite);
+        $this->assertSame(['scene.header', 'scene.footer'], $page->calls);
+    }
+
+    public function test_visual_only_is_read_from_getenv_too(): void
+    {
+        unset($_ENV['PRESTAFLOW_VISUAL_ONLY']);
+        putenv('PRESTAFLOW_VISUAL_ONLY=login');
+
+        $this->assertSame(['login'], VisualTestsSuite::onlyFromEnv());
+    }
+
+    public function test_visual_only_unset_or_empty_runs_every_checkpoint(): void
+    {
+        foreach ([null, '', ' , '] as $raw) {
+            if ($raw === null) {
+                unset($_ENV['PRESTAFLOW_VISUAL_ONLY']);
+            } else {
+                $_ENV['PRESTAFLOW_VISUAL_ONLY'] = $raw;
+            }
+            $page = $this->recordingPage();
+            $this->runSteps($this->sequenceSuite($page, $this->onlyCheckpoints()));
+
+            $this->assertSame(['scene.header', 'scene.home', 'scene.footer', 'scene.login'], $page->calls);
+        }
+    }
+
+    public function test_visual_only_with_no_match_registers_a_failing_step(): void
+    {
+        $_ENV['PRESTAFLOW_VISUAL_ONLY'] = 'nope, missing';
+        $page = $this->recordingPage();
+        $suite = $this->sequenceSuite($page, $this->onlyCheckpoints());
+        $tests = array_values($suite->tests);
+
+        $this->assertCount(1, $tests);
+        $this->assertArrayNotHasKey('skip', $tests[0]);
+
+        try {
+            ($tests[0]['steps'])();
+            $this->fail('le filtre sans correspondance doit échouer');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('PRESTAFLOW_VISUAL_ONLY', $e->getMessage());
+            $this->assertStringContainsString('nope, missing', $e->getMessage());
+            $this->assertStringContainsString('header, home, footer, login', $e->getMessage());
+        }
+        $this->assertSame([], $page->calls);
+    }
+
+    public function test_visual_only_with_no_match_fails_the_suite_run(): void
+    {
+        $_ENV['PRESTAFLOW_VISUAL_ONLY'] = 'nope';
+        $suite = $this->scopedSuite($this->recordingPage(), 'scene');
+        $suite->useDefinition(['desktop'], ['fr'], $this->onlyCheckpoints());
+        $suite->run(); // run() appelle init()
+
+        $results = $suite->results(false);
+        $this->assertCount(1, $results['tests']);
+        $this->assertSame(1, $results['stats']['failures']);
     }
 }

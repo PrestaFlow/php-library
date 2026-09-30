@@ -51,6 +51,21 @@ PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run te
 - `--group` and `--draft` still apply, on the suites of the selected folders.
 - Unset or empty: every suite under `<path>` runs, as before.
 
+## Visual regression runs
+
+`VisualTestsSuite` reads these variables:
+
+| Variable | Effect |
+|---|---|
+| `PRESTAFLOW_DEVICE` | Device preset of the run (`desktop`, `mobile`, …); must be declared in the suite's `$devices`. Default: first declared device. |
+| `PRESTAFLOW_LOCALE` | Locale of the run; must be declared in the suite's `$locales`. Default: first declared locale. |
+| `PRESTAFLOW_VISUAL_ONLY` | Comma-separated checkpoint names, as declared in `$checkpoints` (e.g. `home,footer`). Only those run, in declaration order; the others are not in the results at all. Spaces are trimmed, unknown names are ignored — but if **none** matches, the run fails with a step listing the unknown and declared names. Unset or empty: every checkpoint runs. |
+| `PRESTAFLOW_VISUAL_UPDATE` | Boolean (`1`, `true`, `yes`, `on`). Captures exactly as usual (masks, device, scroll, element clip) but writes each capture as the reference instead of comparing it. The result is `status: baseline` with `updated: true` when a reference was replaced (`false` for a first baseline); no diff image. |
+
+```bash
+PRESTAFLOW_VISUAL_ONLY=home,footer PRESTAFLOW_VISUAL_UPDATE=1 ./vendor/bin/prestaflow run tests/Visual
+```
+
 ## Run a suite against a throwaway shop
 
 `docker-compose.yml` boots a disposable PrestaShop from the official
