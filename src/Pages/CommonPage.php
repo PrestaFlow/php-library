@@ -652,6 +652,7 @@ class CommonPage
                     throw new \RuntimeException("visualCheckpoint : l'élément « {$selector} » n'a pas de boîte de rendu");
                 }
                 [$scrollX, $scrollY] = $this->getScrollOffset();
+                $origin = [(int) round($clip->getX() + $scrollX), (int) round($clip->getY() + $scrollY)];
                 $page->screenshot([
                     'captureBeyondViewport' => true,
                     'clip' => new \HeadlessChromium\Clip(
@@ -663,6 +664,7 @@ class CommonPage
                     'format' => 'png',
                 ])->saveToFile($actualPath);
             } elseif ($fullPage) {
+                $origin = [0, 0];
                 $page->screenshot([
                     'captureBeyondViewport' => true,
                     'clip' => $page->getFullPageClip(),
@@ -670,6 +672,8 @@ class CommonPage
                 ])->saveToFile($actualPath);
             } else {
                 // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
+                [$sx, $sy] = $this->getScrollOffset();
+                $origin = [(int) round($sx), (int) round($sy)];
                 $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
             }
         } finally {
@@ -685,6 +689,7 @@ class CommonPage
                 'threshold' => self::effectiveThreshold($threshold, $budget, $total),
                 'changed_pixels' => null, 'total_pixels' => $total, 'max_diff_pixels' => $budget,
                 'reference' => $refPath, 'actual' => $actualPath, 'diff' => null,
+                'origin' => $origin,
             ]);
             \PrestaFlow\Library\Expects\Expect::that(true)->isTheSameAs(true);
             return;
@@ -701,6 +706,7 @@ class CommonPage
             'threshold' => self::effectiveThreshold($threshold, $budget, $result->totalPixels),
             'changed_pixels' => $result->changedPixels, 'total_pixels' => $result->totalPixels, 'max_diff_pixels' => $budget,
             'reference' => $refPath, 'actual' => $actualPath, 'diff' => $diffPath,
+            'origin' => $origin,
         ]);
 
         if ($status === 'fail') {

@@ -77,10 +77,14 @@ final class VisualCheckpointMasksTest extends TestCase
                     {
                         $this->outer->evaluatedLog[] = $js;
 
-                        return new class {
+                        return new class ($js) {
+                            public function __construct(private string $js)
+                            {
+                            }
+
                             public function getReturnValue($timeout = null)
                             {
-                                return [1280, 720];
+                                return str_contains($this->js, 'scrollY') ? [0, 287] : [1280, 720];
                             }
                         };
                     }
@@ -164,5 +168,21 @@ final class VisualCheckpointMasksTest extends TestCase
             $this->assertStringContainsString("getElementById('pf-visual-masks')", $js);
             $this->assertStringContainsString('.remove()', $js);
         }
+    }
+
+    public function test_viewport_capture_records_the_scroll_offset_as_origin(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, 0.98, false);
+
+        $this->assertSame([0, 287], TestsSuite::$visualResults[0]['origin']);
+    }
+
+    public function test_full_page_capture_records_a_zero_origin(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, 0.98, true);
+
+        $this->assertSame([0, 0], TestsSuite::$visualResults[0]['origin']);
     }
 }
