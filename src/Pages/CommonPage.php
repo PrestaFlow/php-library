@@ -572,6 +572,21 @@ class CommonPage
         return [null, null];
     }
 
+    /** @return array{0: float, 1: float} [scrollX, scrollY] (0 si indisponible) */
+    private function getScrollOffset(): array
+    {
+        try {
+            $value = $this->getPage()->evaluate('[window.scrollX, window.scrollY]')->getReturnValue();
+            if (is_array($value) && count($value) === 2) {
+                return [(float) $value[0], (float) $value[1]];
+            }
+        } catch (\Throwable $e) {
+            // best-effort : sans offset, la capture reste correcte en haut de page
+        }
+
+        return [0.0, 0.0];
+    }
+
     /**
      * Point de contrôle de régression visuelle.
      * - pas de référence => capture-la (auto-baseline), PASS.
@@ -638,7 +653,25 @@ class CommonPage
                 if ($node === null) {
                     throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
                 }
-                $page->screenshotElement($node)->saveToFile($actualPath);
+                // Node::getClip() est relatif au viewport, le clip de capture au
+                // document (et coupé au viewport sans captureBeyondViewport) : via
+                // screenshotElement(), un élément sous la ligne de flottaison
+                // (footer) donnait une image vide.
+                $clip = $node->getClip();
+                if ($clip === null) {
+                    throw new \RuntimeException("visualCheckpoint : l'élément « {$selector} » n'a pas de boîte de rendu");
+                }
+                [$scrollX, $scrollY] = $this->getScrollOffset();
+                $page->screenshot([
+                    'captureBeyondViewport' => true,
+                    'clip' => new \HeadlessChromium\Clip(
+                        $clip->getX() + $scrollX,
+                        $clip->getY() + $scrollY,
+                        $clip->getWidth(),
+                        $clip->getHeight()
+                    ),
+                    'format' => 'png',
+                ])->saveToFile($actualPath);
             } elseif ($fullPage) {
                 $page->screenshot([
                     'captureBeyondViewport' => true,
