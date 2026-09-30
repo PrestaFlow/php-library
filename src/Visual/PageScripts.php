@@ -32,4 +32,7 @@ final class PageScripts
         "(function(){if(!document.getAnimations){return;}document.getAnimations().forEach(function(a){"
         . "try{var t=a.effect&&a.effect.getComputedTiming();if(t&&t.endTime===Infinity){a.cancel();}else{a.finish();}}catch(e){}"
         . "});})()";
+
+    /** Carte des éléments visibles (JSON string). Remplacée par le vrai script en Task 3. */
+    public const ELEMENT_MAP = '(function(MAX, MAX_Y){return JSON.stringify([]);})';
 }
