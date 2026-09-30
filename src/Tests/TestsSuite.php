@@ -111,7 +111,9 @@ class TestsSuite implements OutputStates
      * de pixels, c'est le ratio équivalent 1 - max_diff_pixels / total_pixels.
      * `max_diff_pixels` est null en mode ratio historique (seuil explicite seul).
      *
-     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, changed_pixels: ?int, total_pixels: ?int, max_diff_pixels: ?int, actual_relpath: ?string, diff_relpath: ?string}>
+     * `origin` = [x, y] du coin haut-gauche de la capture dans la page (null si inconnu).
+     *
+     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, changed_pixels: ?int, total_pixels: ?int, max_diff_pixels: ?int, origin: ?array{0: int, 1: int}, actual_relpath: ?string, diff_relpath: ?string}>
      */
     private static function buildVisualBlock(int $startIndex): array
     {
@@ -129,6 +131,9 @@ class TestsSuite implements OutputStates
                 'changed_pixels' => $raw['changed_pixels'] ?? null,
                 'total_pixels' => $raw['total_pixels'] ?? null,
                 'max_diff_pixels' => $raw['max_diff_pixels'] ?? null,
+                'origin' => isset($raw['origin']) && is_array($raw['origin']) && count($raw['origin']) === 2
+                    ? array_values(array_map('intval', $raw['origin']))
+                    : null,
                 'actual_relpath' => ($needsFiles && !empty($raw['actual']))
                     ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', basename($raw['actual']))
                     : null,

@@ -173,4 +173,38 @@ final class ResultsJsonVisualBlockTest extends TestCase
         $this->assertNull($visual['max_diff_pixels']);
         $this->assertSame(0.98, $visual['threshold']);
     }
+
+    public function testVisualBlockCarriesOrigin(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+        $suite->it('capture visuelle : origine', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'home', 'tag' => null, 'status' => 'pass', 'score' => 1.0, 'threshold' => 0.98,
+                'origin' => [0, 287],
+                'reference' => null, 'actual' => null, 'diff' => null,
+            ]);
+        });
+        $suite->run();
+
+        $visual = json_decode(json_encode($suite->results(false)), true)['tests'][0]['visual'][0];
+        $this->assertSame([0, 287], $visual['origin']);
+    }
+
+    public function testVisualBlockOriginIsNullWhenAbsent(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+        $suite->it('capture visuelle : sans origine', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'home', 'tag' => null, 'status' => 'pass', 'score' => 1.0, 'threshold' => 0.98,
+                'reference' => null, 'actual' => null, 'diff' => null,
+            ]);
+        });
+        $suite->run();
+
+        $visual = json_decode(json_encode($suite->results(false)), true)['tests'][0]['visual'][0];
+        $this->assertArrayHasKey('origin', $visual);
+        $this->assertNull($visual['origin']);
+    }
 }
