@@ -207,4 +207,42 @@ final class ResultsJsonVisualBlockTest extends TestCase
         $this->assertArrayHasKey('origin', $visual);
         $this->assertNull($visual['origin']);
     }
+
+    public function testUpdatedFlagIsCarriedIntoVisualBlock(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+        };
+
+        $suite->title = 'Visual update run';
+
+        $suite->it('capture visuelle : home', function () {
+            TestsSuite::recordVisualResult([
+                'name' => 'scene.home', 'tag' => 'auto-v9-1280x720-fr', 'status' => 'baseline',
+                'score' => null, 'threshold' => 0.99, 'reference' => '/tmp/visual-baseline/a.png',
+                'actual' => '/tmp/prestaflow/screens/actual/a.png', 'diff' => null,
+                'origin' => [0, 0], 'updated' => true,
+            ]);
+            TestsSuite::recordVisualResult([
+                'name' => 'scene.footer', 'tag' => 'auto-v9-1280x720-fr', 'status' => 'baseline',
+                'score' => null, 'threshold' => 0.99, 'reference' => '/tmp/visual-baseline/b.png',
+                'actual' => '/tmp/prestaflow/screens/actual/b.png', 'diff' => null,
+                'origin' => [0, 0], 'updated' => false,
+            ]);
+            TestsSuite::recordVisualResult([
+                'name' => 'scene.legacy', 'tag' => null, 'status' => 'pass',
+                'score' => 1.0, 'threshold' => 0.99, 'reference' => '/tmp/visual-baseline/c.png',
+                'actual' => '/tmp/prestaflow/screens/actual/c.png', 'diff' => '/tmp/prestaflow/screens/diff/c.png',
+            ]);
+        });
+
+        $suite->run();
+
+        $visual = $suite->results(false)['tests'][0]['visual'];
+
+        $this->assertTrue($visual[0]['updated']);
+        $this->assertSame('baseline', $visual[0]['status']);
+        $this->assertNull($visual[0]['diff_relpath']);
+        $this->assertFalse($visual[1]['updated']);
+        $this->assertFalse($visual[2]['updated']);
+    }
 }

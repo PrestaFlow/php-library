@@ -113,7 +113,10 @@ class TestsSuite implements OutputStates
      *
      * `origin` = [x, y] du coin haut-gauche de la capture dans la page (null si inconnu).
      *
-     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, changed_pixels: ?int, total_pixels: ?int, max_diff_pixels: ?int, origin: ?array{0: int, 1: int}, actual_relpath: ?string, diff_relpath: ?string}>
+     * `updated` = true quand une référence existante a été remplacée
+     * (PRESTAFLOW_VISUAL_UPDATE) ; false sinon, y compris pour une 1re baseline.
+     *
+     * @return array<int, array{name: string, tag: ?string, status: string, score: ?float, threshold: float, changed_pixels: ?int, total_pixels: ?int, max_diff_pixels: ?int, origin: ?array{0: int, 1: int}, updated: bool, actual_relpath: ?string, diff_relpath: ?string}>
      */
     private static function buildVisualBlock(int $startIndex): array
     {
@@ -134,6 +137,7 @@ class TestsSuite implements OutputStates
                 'origin' => isset($raw['origin']) && is_array($raw['origin']) && count($raw['origin']) === 2
                     ? array_values(array_map('intval', $raw['origin']))
                     : null,
+                'updated' => (bool) ($raw['updated'] ?? false),
                 'actual_relpath' => ($needsFiles && !empty($raw['actual']))
                     ? \PrestaFlow\Library\Utils\Screenshots::relativeVisualPath('actual', basename($raw['actual']))
                     : null,
