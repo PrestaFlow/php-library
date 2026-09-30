@@ -219,7 +219,25 @@ abstract class VisualTestsSuite extends TestsSuite
         $scope = $this->visualScope();
         $this->lastVisualUrl = null;
 
-        foreach ($this->checkpoints() as $cp) {
+        $checkpoints = $this->checkpoints();
+        $only = self::onlyFromEnv();
+        if ($only !== []) {
+            $checkpoints = array_values(array_filter($checkpoints, static fn (array $cp) => in_array((string) ($cp['name'] ?? ''), $only, true)));
+            if ($checkpoints === []) {
+                $message = sprintf(
+                    'PRESTAFLOW_VISUAL_ONLY : aucun checkpoint ne correspond (%s) ; checkpoints déclarés : %s',
+                    implode(', ', $only),
+                    implode(', ', array_map(static fn (array $cp) => (string) ($cp['name'] ?? ''), $this->checkpoints())) ?: 'aucun'
+                );
+                $this->it('capture visuelle : filtre PRESTAFLOW_VISUAL_ONLY', function () use ($message) {
+                    throw new \InvalidArgumentException($message);
+                });
+
+                return $this;
+            }
+        }
+
+        foreach ($checkpoints as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
             $path = $this->resolvePath($cp, $locale);
 
@@ -274,6 +292,22 @@ abstract class VisualTestsSuite extends TestsSuite
     protected function importVisualPage(): void
     {
         $this->importPage('FrontOffice');
+    }
+
+    /**
+     * Noms de checkpoints (non préfixés du scope) retenus via
+     * PRESTAFLOW_VISUAL_ONLY=home,footer ; [] = pas de filtre.
+     *
+     * @return list<string>
+     */
+    public static function onlyFromEnv(): array
+    {
+        $raw = Env::get('PRESTAFLOW_VISUAL_ONLY');
+        if (!is_string($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), static fn (string $n) => $n !== '')));
     }
 
     private function deviceFromEnv(): ?string
