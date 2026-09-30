@@ -443,9 +443,7 @@ class CommonPage
     {
         try {
             $this->getPage()->evaluate(
-                "(function(){if(!document.getAnimations){return;}document.getAnimations().forEach(function(a){"
-                . "try{var t=a.effect&&a.effect.getComputedTiming();if(t&&t.endTime===Infinity){a.cancel();}else{a.finish();}}catch(e){}"
-                . "});})()"
+                \PrestaFlow\Library\Visual\PageScripts::SETTLE_ANIMATIONS
             )->getReturnValue();
         } catch (\Throwable $e) {
             // best-effort : l'écart de capture tranchera si le gel a échoué
@@ -527,15 +525,7 @@ class CommonPage
     {
         try {
             return $this->waitForJsCondition(
-                "document.readyState === 'complete' && (!document.fonts || document.fonts.status === 'loaded') "
-                . "&& Array.from(document.images).every(function(i){"
-                . "if (i.complete) { return true; }"
-                . "if (i.getClientRects().length === 0) { return true; }"
-                . "if (!i.offsetParent && getComputedStyle(i).position !== 'fixed') { return true; }"
-                . "var r = i.getBoundingClientRect();"
-                . "var outside = r.bottom <= 0 || r.top >= window.innerHeight || r.right <= 0 || r.left >= window.innerWidth;"
-                . "return i.loading === 'lazy' && outside;"
-                . "})",
+                \PrestaFlow\Library\Visual\PageScripts::STABLE_CONDITION,
                 $timeout
             );
         } catch (\Throwable $e) {
