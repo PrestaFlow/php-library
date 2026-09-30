@@ -12,6 +12,7 @@ final class SnapshotResult
      * @param int    $height   hauteur capturée, en CSS px (plafonnée)
      * @param array<int, array{i:int,p:int,tag:string,id:string,classes:string[],box:array{0:float,1:float,2:float,3:float},selector:string,matches:int}> $elements
      * @param bool   $stable   false si la page n'était pas stable à l'échéance
+     * @param int    $status   statut HTTP du document principal (0 si inconnu, ex. file://)
      */
     public function __construct(
         public readonly string $image,
@@ -20,6 +21,7 @@ final class SnapshotResult
         public readonly int $height,
         public readonly array $elements,
         public readonly bool $stable,
+        public readonly int $status = 0,
     ) {
     }
 }

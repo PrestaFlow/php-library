@@ -51,6 +51,7 @@ final class PageSnapshotBrowserTest extends TestCase
         $r = $this->snapshot();
         $this->assertStringStartsWith("\xFF\xD8\xFF", $r->image);
         $this->assertSame('image/jpeg', $r->mime);
+        $this->assertContains($r->status, [0, 200], 'file:// : statut inconnu (0) ou 200 selon la version de Chrome');
         $this->assertSame(1920, $r->width);
         $this->assertGreaterThan(3000, $r->height);
     }
