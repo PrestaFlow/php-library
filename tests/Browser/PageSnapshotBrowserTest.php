@@ -63,15 +63,66 @@ final class PageSnapshotBrowserTest extends TestCase
 
     public function test_generated_id_falls_back_to_classes(): void
     {
-        $banner = $this->byText('div', 'item-48213')[0];
-        $this->assertStringNotContainsString('48213', $banner['selector']);
-        $this->assertMatchesRegularExpression('/^div\.(bloc|promo-banner|bloc\.promo-banner|promo-banner\.bloc)$/', $banner['selector']);
+        $hash = $this->byText('div', 'a1b2c3d4e5')[0];
+        $this->assertSame('div.hashed', $hash['selector']);
+        $stamp = $this->byText('div', '1690000000123')[0];
+        $this->assertSame('div.stamped', $stamp['selector']);
+    }
+
+    public function test_entity_ids_and_classes_are_stable(): void
+    {
+        $this->assertNotNull($this->bySelector('#item-48213'));
+        $this->assertNotNull($this->bySelector('#prettyblocks-carousel-195226'));
+        $this->assertNotNull($this->bySelector('#_desktop_cart'));
+        $this->assertNotNull($this->bySelector('div.product-12'));
+    }
+
+    public function test_carousel_clones_are_excluded_and_real_slides_get_short_selectors(): void
+    {
+        $elements = $this->snapshot()->elements;
+        $classes = array_merge(...array_column($elements, 'classes'));
+        foreach (['cloned', 'slick-cloned', 'swiper-slide-duplicate'] as $c) {
+            $this->assertNotContains($c, $classes, $c);
+        }
+        // une seule occurrence de chaque slide (et de ses enfants) : les clones ne sont pas cartographiés
+        $this->assertCount(1, $this->byText('div', 'block-195226-1'));
+        $this->assertCount(1, $this->byText('div', 'block-195226-2'));
+        $this->assertCount(2, array_filter($elements, fn ($e) => in_array('slide-link', $e['classes'], true)));
+        $this->assertCount(2, array_filter($elements, fn ($e) => in_array('slick-card', $e['classes'], true)));
+        $this->assertCount(2, array_filter($elements, fn ($e) => in_array('swiper-card', $e['classes'], true)));
+
+        foreach (['block-195226-1', 'block-195226-2'] as $id) {
+            $slide = $this->byText('div', $id)[0];
+            $this->assertStringStartsWith('#'.$id, $slide['selector']);
+            $this->assertSame(1, $slide['matches'], $slide['selector']);
+        }
+        foreach ($elements as $el) {
+            if (in_array('slide-link', $el['classes'], true)) {
+                $this->assertStringNotContainsString('nth-of-type', $el['selector']);
+                $this->assertSame(1, $el['matches'], $el['selector']);
+            }
+        }
+    }
+
+    public function test_distant_unique_ancestor_plus_intermediate_landmark_beats_the_nth_of_type_chain(): void
+    {
+        // #block-7-1 existe aussi dans le bloc _mobile_ masqué : repère non unique seul,
+        // l'ancêtre unique (#_desktop_blocks-7) est à plus de 6 niveaux
+        $titles = array_values(array_filter($this->snapshot()->elements, fn ($e) => $e['tag'] === 'h5'));
+        $this->assertCount(2, $titles);
+        $this->assertSame('#_desktop_blocks-7 #block-7-1 h5.card-title', $titles[0]['selector']);
+        $this->assertSame('#_desktop_blocks-7 #block-7-2 h5.card-title', $titles[1]['selector']);
+        foreach ($titles as $t) {
+            $this->assertSame(1, $t['matches'], $t['selector']);
+        }
     }
 
     public function test_state_and_library_classes_are_ignored(): void
     {
         foreach ($this->snapshot()->elements as $el) {
-            $this->assertDoesNotMatchRegularExpression('/\.(active|owl-item|hidden|d-none|sr-only|invisible)(?![\w-])/', $el['selector'], $el['selector']);
+            // le filtre anti-clones `:not(.owl-item.cloned *)` n'est pas une classe proposée
+            $sel = preg_replace('/:not\([^)]*\)/', '', $el['selector']);
+            $this->assertDoesNotMatchRegularExpression('/\.(active|owl-item|hidden|d-none|sr-only|invisible)(?![\w-])/', $sel, $el['selector']);
         }
         $marked = array_values(array_filter($this->snapshot()->elements, fn ($e) => in_array('hidden', $e['classes'], true)));
         $this->assertCount(1, $marked, 'un .hidden visible doit rester dans la carte');

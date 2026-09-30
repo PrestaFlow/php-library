@@ -15,7 +15,7 @@ final class PageSnapshotTest extends TestCase
 
     private function snapshot(array $values = [], ?\Throwable $navigateThrows = null, bool $factoryThrows = false): PageSnapshot
     {
-        $this->rec = ['log' => [], 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null];
+        $this->rec = ['log' => [], 'event' => null, 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null];
         $rec = &$this->rec;
         $values += [
             'stable' => true,
@@ -50,14 +50,16 @@ final class PageSnapshotTest extends TestCase
                         {
                             $this->rec['log'][] = 'navigate '.$url;
                             $throws = $this->throws;
+                            $rec = &$this->rec;
 
-                            return new class ($throws) {
-                                public function __construct(private ?\Throwable $throws)
+                            return new class ($rec, $throws) {
+                                public function __construct(private array &$rec, private ?\Throwable $throws)
                                 {
                                 }
 
                                 public function waitForNavigation($event = null, $timeout = null)
                                 {
+                                    $this->rec['event'] = $event;
                                     if ($this->throws) {
                                         throw $this->throws;
                                     }
@@ -130,7 +132,9 @@ final class PageSnapshotTest extends TestCase
 
         $this->assertSame(['navigate https://shop.test/fr/', 'stable', 'settle', 'status', 'size', 'top', 'map', 'screenshot'], $this->rec['log']);
         $this->assertTrue($this->rec['closed']);
-        $this->assertSame([390, 844], $this->rec['options']['windowSize']);
+        // DOMContentLoaded : la stabilité (readyState complete, images, polices) est sondée ensuite, bornée
+        $this->assertSame(\HeadlessChromium\Page::DOM_CONTENT_LOADED, $this->rec['event']);
+        $this->assertSame([390, 844],$this->rec['options']['windowSize']);
         $this->assertStringContainsString('iPhone', $this->rec['options']['userAgent']);
         $this->assertSame('JPEGDATA', $result->image);
         $this->assertSame('image/jpeg', $result->mime);

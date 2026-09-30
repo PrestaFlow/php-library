@@ -10,10 +10,45 @@
   .tiny { width: 3px; height: 3px; }
   .spacer { height: 3000px; }
   .card, .square { height: 40px; margin: 4px; background: #ddd; }
+  .owl-item, .slick-slide, .swiper-slide { height: 60px; margin: 4px; background: #ccc; }
+  .owl-item > div, .slick-slide > div, .swiper-slide > div { height: 50px; }
+  .slide-link { display: block; height: 30px; }
 </style></head>
 <body>
   <header id="header" class="site-header"><nav class="menu"><a href="#">Accueil</a></nav></header>
   <div id="item-48213" class="bloc promo-banner">Bannière</div>
+  <div id="a1b2c3d4e5" class="bloc hashed">Id hash</div>
+  <div id="1690000000123" class="bloc stamped">Id timestamp</div>
+  <div class="bloc product-12">Classe d'entité</div>
+  <div id="_desktop_cart" class="bloc">Panier desktop</div>
+  <!-- Owl (loop) : clones avant et après les vraies slides, mêmes id/classes -->
+  <div id="prettyblocks-carousel-195226" class="prettyblocks-carousel owl-carousel owl-loaded">
+    <div class="owl-stage">
+      <div class="owl-item cloned"><div id="block-195226-2" class="block-195226-2 item vertical"><a class="slide-link" href="#">B</a></div></div>
+      <div class="owl-item active"><div id="block-195226-1" class="block-195226-1 item vertical"><a class="slide-link" href="#">A</a></div></div>
+      <div class="owl-item"><div id="block-195226-2" class="block-195226-2 item vertical"><a class="slide-link" href="#">B</a></div></div>
+      <div class="owl-item cloned"><div id="block-195226-1" class="block-195226-1 item vertical"><a class="slide-link" href="#">A</a></div></div>
+    </div>
+  </div>
+  <!-- même bloc rendu en desktop (visible) et mobile (masqué) : ids en double -->
+  <section id="_desktop_blocks-7" class="highlight-section"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap">
+    <div id="block-7-1" class="item"><div class="card-body"><h5 class="card-title">Titre 1</h5></div></div>
+    <div id="block-7-2" class="item"><div class="card-body"><h5 class="card-title">Titre 2</h5></div></div>
+  </div></div></div></div></div></div></section>
+  <section id="_mobile_blocks-7" class="highlight-section" style="display:none"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap">
+    <div id="block-7-1" class="item"><div class="card-body"><h5 class="card-title">Titre 1</h5></div></div>
+    <div id="block-7-2" class="item"><div class="card-body"><h5 class="card-title">Titre 2</h5></div></div>
+  </div></div></div></div></div></div></section>
+  <div class="slick-track">
+    <div class="slick-slide slick-cloned"><div class="slick-card">S2</div></div>
+    <div class="slick-slide"><div class="slick-card">S1</div></div>
+    <div class="slick-slide"><div class="slick-card">S2</div></div>
+  </div>
+  <div class="swiper-wrapper">
+    <div class="swiper-slide swiper-slide-duplicate"><div class="swiper-card">W2</div></div>
+    <div class="swiper-slide"><div class="swiper-card">W1</div></div>
+    <div class="swiper-slide"><div class="swiper-card">W2</div></div>
+  </div>
   <ul class="carousel">
     <li class="owl-item active slide">A</li>
     <li class="owl-item slide">B</li>
