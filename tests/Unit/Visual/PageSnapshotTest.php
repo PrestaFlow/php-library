@@ -10,12 +10,12 @@ use PrestaFlow\Library\Visual\SnapshotException;
 
 final class PageSnapshotTest extends TestCase
 {
-    /** @var array{log: string[], closed: bool, options: array|null, clip: Clip|null} */
+    /** @var array{log: string[], closed: bool, options: array|null, clip: Clip|null, shot: array|null} */
     private array $rec;
 
     private function snapshot(array $values = [], ?\Throwable $navigateThrows = null, bool $factoryThrows = false): PageSnapshot
     {
-        $this->rec = ['log' => [], 'closed' => false, 'options' => null, 'clip' => null];
+        $this->rec = ['log' => [], 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null];
         $rec = &$this->rec;
         $values += [
             'stable' => true,
@@ -102,11 +102,12 @@ final class PageSnapshotTest extends TestCase
                         {
                             $this->rec['log'][] = 'screenshot';
                             $this->rec['clip'] = $opts['clip'] ?? null;
+                            $this->rec['shot'] = $opts;
 
                             return new class {
                                 public function getBase64($timeout = null)
                                 {
-                                    return base64_encode('PNGDATA');
+                                    return base64_encode('JPEGDATA');
                                 }
                             };
                         }
@@ -131,7 +132,9 @@ final class PageSnapshotTest extends TestCase
         $this->assertTrue($this->rec['closed']);
         $this->assertSame([390, 844], $this->rec['options']['windowSize']);
         $this->assertStringContainsString('iPhone', $this->rec['options']['userAgent']);
-        $this->assertSame('PNGDATA', $result->png);
+        $this->assertSame('JPEGDATA', $result->image);
+        $this->assertSame('image/jpeg', $result->mime);
+        $this->assertSame(['jpeg', 80], [$this->rec['shot']['format'], $this->rec['shot']['quality']]);
         $this->assertSame([1920, 4000], [$result->width, $result->height]);
         $this->assertSame('body', $result->elements[0]['selector']);
         $this->assertTrue($result->stable);

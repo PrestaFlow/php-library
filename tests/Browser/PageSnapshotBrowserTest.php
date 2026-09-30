@@ -18,7 +18,11 @@ final class PageSnapshotBrowserTest extends TestCase
             try {
                 self::$result = (new PageSnapshot())->take('file://'.__DIR__.'/fixtures/snapshot.html', 'desktop', 30000);
             } catch (SnapshotException $e) {
-                $this->markTestSkipped('Chrome indisponible : '.$e->getMessage());
+                // en local sans Chrome : ignoré ; en CI : le test doit échouer, jamais passer en silence
+                if (getenv('CI') === false || getenv('CI') === '') {
+                    $this->markTestSkipped('Chrome indisponible : '.$e->getMessage());
+                }
+                $this->fail('Chrome indisponible en CI : '.$e->getMessage());
             }
         }
 
@@ -42,10 +46,11 @@ final class PageSnapshotBrowserTest extends TestCase
         return array_values(array_filter($this->snapshot()->elements, fn ($e) => $e['tag'] === $tag && ($id === '' || $e['id'] === $id)));
     }
 
-    public function test_capture_is_a_full_page_png(): void
+    public function test_capture_is_a_full_page_jpeg(): void
     {
         $r = $this->snapshot();
-        $this->assertStringStartsWith("\x89PNG", $r->png);
+        $this->assertStringStartsWith("\xFF\xD8\xFF", $r->image);
+        $this->assertSame('image/jpeg', $r->mime);
         $this->assertSame(1920, $r->width);
         $this->assertGreaterThan(3000, $r->height);
     }
@@ -66,8 +71,17 @@ final class PageSnapshotBrowserTest extends TestCase
     public function test_state_and_library_classes_are_ignored(): void
     {
         foreach ($this->snapshot()->elements as $el) {
-            $this->assertDoesNotMatchRegularExpression('/\.(active|owl-item)\b/', $el['selector'], $el['selector']);
+            $this->assertDoesNotMatchRegularExpression('/\.(active|owl-item|hidden|d-none|sr-only|invisible)(?![\w-])/', $el['selector'], $el['selector']);
         }
+        $marked = array_values(array_filter($this->snapshot()->elements, fn ($e) => in_array('hidden', $e['classes'], true)));
+        $this->assertCount(1, $marked, 'un .hidden visible doit rester dans la carte');
+    }
+
+    public function test_descendant_of_a_unique_ancestor_beats_the_nth_of_type_chain(): void
+    {
+        $card = $this->bySelector('#main div.card');
+        $this->assertNotNull($card, json_encode(array_column($this->snapshot()->elements, 'selector')));
+        $this->assertSame(1, $card['matches']);
     }
 
     public function test_ancestor_nth_of_type_fallback_is_unique(): void

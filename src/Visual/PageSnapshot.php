@@ -6,8 +6,9 @@ use HeadlessChromium\BrowserFactory;
 use HeadlessChromium\Clip;
 
 /**
- * Capture d'une page pour le sélecteur visuel : pleine page (animations figées,
- * comme au run) + carte des éléments visibles avec un sélecteur CSS proposé.
+ * Capture d'une page pour le sélecteur visuel : pleine page en JPEG qualité 80
+ * (animations figées, comme au run ; bien plus léger qu'un PNG pleine page)
+ * + carte des éléments visibles avec un sélecteur CSS proposé.
  *
  * Navigateur DÉDIÉ (jamais l'instance statique de TestsSuite) : une capture ne
  * doit pas perturber un run en cours, et inversement.
@@ -18,6 +19,8 @@ class PageSnapshot
     public const MAX_HEIGHT = 15000;
 
     public const MAX_ELEMENTS = 4000;
+
+    public const JPEG_QUALITY = 80;
 
     /** @var \Closure(array): object */
     private \Closure $browserFactory;
@@ -78,13 +81,14 @@ class PageSnapshot
             $json = $page->evaluate(PageScripts::ELEMENT_MAP.'('.self::MAX_ELEMENTS.', '.$height.')')->getReturnValue($timeoutMs);
             $elements = is_string($json) ? json_decode($json, true) : null;
 
-            $png = base64_decode((string) $page->screenshot([
-                'format' => 'png',
+            $image = base64_decode((string) $page->screenshot([
+                'format' => 'jpeg',
+                'quality' => self::JPEG_QUALITY,
                 'captureBeyondViewport' => true,
                 'clip' => new Clip(0, 0, $width, $height),
             ])->getBase64($timeoutMs), true);
 
-            return new SnapshotResult((string) $png, $width, $height, is_array($elements) ? $elements : [], $stable);
+            return new SnapshotResult((string) $image, 'image/jpeg', $width, $height, is_array($elements) ? $elements : [], $stable);
         } finally {
             try {
                 $browser->close();
