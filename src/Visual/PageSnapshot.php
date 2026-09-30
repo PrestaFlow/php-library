@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Visual;
 
 use HeadlessChromium\BrowserFactory;
 use HeadlessChromium\Clip;
+use HeadlessChromium\Page;
 
 /**
  * Capture d'une page pour le sélecteur visuel : pleine page en JPEG qualité 80
@@ -56,7 +57,10 @@ class PageSnapshot
         try {
             $page = $browser->createPage();
             try {
-                $page->navigate($url)->waitForNavigation('load', $timeoutMs);
+                // DOMContentLoaded plutôt que `load` (souvent plusieurs secondes de plus sur
+                // une boutique) : la stabilité (readyState complete, polices, images
+                // visibles) est ensuite sondée, bornée par stableTimeoutMs et rapportée.
+                $page->navigate($url)->waitForNavigation(Page::DOM_CONTENT_LOADED, $timeoutMs);
             } catch (\Throwable $e) {
                 throw new SnapshotException(sprintf("La page %s n'a pas répondu en %d s.", $url, intdiv($timeoutMs, 1000)), 0, $e);
             }
