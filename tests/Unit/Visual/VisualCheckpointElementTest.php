@@ -127,6 +127,7 @@ final class VisualCheckpointElementTest extends TestCase
         $this->assertSame([10.0, 5400.0, 300.0, 1500.0], array_map('floatval', [
             $opts['clip']->getX(), $opts['clip']->getY(), $opts['clip']->getWidth(), $opts['clip']->getHeight(),
         ]));
+        $this->assertSame([10, 5400], TestsSuite::$visualResults[0]['origin']);
     }
 
     public function test_element_without_a_render_box_fails_explicitly(): void
