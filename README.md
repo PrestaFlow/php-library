@@ -61,6 +61,7 @@ PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run te
 | `PRESTAFLOW_LOCALE` | Locale of the run; must be declared in the suite's `$locales`. Default: first declared locale. |
 | `PRESTAFLOW_VISUAL_ONLY` | Comma-separated checkpoint names, as declared in `$checkpoints` (e.g. `home,footer`). Only those run, in declaration order; the others are not in the results at all. Spaces are trimmed, unknown names are ignored — but if **none** matches, the run fails with a step listing the unknown and declared names. Unset or empty: every checkpoint runs. |
 | `PRESTAFLOW_VISUAL_UPDATE` | Boolean (`1`, `true`, `yes`, `on`). Captures exactly as usual (masks, device, scroll, element clip) but writes each capture as the reference instead of comparing it. The result is `status: baseline` with `updated: true` when a reference was replaced (`false` for a first baseline); no diff image. |
+| `PRESTAFLOW_CDP_TIMEOUT` | Timeout in milliseconds of the synchronous Chrome calls (evaluate, querySelector…), for every suite, not only visual ones. Default: `5000`, chrome-php's own default. Visual captures are always written with a 30 s timeout. |
 
 ```bash
 PRESTAFLOW_VISUAL_ONLY=home,footer PRESTAFLOW_VISUAL_UPDATE=1 ./vendor/bin/prestaflow run tests/Visual
