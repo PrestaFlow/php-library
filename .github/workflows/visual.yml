@@ -1,0 +1,171 @@
+name: Visual
+
+# Visual regression of the front office against a throwaway Flashlight shop:
+# src/Tests/Suites/Visual/FrontOfficeHummingbird.php on shop 1 (port 8092) and
+# src/Tests/Suites/Visual/FrontOfficeClassic.php on shop 2 (port 8093) of the
+# same PrestaShop 9.2.0 container that live-smoke.yml already uses.
+#
+# Not a required check, for now. Pixel comparison is new in CI and its
+# stability on GitHub runners (fonts, anti-aliasing, lazy images) has not been
+# measured yet. A red row means "look at the uploaded diffs", not "the PR is
+# broken". It will be made required once it has proven itself stable. Nothing
+# here is `continue-on-error`: a red row stays red.
+#
+# 9.2.0 only. It is the only Flashlight container that serves both themes
+# (one per shop), and a reference is tied to the PrestaShop major anyway (the
+# file name carries v9). Adding 1.7 / 8.2 would double the references to keep
+# for little extra coverage of the visual layer.
+#
+# English only (PRESTAFLOW_LOCALE=en). The Flashlight shops are installed with
+# a single language, so the suites use the English paths (login, cart,
+# contact-us, search) with no /en/ prefix: PrestaShop does not prefix URLs
+# when only one language is active, and PRESTAFLOW_PREFIX_LOCALE defaults to
+# false.
+#
+# Devices: one `prestaflow run` is one device × one locale
+# (VisualTestsSuite reads PRESTAFLOW_DEVICE), so the suite runs once per
+# device. The reference files carry the viewport size and the locale in their
+# name, so desktop and mobile references live side by side.
+#
+# References: a CLI run reads and writes them in ./visual-baseline/ (relative
+# to the working directory, see Utils\Screenshots::referencesBaseDir). That
+# directory is cached per theme:
+#   - restored on every run (push, pull_request, workflow_dispatch) from the
+#     most recent `visual-refs-v1-<theme>-*` entry;
+#   - saved ONLY on push to main, under a key unique to the run, so a pull
+#     request can never move the baseline; it only compares against it.
+# A checkpoint with no reference yet becomes the reference and passes, so the
+# first run (empty cache) creates the baselines and is green. To reset the
+# baselines on purpose, bump `v1` in both keys.
+#
+# The run's captures and diffs (prestaflow/screens/actual and /diff) are
+# uploaded on every run, one artifact per row, together with the references
+# that were compared against.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  visual:
+    name: Visual (PrestaShop 9.2.0, ${{ matrix.theme }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: ps92
+            port: 8092
+            theme: hummingbird
+            suite: FrontOfficeHummingbird
+          # Shop 2 of the same container, on its own port and its own theme.
+          - service: ps92
+            port: 8093
+            theme: classic
+            suite: FrontOfficeClassic
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # Restore only: saving is a separate step gated on push to main.
+      # The primary key never matches (saved keys end with a run id), so the
+      # most recent entry for this theme is picked through the prefix.
+      - name: Restore visual references
+        id: refs
+        uses: actions/cache/restore@v4
+        with:
+          path: visual-baseline
+          key: visual-refs-v1-${{ matrix.theme }}-${{ github.run_id }}
+          restore-keys: visual-refs-v1-${{ matrix.theme }}-
+
+      - name: Report the references in use
+        run: |
+          if [ -n "${{ steps.refs.outputs.cache-matched-key }}" ]; then
+            echo "references restored from ${{ steps.refs.outputs.cache-matched-key }}"
+            ls visual-baseline/ | wc -l
+          else
+            echo "no cached references: this run creates the baselines"
+          fi
+
+      - name: Start the shop
+        run: docker compose up ${{ matrix.service }} -d
+
+      # Probe /admin-dev/, not /: the front office answers 200 well before the
+      # post-scripts that provision the second shop have finished (see
+      # live-smoke.yml).
+      - name: Wait for the shop
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${{ matrix.port }}/admin-dev/" || true)
+            if [ "$code" = "302" ] || [ "$code" = "200" ]; then
+              echo "back office answers $code — shop is up"; exit 0
+            fi
+            echo "back office answers ${code:-000}, waiting..."
+            sleep 5
+          done
+          echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
+
+      # Every device runs even when the previous one is red, and each status is
+      # captured separately. Every `prestaflow run` empties prestaflow/ when it
+      # starts, so each device's output is copied aside as soon as it finishes.
+      - name: Run the visual suite
+        env:
+          PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
+          PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
+          PRESTAFLOW_PS_VERSION: '9.2.0'
+          PRESTAFLOW_THEME: ${{ matrix.theme }}
+          PRESTAFLOW_LOCALE: en
+        run: |
+          status=0
+          for device in desktop mobile; do
+            PRESTAFLOW_DEVICE=$device php bin/prestaflow run "src/Tests/Suites/Visual/${{ matrix.suite }}.php" || status=1
+            if [ -d prestaflow ]; then
+              mkdir -p "visual-output/$device"
+              cp -R prestaflow/. "visual-output/$device/"
+            fi
+          done
+          exit $status
+
+      - name: Upload captures and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-9.2.0-${{ matrix.theme }}
+          path: |
+            visual-output/
+            visual-baseline/
+          retention-days: 7
+          if-no-files-found: warn
+
+      # Only main moves the baseline. The key is unique to the run (cache
+      # entries are immutable), and the restore above picks the newest one.
+      - name: Save visual references
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: visual-baseline
+          key: visual-refs-v1-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
