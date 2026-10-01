@@ -65,5 +65,6 @@ final class FrontOfficeSuitesTest extends TestCase
         $suite = $this->suite($class, prefixLocale: false);
 
         $this->assertSame('http://localhost:8017/cart?action=show', $this->cartUrl($suite, 'en'));
+        $this->assertSame('http://localhost:8017/panier?action=show', $this->cartUrl($suite, 'fr'));
     }
 }
