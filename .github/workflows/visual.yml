@@ -1,20 +1,26 @@
 name: Visual
 
-# Visual regression of the front office against a throwaway Flashlight shop:
-# src/Tests/Suites/Visual/FrontOfficeHummingbird.php on shop 1 (port 8092) and
-# src/Tests/Suites/Visual/FrontOfficeClassic.php on shop 2 (port 8093) of the
-# same PrestaShop 9.2.0 container that live-smoke.yml already uses.
+# Visual regression of the front office against throwaway Flashlight shops,
+# the same containers live-smoke.yml uses. One job per PrestaShop version ×
+# theme:
+#   - 1.7.8.11 (ps17, port 8017) and 8.2.8 (ps82, port 8082): Classic, the only
+#     theme these versions ship, with src/Tests/Suites/Visual/FrontOfficeClassic.php;
+#   - 9.2.0 (ps92): src/Tests/Suites/Visual/FrontOfficeHummingbird.php on shop 1
+#     (port 8092) and FrontOfficeClassic.php on shop 2 (port 8093) of the same
+#     container.
+# One Classic suite serves every version: the selectors it relies on (#header,
+# #footer, .cart-products-count, #carousel) are the same on 1.7, 8 and 9.
+# Hummingbird does not exist before 9.
 #
-# Not a required check, for now. Pixel comparison is new in CI and its
-# stability on GitHub runners (fonts, anti-aliasing, lazy images) has not been
-# measured yet. A red row means "look at the uploaded diffs", not "the PR is
-# broken". It will be made required once it has proven itself stable. Nothing
-# here is `continue-on-error`: a red row stays red.
+# The two 9.2.0 rows are required checks on main. The 1.7.8.11 and 8.2.8 rows
+# are added to the branch protection once they have run green on main. Nothing
+# here is `continue-on-error`: a red row stays red, and means "look at the
+# uploaded diffs" first.
 #
-# 9.2.0 only. It is the only Flashlight container that serves both themes
-# (one per shop), and a reference is tied to the PrestaShop major anyway (the
-# file name carries v9). Adding 1.7 / 8.2 would double the references to keep
-# for little extra coverage of the visual layer.
+# The empty cart is opened with cart?action=show (panier?action=show in
+# French), not cart: on 1.7, /cart with an empty cart redirects to the home
+# page, so the "cart-empty" capture would have been the home page.
+# ?action=show displays the cart page on every version.
 #
 # English and French. The Flashlight shops are installed with English only, so
 # the job installs French itself once the shop is up, with
@@ -25,28 +31,31 @@ name: Visual
 # workflows must keep testing stock single-language shops. A failed install is
 # fatal: the French checkpoints must never be captured on an English-only shop.
 # With two active languages PrestaShop prefixes every URL (/en/..., /fr/...),
-# hence PRESTAFLOW_PREFIX_LOCALE=true. The suites keep the English paths as
-# `path` and give the French rewrites (connexion, panier, nous-contacter,
-# recherche, page-introuvable-prestaflow) through `paths['fr']`.
+# hence PRESTAFLOW_PREFIX_LOCALE=true. 1.7 and 8 do it natively; 9 needs
+# PS_DEFAULT_LANGUAGE_URL_PREFIX, which the script sets (unknown, and
+# harmless, before 9). The suites keep the English paths as `path` and give
+# the French rewrites (connexion, panier, nous-contacter, recherche,
+# page-introuvable-prestaflow) through `paths['fr']`.
 #
 # Devices × locales: one `prestaflow run` is one device × one locale
 # (VisualTestsSuite reads PRESTAFLOW_DEVICE and PRESTAFLOW_LOCALE), so the
 # suite runs four times per job: desktop/mobile × en/fr. The reference files
-# carry the viewport size and the locale in their name, so all four sets of
-# references live side by side.
+# carry the PrestaShop major, the viewport size and the locale in their name
+# (…--auto-v1.7-1920x1080-fr.png), so all four sets of references live side
+# by side and two versions can never compare against each other.
 #
 # References: a CLI run reads and writes them in ./visual-baseline/ (relative
 # to the working directory, see Utils\Screenshots::referencesBaseDir). That
-# directory is cached per theme:
+# directory is cached per PrestaShop version × theme:
 #   - restored on every run (push, pull_request, workflow_dispatch) from the
-#     most recent `visual-refs-v2-<theme>-*` entry;
+#     most recent `visual-refs-v3-<ps>-<theme>-*` entry;
 #   - saved ONLY on push to main, under a key unique to the run, so a pull
 #     request can never move the baseline; it only compares against it.
 # A checkpoint with no reference yet becomes the reference and passes, so the
 # first run (empty cache) creates the baselines and is green. To reset the
-# baselines on purpose, bump the version in both keys. v2: French was added
-# and the /en/ prefix changed the English pages' URLs, so the v1 references
-# no longer apply.
+# baselines on purpose, bump the version in both keys. v3: the key gained the
+# PrestaShop version (three rows are Classic now) and the cart checkpoint
+# moved to cart?action=show, so the v2 references no longer apply.
 #
 # The run's captures and diffs (prestaflow/screens/actual and /diff) are
 # uploaded on every run, one artifact per row, together with the references
@@ -60,19 +69,31 @@ on:
 
 jobs:
   visual:
-    name: Visual (PrestaShop 9.2.0, ${{ matrix.theme }})
+    name: Visual (PrestaShop ${{ matrix.ps }}, ${{ matrix.theme }})
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - service: ps92
+          - ps: '1.7.8.11'
+            service: ps17
+            port: 8017
+            theme: classic
+            suite: FrontOfficeClassic
+          - ps: '8.2.8'
+            service: ps82
+            port: 8082
+            theme: classic
+            suite: FrontOfficeClassic
+          - ps: '9.2.0'
+            service: ps92
             port: 8092
             theme: hummingbird
             suite: FrontOfficeHummingbird
           # Shop 2 of the same container, on its own port and its own theme.
-          - service: ps92
+          - ps: '9.2.0'
+            service: ps92
             port: 8093
             theme: classic
             suite: FrontOfficeClassic
@@ -103,14 +124,14 @@ jobs:
 
       # Restore only: saving is a separate step gated on push to main.
       # The primary key never matches (saved keys end with a run id), so the
-      # most recent entry for this theme is picked through the prefix.
+      # most recent entry for this version × theme is picked through the prefix.
       - name: Restore visual references
         id: refs
         uses: actions/cache/restore@v4
         with:
           path: visual-baseline
-          key: visual-refs-v2-${{ matrix.theme }}-${{ github.run_id }}
-          restore-keys: visual-refs-v2-${{ matrix.theme }}-
+          key: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}
+          restore-keys: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-
 
       - name: Report the references in use
         run: |
@@ -139,7 +160,7 @@ jobs:
           done
           echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
 
-      # Once per job: each theme is its own job with its own container. Copied
+      # Once per job: each row is its own job with its own container. Copied
       # to /tmp and run as the container's default user (www-data), the user
       # Flashlight runs its post-scripts as. `docker compose cp` leaves the
       # file owned by root in the sticky /tmp, hence -u root for the cleanup.
@@ -169,7 +190,7 @@ jobs:
         env:
           PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
           PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
-          PRESTAFLOW_PS_VERSION: '9.2.0'
+          PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
           PRESTAFLOW_THEME: ${{ matrix.theme }}
           PRESTAFLOW_PREFIX_LOCALE: 'true'
         run: |
@@ -191,7 +212,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: visual-9.2.0-${{ matrix.theme }}
+          name: visual-${{ matrix.ps }}-${{ matrix.theme }}
           path: |
             visual-output/
             visual-baseline/
@@ -205,4 +226,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: visual-baseline
-          key: visual-refs-v2-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
