@@ -12,3 +12,5 @@ prestaflow/
 datas/.broswer
 .phpunit.cache/
 .env.flashlight
+visual-baseline/
+visual-output/
