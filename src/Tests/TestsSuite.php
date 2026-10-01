@@ -191,6 +191,19 @@ class TestsSuite implements OutputStates
             : ['width' => $width, 'height' => $height, 'userAgent' => $userAgent];
     }
 
+    /**
+     * Délai (ms) des appels synchrones à Chrome (evaluate, querySelector…),
+     * l'option `sendSyncDefaultTimeout` de chrome-php : PRESTAFLOW_CDP_TIMEOUT,
+     * sinon 5000, le défaut de chrome-php. Appliqué au lancement du navigateur
+     * comme à la reconnexion au navigateur partagé.
+     */
+    public static function cdpTimeout(): int
+    {
+        $value = (int) Env::get('PRESTAFLOW_CDP_TIMEOUT');
+
+        return $value > 0 ? $value : 5000;
+    }
+
     /** @return array{windowSize: array{0:int,1:int}, userAgent: string} */
     public static function browserOptions(): array
     {
@@ -500,14 +513,14 @@ class TestsSuite implements OutputStates
                 }
                 throw new BrowserConnectionFailed('');
             }
-            $browser = BrowserFactory::connectToBrowser($socket);
+            $browser = BrowserFactory::connectToBrowser($socket, ['sendSyncDefaultTimeout' => self::cdpTimeout()]);
         } catch (BrowserConnectionFailed | OperationTimedOut $e) {
             if (!$force) {
                 return null;
             }
 
             $browserFactory = new BrowserFactory();
-            $browser = $browserFactory->createBrowser($browserOptions);
+            $browser = $browserFactory->createBrowser($browserOptions + ['sendSyncDefaultTimeout' => self::cdpTimeout()]);
 
             \file_put_contents($browserOptionsFile, \json_encode($browserOptions));
             \file_put_contents($socketFile, $browser->getSocketUri());
@@ -556,7 +569,7 @@ class TestsSuite implements OutputStates
                 }
                 throw new BrowserConnectionFailed('');
             }
-            $browser = BrowserFactory::connectToBrowser($socket);
+            $browser = BrowserFactory::connectToBrowser($socket, ['sendSyncDefaultTimeout' => self::cdpTimeout()]);
         } catch (BrowserConnectionFailed | OperationTimedOut $e) {
             if (!$force) {
                 return null;
@@ -574,6 +587,7 @@ class TestsSuite implements OutputStates
                 'windowSize' => $opts['windowSize'],
                 'headless' => (bool) $headless,
                 'ignoreCertificateErrors' => true,
+                'sendSyncDefaultTimeout' => self::cdpTimeout(),
             ];
 
             // Le lancement d'un navigateur « froid » échoue parfois au handshake

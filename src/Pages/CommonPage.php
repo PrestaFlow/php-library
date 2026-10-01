@@ -22,6 +22,13 @@ class CommonPage
     /** Budget par défaut de pixels changés tolérés par un checkpoint visuel. */
     public const DEFAULT_MAX_DIFF_PIXELS = 100;
 
+    /**
+     * Délai d'écriture d'une capture visuelle. chrome-php attend 5 s par défaut
+     * dans saveToFile() : la toute première capture d'un Chrome qui vient de
+     * démarrer l'a dépassé en CI (header, 8.2.8).
+     */
+    public const SCREENSHOT_TIMEOUT_MS = 30000;
+
     protected $customs = [
         'selectors' => [],
         'messages' => [],
@@ -664,19 +671,19 @@ class CommonPage
                         $clip->getHeight()
                     ),
                     'format' => 'png',
-                ])->saveToFile($actualPath);
+                ])->saveToFile($actualPath, self::SCREENSHOT_TIMEOUT_MS);
             } elseif ($fullPage) {
                 $origin = [0, 0];
                 $page->screenshot([
                     'captureBeyondViewport' => true,
                     'clip' => $page->getFullPageClip(),
                     'format' => 'png',
-                ])->saveToFile($actualPath);
+                ])->saveToFile($actualPath, self::SCREENSHOT_TIMEOUT_MS);
             } else {
                 // Viewport seul : hauteur fixe (fenêtre), indépendante du total de la page.
                 [$sx, $sy] = $this->getScrollOffset();
                 $origin = [(int) round($sx), (int) round($sy)];
-                $page->screenshot(['format' => 'png'])->saveToFile($actualPath);
+                $page->screenshot(['format' => 'png'])->saveToFile($actualPath, self::SCREENSHOT_TIMEOUT_MS);
             }
         } finally {
             $this->removeVisualMasks($masks);
