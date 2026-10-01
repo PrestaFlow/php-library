@@ -16,27 +16,37 @@ name: Visual
 # file name carries v9). Adding 1.7 / 8.2 would double the references to keep
 # for little extra coverage of the visual layer.
 #
-# English only (PRESTAFLOW_LOCALE=en). The Flashlight shops are installed with
-# a single language, so the suites use the English paths (login, cart,
-# contact-us, search) with no /en/ prefix: PrestaShop does not prefix URLs
-# when only one language is active, and PRESTAFLOW_PREFIX_LOCALE defaults to
-# false.
+# English and French. The Flashlight shops are installed with English only, so
+# the job installs French itself once the shop is up, with
+# .github/visual/install-french.sh (language pack downloaded and installed on
+# every shop, URL prefix kept on the default language, caches cleared). It
+# lives under .github/visual/ and NOT under docker/post-scripts/: the
+# post-scripts run on every container of docker-compose.yml, and the smoke
+# workflows must keep testing stock single-language shops. A failed install is
+# fatal: the French checkpoints must never be captured on an English-only shop.
+# With two active languages PrestaShop prefixes every URL (/en/..., /fr/...),
+# hence PRESTAFLOW_PREFIX_LOCALE=true. The suites keep the English paths as
+# `path` and give the French rewrites (connexion, panier, nous-contacter,
+# recherche, page-introuvable-prestaflow) through `paths['fr']`.
 #
-# Devices: one `prestaflow run` is one device × one locale
-# (VisualTestsSuite reads PRESTAFLOW_DEVICE), so the suite runs once per
-# device. The reference files carry the viewport size and the locale in their
-# name, so desktop and mobile references live side by side.
+# Devices × locales: one `prestaflow run` is one device × one locale
+# (VisualTestsSuite reads PRESTAFLOW_DEVICE and PRESTAFLOW_LOCALE), so the
+# suite runs four times per job: desktop/mobile × en/fr. The reference files
+# carry the viewport size and the locale in their name, so all four sets of
+# references live side by side.
 #
 # References: a CLI run reads and writes them in ./visual-baseline/ (relative
 # to the working directory, see Utils\Screenshots::referencesBaseDir). That
 # directory is cached per theme:
 #   - restored on every run (push, pull_request, workflow_dispatch) from the
-#     most recent `visual-refs-v1-<theme>-*` entry;
+#     most recent `visual-refs-v2-<theme>-*` entry;
 #   - saved ONLY on push to main, under a key unique to the run, so a pull
 #     request can never move the baseline; it only compares against it.
 # A checkpoint with no reference yet becomes the reference and passes, so the
 # first run (empty cache) creates the baselines and is green. To reset the
-# baselines on purpose, bump `v1` in both keys.
+# baselines on purpose, bump the version in both keys. v2: French was added
+# and the /en/ prefix changed the English pages' URLs, so the v1 references
+# no longer apply.
 #
 # The run's captures and diffs (prestaflow/screens/actual and /diff) are
 # uploaded on every run, one artifact per row, together with the references
@@ -99,8 +109,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: visual-baseline
-          key: visual-refs-v1-${{ matrix.theme }}-${{ github.run_id }}
-          restore-keys: visual-refs-v1-${{ matrix.theme }}-
+          key: visual-refs-v2-${{ matrix.theme }}-${{ github.run_id }}
+          restore-keys: visual-refs-v2-${{ matrix.theme }}-
 
       - name: Report the references in use
         run: |
@@ -129,24 +139,51 @@ jobs:
           done
           echo "shop never came up"; docker compose logs ${{ matrix.service }}; exit 1
 
-      # Every device runs even when the previous one is red, and each status is
-      # captured separately. Every `prestaflow run` empties prestaflow/ when it
-      # starts, so each device's output is copied aside as soon as it finishes.
+      # Once per job: each theme is its own job with its own container. Copied
+      # to /tmp and run as the container's default user (www-data), the user
+      # Flashlight runs its post-scripts as. `docker compose cp` leaves the
+      # file owned by root in the sticky /tmp, hence -u root for the cleanup.
+      - name: Install French
+        run: |
+          docker compose cp .github/visual/install-french.sh ${{ matrix.service }}:/tmp/install-french.sh
+          docker compose exec -T ${{ matrix.service }} sh /tmp/install-french.sh
+          docker compose exec -T -u root ${{ matrix.service }} rm -f /tmp/install-french.sh
+
+      # The language pack must have made both prefixed home pages reachable on
+      # this shop's port; otherwise the French run would compare 404s.
+      - name: Check both languages answer
+        run: |
+          status=0
+          for locale in en fr; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${{ matrix.port }}/$locale/" || true)
+            echo "/$locale/ answers ${code:-000}"
+            [ "$code" = "200" ] || status=1
+          done
+          exit $status
+
+      # Every device × locale runs even when the previous one is red, and each
+      # status is captured separately. Every `prestaflow run` empties
+      # prestaflow/ when it starts, so each run's output is copied aside as
+      # soon as it finishes.
       - name: Run the visual suite
         env:
           PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
           PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
           PRESTAFLOW_PS_VERSION: '9.2.0'
           PRESTAFLOW_THEME: ${{ matrix.theme }}
-          PRESTAFLOW_LOCALE: en
+          PRESTAFLOW_PREFIX_LOCALE: 'true'
         run: |
           status=0
           for device in desktop mobile; do
-            PRESTAFLOW_DEVICE=$device php bin/prestaflow run "src/Tests/Suites/Visual/${{ matrix.suite }}.php" || status=1
-            if [ -d prestaflow ]; then
-              mkdir -p "visual-output/$device"
-              cp -R prestaflow/. "visual-output/$device/"
-            fi
+            for locale in en fr; do
+              echo "::group::$device × $locale"
+              PRESTAFLOW_DEVICE=$device PRESTAFLOW_LOCALE=$locale php bin/prestaflow run "src/Tests/Suites/Visual/${{ matrix.suite }}.php" || status=1
+              if [ -d prestaflow ]; then
+                mkdir -p "visual-output/$device-$locale"
+                cp -R prestaflow/. "visual-output/$device-$locale/"
+              fi
+              echo "::endgroup::"
+            done
           done
           exit $status
 
@@ -168,4 +205,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: visual-baseline
-          key: visual-refs-v1-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: visual-refs-v2-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
