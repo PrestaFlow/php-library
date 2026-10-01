@@ -10,7 +10,7 @@ final class BrowserOptionsTest extends TestCase
     protected function tearDown(): void
     {
         TestsSuite::useBrowserOptions(null, null, null);
-        unset($_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'], $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'], $_ENV['PRESTAFLOW_USER_AGENT']);
+        unset($_ENV['PRESTAFLOW_WINDOW_SIZE_WIDTH'], $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'], $_ENV['PRESTAFLOW_USER_AGENT'], $_ENV['PRESTAFLOW_CDP_TIMEOUT']);
     }
 
     public function test_overrides_win(): void
@@ -30,6 +30,25 @@ final class BrowserOptionsTest extends TestCase
         $_ENV['PRESTAFLOW_WINDOW_SIZE_HEIGHT'] = '844';
         $_ENV['PRESTAFLOW_USER_AGENT'] = 'Mobile';
         $this->assertSame(['windowSize' => [390, 844], 'userAgent' => 'Mobile'], TestsSuite::browserOptions());
+    }
+
+    public function test_cdp_timeout_defaults_to_chrome_php_five_seconds(): void
+    {
+        $this->assertSame(5000, TestsSuite::cdpTimeout());
+    }
+
+    public function test_cdp_timeout_read_from_env_in_milliseconds(): void
+    {
+        $_ENV['PRESTAFLOW_CDP_TIMEOUT'] = '15000';
+        $this->assertSame(15000, TestsSuite::cdpTimeout());
+    }
+
+    public function test_invalid_cdp_timeout_falls_back_to_default(): void
+    {
+        foreach (['0', '-1', 'abc', ''] as $value) {
+            $_ENV['PRESTAFLOW_CDP_TIMEOUT'] = $value;
+            $this->assertSame(5000, TestsSuite::cdpTimeout(), "value « {$value} »");
+        }
     }
 
     public function test_reset_browser_removes_socket_files(): void
