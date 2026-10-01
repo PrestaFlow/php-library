@@ -182,22 +182,6 @@ jobs:
           done
           exit $status
 
-      # A cold shop (first Smarty compile, theme assets, image thumbnails) can
-      # make Chrome's very first capture exceed its 5 s timeout, as seen once
-      # on 8.2.8. Each checkpoint page of both suites (keep in sync with
-      # src/Tests/Suites/Visual/FrontOffice*.php) is loaded once with its page
-      # requisites beforehand. Best effort: a 404 page or an asset error never
-      # fails the step.
-      - name: Warm up the checkpoint pages
-        run: |
-          base="http://localhost:${{ matrix.port }}"
-          for path in en/ en/login 'en/cart?action=show' en/contact-us 'en/search?s=test' en/page-not-found-prestaflow \
-                      fr/ fr/connexion 'fr/panier?action=show' fr/nous-contacter 'fr/recherche?s=test' fr/page-introuvable-prestaflow; do
-            start=$(date +%s)
-            wget -q -p -nd -e robots=off --delete-after -P "$RUNNER_TEMP/warmup" "$base/$path" || true
-            echo "/$path warmed in $(( $(date +%s) - start )) s"
-          done
-
       # Every device × locale runs even when the previous one is red, and each
       # status is captured separately. Every `prestaflow run` empties
       # prestaflow/ when it starts, so each run's output is copied aside as
@@ -209,6 +193,9 @@ jobs:
           PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
           PRESTAFLOW_THEME: ${{ matrix.theme }}
           PRESTAFLOW_PREFIX_LOCALE: 'true'
+          # Synchronous Chrome calls wait 5 s by default: a freshly started
+          # Chrome went over it once on its very first capture (8.2.8).
+          PRESTAFLOW_CDP_TIMEOUT: '15000'
         run: |
           status=0
           for device in desktop mobile; do
