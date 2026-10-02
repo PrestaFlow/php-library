@@ -122,10 +122,13 @@ final class VisualCheckpointTagTest extends TestCase
         $this->assertSame('auto-v1.7-1280x720-fr', TestsSuite::$visualResults[0]['tag']);
     }
 
-    public function testMajorVersionDerivesFromGlobalsPsVersionFirst(): void
+    public function testMajorVersionComesFromThisPageOnly(): void
     {
-        // Le cache statique de version peut être périmé (suite précédente du worker).
-        $page = $this->makePage(['PS_VERSION' => '8.1.0'], '1.7');
+        // makePage() construit la page avec patchVersion '8.1.0'. Une autre
+        // page passée en 1.7 ensuite ne doit pas changer son tag.
+        $page = $this->makePage([], null);
+        $other = $this->makePage([], null);
+        $other->setMajorVersion('1.7');
 
         $page->visualCheckpoint('home');
 
