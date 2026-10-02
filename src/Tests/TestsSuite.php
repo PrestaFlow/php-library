@@ -268,6 +268,11 @@ class TestsSuite implements OutputStates
     {
         if ($loadGlobals) {
             $this->loadGlobals();
+        } else {
+            // Une suite a toujours une version ($psVersion, onVersion, env,
+            // sinon 8.1.0) : before() la vérifie, et il n'y a plus de repli
+            // implicite dans Version::getMajorVersion().
+            $this->resolveVersion();
         }
 
         $this->before(getBrowser: $getBrowser);
