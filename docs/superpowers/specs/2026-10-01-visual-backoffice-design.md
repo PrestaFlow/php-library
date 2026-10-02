@@ -1,7 +1,7 @@
 # Régression visuelle du back-office : design
 
 Date : 2026-10-01
-Statut : validé en conversation (pages, versions, langue), en attente de relecture
+Statut : implémenté (branche feat/visual-backoffice)
 
 ## Objectif
 
@@ -179,6 +179,32 @@ réel répète les listes ou les construit dans le constructeur.)
    connexion ni « Invalid token »).
 4. **Après la release vers `main`** : 2 ou 3 runs manuels comparent sans
    écart, BO compris.
+
+## Notes d'implémentation
+
+Écarts avec ce qui précède, constatés à l'implémentation (commits 4a3962e,
+d49c9be, 0ba7d8e) :
+
+- **Masques** : `#notifications-total` ajouté (pastille de notifications du
+  nouveau thème ; `#total_notif_number_wrapper` n'existe que dans le thème
+  legacy).
+- **`hide`** : `#ajax_running` (1.7 legacy) et `#header_infos .ajax-spinner`
+  (9.2) sur tous les points de contrôle connectés. Sur commandes et clients,
+  `.kpi-container` passe de `masks` à `hide` (sa hauteur varie avec le
+  chargement ajax : un masque garde sa place et décale la page), et
+  `.kpi-refresh` est masqué.
+- **Non exercé** : le `hide` de `.onboarding-popup` ne l'est pas en local (la
+  boutique 1.7 locale a `ONBOARDINGV2_SHUT_DOWN=1`) ; le masque
+  `#login-header .text-center` de la connexion ne correspond à rien sur
+  1.7.8.11 (sans effet).
+- **Comportements ajoutés en relecture** : une session BO encore ouverte
+  fait sauter la connexion ; un point de contrôle déconnecté échoue si une
+  session est ouverte (« Session back-office déjà ouverte ») ; le message
+  d'un refus de connexion inclut l'erreur du formulaire ; `auth => false`
+  avec un `menu` est rejeté ; les méthodes auxiliaires sont `protected` (les
+  étapes s'exécutent liées à la sous-classe concrète).
+- **Vérification locale** : 1.7.8.11 et 9.2.0, 1re passe = 6 références,
+  puis 3 passes supplémentaires à 6/6 PASS chacune.
 
 ## Hors périmètre
 
