@@ -82,4 +82,13 @@ final class SuiteVersionWiringTest extends TestCase
             $suite->pages['frontOfficeHomePage']
         );
     }
+
+    public function test_a_suite_without_globals_still_resolves_its_version(): void
+    {
+        $suite = new class (loadGlobals: false, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '1.7.8.11';
+        };
+
+        $this->assertSame('1.7', $suite->getMajorVersion());
+    }
 }

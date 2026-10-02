@@ -17,11 +17,6 @@ final class TranslationsCatalogTest extends TestCase
             use Translations;
             public array $customs = ['messages' => null];
         };
-        $page::$versions = [
-            'patchVersion' => null,
-            'minorVersion' => null,
-            'majorVersion' => null,
-        ];
         $page->initLocale('fr');
         $page->initTranslations(locale: 'fr', patchVersion: $patchVersion);
 
