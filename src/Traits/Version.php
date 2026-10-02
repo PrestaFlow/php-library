@@ -25,8 +25,15 @@ trait Version
         'majorVersion' => null,
     ];
 
+    /**
+     * Fluent override set via onVersion(); wins over the $psVersion property and env.
+     */
     protected ?string $psVersionOverride = null;
 
+    /**
+     * Pin a specific PrestaShop version for this suite. Fluent, chainable.
+     * Overrides the $psVersion property and the PRESTAFLOW_PS_VERSION env variable.
+     */
     public function onVersion(string $version): self
     {
         if (!preg_match('/^\d+\.\d+(\.\d+){0,2}$/', $version)) {
@@ -37,6 +44,8 @@ trait Version
 
         $this->psVersionOverride = $version;
 
+        // Once the globals are loaded, the version has already been resolved:
+        // resolve it again so the pages imported next use this one.
         if (!empty($this->globals)) {
             $this->resolveVersion();
         }
@@ -44,6 +53,10 @@ trait Version
         return $this;
     }
 
+    /**
+     * Resolve the effective PS version and populate $this->globals['PS_VERSION'] + version parts.
+     * Priority: fluent onVersion() > $psVersion property > PRESTAFLOW_PS_VERSION env > '8.1.0'.
+     */
     public function resolveVersion(): void
     {
         $propertyVersion = property_exists($this, 'psVersion') ? ($this->psVersion ?? null) : null;
@@ -59,6 +72,8 @@ trait Version
         }
         $this->globals['PS_VERSION'] = $version;
 
+        // Reset all cached version parts defensively so a re-resolution (e.g. after
+        // onVersion()) never keeps stale values from a previous version.
         $this->setVersions([]);
 
         $this->exctractVersions($version);
