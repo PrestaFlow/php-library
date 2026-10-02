@@ -4,30 +4,10 @@ namespace PrestaFlow\Tests\Unit\Pages;
 
 use PHPUnit\Framework\TestCase;
 use PrestaFlow\Library\Pages\BackOfficePage;
-use PrestaFlow\Library\Pages\CommonPage;
 
 final class BackOfficeGoToMenuTest extends TestCase
 {
     private const CURRENT = 'http://shop.test/admin-dev/index.php?controller=AdminDashboard&token=t';
-
-    /**
-     * The page versions live in a static (Traits\Version) that getPageName()
-     * fills on first use and never re-derives. Before PHP 8.3 a class
-     * re-using that trait (FrontOfficePage, via Translations) shares the
-     * parent's storage, so whatever a BackOfficePage caches here is what the
-     * next front-office page in the process sees. Leave it as found.
-     */
-    private array $versions = [];
-
-    protected function setUp(): void
-    {
-        $this->versions = CommonPage::$versions;
-    }
-
-    protected function tearDown(): void
-    {
-        CommonPage::$versions = $this->versions;
-    }
 
     /** Page factice : $links associe un sélecteur à son href (ou null si absent). */
     private function page(array $links): BackOfficePage

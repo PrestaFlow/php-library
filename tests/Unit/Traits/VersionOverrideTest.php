@@ -20,12 +20,6 @@ final class VersionOverrideTest extends TestCase
             public array $globals = [];
             public ?string $psVersion = null;
         };
-        // Reset the static state via the concrete class using the trait so no deprecation is raised.
-        $suite::$versions = [
-            'patchVersion' => null,
-            'minorVersion' => null,
-            'majorVersion' => null,
-        ];
         $suite->psVersion = $psVersion;
 
         return $suite;
