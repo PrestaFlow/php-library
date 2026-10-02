@@ -224,4 +224,55 @@ final class PageScripts
   }));
 })
 JS;
+
+    /**
+     * Applique `PROP: VALUE !important` en style inline sur les éléments des
+     * sélecteurs (et leurs descendants si DEEP). Nécessaire en plus du <style>
+     * injecté : pour les déclarations !important, une règle en @layer
+     * (utilitaires Bootstrap de Hummingbird, ex. `.d-md-block`) l'emporte sur
+     * une règle hors couche ; le style inline !important, lui, gagne toujours.
+     * Valeur et priorité d'origine mémorisées dans window.__pfVisualInline[KIND]
+     * pour RESTORE_INLINE. Un sélecteur invalide n'empêche pas les autres.
+     * Appel : sprintf('(%s)(%s, %s, %s, %s, %s)', APPLY_INLINE, kind, sélecteurs, prop, valeur, deep) en JSON.
+     */
+    public const APPLY_INLINE = <<<'JS'
+function (KIND, SELECTORS, PROP, VALUE, DEEP) {
+  var reg = window.__pfVisualInline = window.__pfVisualInline || {};
+  var saved = reg[KIND] = reg[KIND] || [];
+  var apply = function (el) {
+    saved.push([el, PROP, el.style.getPropertyValue(PROP), el.style.getPropertyPriority(PROP)]);
+    el.style.setProperty(PROP, VALUE, 'important');
+  };
+  SELECTORS.forEach(function (sel) {
+    try {
+      document.querySelectorAll(sel).forEach(function (el) {
+        apply(el);
+        if (DEEP) { el.querySelectorAll('*').forEach(apply); }
+      });
+    } catch (e) {}
+  });
+  return saved.length;
+}
+JS;
+
+    /**
+     * Restaure exactement (valeur + priorité, ou retrait) les styles inline
+     * posés par APPLY_INLINE pour KIND, dans l'ordre inverse d'application.
+     * Appel : sprintf('(%s)(%s)', RESTORE_INLINE, kind) en JSON.
+     */
+    public const RESTORE_INLINE = <<<'JS'
+function (KIND) {
+  var reg = window.__pfVisualInline;
+  if (!reg || !reg[KIND]) { return 0; }
+  var saved = reg[KIND];
+  delete reg[KIND];
+  for (var i = saved.length - 1; i >= 0; i--) {
+    var el = saved[i][0], prop = saved[i][1], old = saved[i][2], prio = saved[i][3];
+    try {
+      if (old === '') { el.style.removeProperty(prop); } else { el.style.setProperty(prop, old, prio); }
+    } catch (e) {}
+  }
+  return saved.length;
+}
+JS;
 }
