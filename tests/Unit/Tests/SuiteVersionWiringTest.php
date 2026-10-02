@@ -109,4 +109,29 @@ final class SuiteVersionWiringTest extends TestCase
         $this->assertSame('1.7', $old->pages['frontOfficeHomePage']->getMajorVersion());
         $this->assertSame('9', $new->pages['frontOfficeHomePage']->getMajorVersion());
     }
+
+    public function test_a_patch_version_global_decides_both_the_namespace_and_the_page_version(): void
+    {
+        $suite = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '8.1.0';
+        };
+        $suite->importPage('FrontOffice\Home', globals: ['PATCH_VERSION' => '1.7.8.11']);
+
+        $page = $suite->pages['frontOfficeHomePage'];
+        $this->assertInstanceOf(\PrestaFlow\Library\Pages\v7\FrontOffice\Home\Page::class, $page);
+        $this->assertSame('1.7', $page->getMajorVersion());
+    }
+
+    public function test_a_scenario_imports_pages_of_its_own_version(): void
+    {
+        $suite = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '1.7.8.11';
+        };
+        $scenario = new \PrestaFlow\Library\Scenarios\Scenario($suite, ['locale' => 'en']);
+        $scenario->importPage('FrontOffice\Home');
+
+        $page = $scenario->pages['frontOfficeHomePage'];
+        $this->assertInstanceOf(\PrestaFlow\Library\Pages\v7\FrontOffice\Home\Page::class, $page);
+        $this->assertSame('1.7.8.11', $page->getPatchVersion());
+    }
 }
