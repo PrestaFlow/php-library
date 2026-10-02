@@ -7,6 +7,7 @@ use HeadlessChromium\Exception\ElementNotFoundException;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use HeadlessChromium\Page as DomPage;
+use PrestaFlow\Library\Exceptions\InvalidVersionException;
 use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
@@ -46,6 +47,7 @@ class CommonPage
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
+        $this->initVersion(patchVersion: $patchVersion, globals: $globals);
         $this->globals = $globals;
         $this->customs = array_merge($this->customs, $customs);
         $this->patchVersion = $patchVersion;
@@ -59,6 +61,24 @@ class CommonPage
         */
 
         return $this;
+    }
+
+    /**
+     * Version PrestaShop de cette page : son patchVersion, sinon le
+     * PS_VERSION des globals. Appelée en tête des constructeurs, avant que
+     * getSelectors()/getMessages() ne choisissent les fichiers par majeure.
+     */
+    public function initVersion(string $patchVersion, array $globals): void
+    {
+        $version = $patchVersion !== '' ? $patchVersion : ($globals['PS_VERSION'] ?? null);
+
+        if (!is_string($version) || $version === '') {
+            throw new InvalidVersionException(
+                static::class . ' : version PrestaShop inconnue (ni patchVersion ni PS_VERSION dans les globals).'
+            );
+        }
+
+        $this->exctractVersions($version);
     }
 
     public function setCustoms(string $type, array $data = [])
