@@ -157,23 +157,35 @@ trait Version
 
     public function exctractVersions(string $patchVersion)
     {
-        $this->versions['patchVersion'] = $patchVersion;
+        $this->setVersions(self::parseVersions($patchVersion));
+    }
 
+    /**
+     * Analyseur unique d'une version ('1.7.8.11', '9.2.0'…) : patch, mineure et
+     * majeure. Lève InvalidVersionException pour un format refusé.
+     */
+    public static function parseVersions(string $patchVersion): array
+    {
         if (strlen($patchVersion) === 7 || strlen($patchVersion) === 8) {
-            $this->versions['minorVersion'] = substr($patchVersion, 0, 5);
+            $minorVersion = substr($patchVersion, 0, 5);
         } else if (strlen($patchVersion) === 5) {
-            $this->versions['minorVersion'] = substr($patchVersion, 0, 3);
+            $minorVersion = substr($patchVersion, 0, 3);
         } else {
             throw new InvalidVersionException('Error with version ' . $patchVersion);
         }
 
-        $minorVersion = $this->versions['minorVersion'];
         if (str_starts_with($minorVersion, '1.7')) {
-            $this->versions['majorVersion'] = '1.7';
+            $majorVersion = '1.7';
         } else if (str_starts_with($minorVersion, '1.6')) {
-            $this->versions['majorVersion'] = '1.6';
+            $majorVersion = '1.6';
         } else {
-            $this->versions['majorVersion'] = substr($minorVersion, 0, 1);
+            $majorVersion = substr($minorVersion, 0, 1);
         }
+
+        return [
+            'patchVersion' => $patchVersion,
+            'minorVersion' => $minorVersion,
+            'majorVersion' => $majorVersion,
+        ];
     }
 }

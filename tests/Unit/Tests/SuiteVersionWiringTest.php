@@ -134,4 +134,25 @@ final class SuiteVersionWiringTest extends TestCase
         $this->assertInstanceOf(\PrestaFlow\Library\Pages\v7\FrontOffice\Home\Page::class, $page);
         $this->assertSame('1.7.8.11', $page->getPatchVersion());
     }
+
+    public function test_a_patch_version_without_pages_is_a_clear_error(): void
+    {
+        $suite = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '8.1.0';
+        };
+
+        $this->expectException(\PrestaFlow\Library\Exceptions\InvalidVersionException::class);
+        $suite->importPage('FrontOffice\Home', globals: ['PATCH_VERSION' => '10.0.0']);
+    }
+
+    public function test_an_unsupported_old_version_is_a_clear_error(): void
+    {
+        $suite = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '8.1.0';
+        };
+
+        $this->expectException(\PrestaFlow\Library\Exceptions\InvalidVersionException::class);
+        $this->expectExceptionMessage('non prise en charge');
+        $suite->importPage('FrontOffice\Home', globals: ['PATCH_VERSION' => '1.6.1.24']);
+    }
 }
