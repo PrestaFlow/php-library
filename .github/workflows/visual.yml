@@ -12,6 +12,13 @@ name: Visual
 # #footer, .cart-products-count, #carousel) are the same on 1.7, 8 and 9.
 # Hummingbird does not exist before 9.
 #
+# Back-office: one suite (src/Tests/Suites/Visual/BackOffice.php), run once per
+# version (1.7.8.11, 8.2.8, 9.2.0 on its Classic shop, port 8093; not on
+# Hummingbird, the back office does not depend on the front-office theme), in
+# English, desktop only. Admin URLs carry a token, so the suite navigates
+# through the sidebar menu. Same references cache and same artifact as the
+# front office (captures under visual-output/backoffice/).
+#
 # The two 9.2.0 rows are required checks on main. The 1.7.8.11 and 8.2.8 rows
 # are added to the branch protection once they have run green on main. Nothing
 # here is `continue-on-error`: a red row stays red, and means "look at the
@@ -81,22 +88,26 @@ jobs:
             port: 8017
             theme: classic
             suite: FrontOfficeClassic
+            backoffice: true
           - ps: '8.2.8'
             service: ps82
             port: 8082
             theme: classic
             suite: FrontOfficeClassic
+            backoffice: true
           - ps: '9.2.0'
             service: ps92
             port: 8092
             theme: hummingbird
             suite: FrontOfficeHummingbird
+            backoffice: false
           # Shop 2 of the same container, on its own port and its own theme.
           - ps: '9.2.0'
             service: ps92
             port: 8093
             theme: classic
             suite: FrontOfficeClassic
+            backoffice: true
 
     steps:
       - uses: actions/checkout@v4
@@ -209,6 +220,28 @@ jobs:
               echo "::endgroup::"
             done
           done
+          exit $status
+
+      # Back-office : une fois par version (il ne dépend pas du thème), en anglais
+      # sur desktop. Les URL d'admin portent un jeton : la suite navigue par le menu.
+      - name: Run the back-office visual suite
+        if: ${{ !cancelled() && matrix.backoffice }}
+        env:
+          PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
+          PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
+          PRESTAFLOW_BO_EMAIL: admin@prestashop.com
+          PRESTAFLOW_BO_PASSWD: prestashop
+          PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
+          PRESTAFLOW_DEVICE: desktop
+          PRESTAFLOW_LOCALE: en
+          PRESTAFLOW_CDP_TIMEOUT: '15000'
+        run: |
+          status=0
+          php bin/prestaflow run src/Tests/Suites/Visual/BackOffice.php || status=1
+          if [ -d prestaflow ]; then
+            mkdir -p visual-output/backoffice
+            cp -R prestaflow/. visual-output/backoffice/
+          fi
           exit $status
 
       - name: Upload captures and diffs
