@@ -1,7 +1,7 @@
 # Version de PrestaShop portée par chaque objet : design
 
 Date : 2026-10-02
-Statut : validé en conversation, en attente de relecture
+Statut : implémenté (branche fix/version-per-instance)
 
 ## Problème
 
@@ -116,3 +116,19 @@ La version de PrestaShop (majeure, mineure, patch) vit dans un attribut
 
 - Élargir les formats de version acceptés (ex. `8.1.10`).
 - Revoir `resolveVersion()` et son défaut `'8.1.0'`.
+
+## Notes d'implémentation
+
+Écarts avec ce qui précède, décidés pendant l'implémentation :
+
+- **Suites sans globals** : `TestsSuite::__construct(loadGlobals: false)` appelle
+  `resolveVersion()`. Sans cela, `before()` → `isVersionSupported()` dépendait
+  du repli sur `'8'`.
+- **Analyseur unique** : `Version::parseVersions()` (statique) découpe une version ;
+  `exctractVersions()` et `importPage()` s'en servent. Un échec ne modifie plus
+  l'état de l'objet.
+- **`importPage()`** : le namespace `vX` et la version de la page viennent du même
+  patch (`globals['PATCH_VERSION']`, sinon celui de l'appelant). Une classe de page
+  introuvable lève `InvalidVersionException`.
+- **`initVersion()`** est `protected` : l'éditeur de l'app liste les méthodes
+  publiques des pages comme actions.
