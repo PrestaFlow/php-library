@@ -2,6 +2,8 @@
 
 namespace PrestaFlow\Library\Traits;
 
+use PrestaFlow\Library\Exceptions\InvalidVersionException;
+
 trait ImportPage
 {
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null, $domain = '\\PrestaFlow\\Library')
@@ -31,6 +33,12 @@ trait ImportPage
         }
 
         $pageClass = $domain.'\\Pages\\v'.$this->pageNamespaceVersion($patchVersion).'\\'.$pageName.'\\Page';
+
+        if (!class_exists($pageClass)) {
+            throw new InvalidVersionException(
+                'Version PrestaShop non prise en charge pour ' . $pageName . ' (' . $patchVersion . ') : ' . $pageClass . ' introuvable.'
+            );
+        }
 
         $customs = [];
         if (isset($this->customs) && is_array($this->customs)) {
@@ -70,6 +78,8 @@ trait ImportPage
             return (string) $this->getMajorVersion(namespace: true);
         }
 
-        return preg_match('/^1\.(\d+)/', $patchVersion, $m) === 1 ? $m[1] : explode('.', $patchVersion)[0];
+        $major = self::parseVersions($patchVersion)['majorVersion'];
+
+        return str_starts_with($major, '1.') ? substr($major, 2) : $major;
     }
 }
