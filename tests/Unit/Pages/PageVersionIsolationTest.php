@@ -60,4 +60,22 @@ final class PageVersionIsolationTest extends TestCase
             $object->getVersions()
         );
     }
+    public function test_parse_versions_splits_a_patch_version(): void
+    {
+        // Appelé via une classe qui utilise le trait : appeler un statique de
+        // trait directement est déprécié depuis PHP 8.1.
+        $parser = new class {
+            use Version;
+            public array $globals = [];
+        };
+
+        $this->assertSame(
+            ['patchVersion' => '1.7.8.11', 'minorVersion' => '1.7.8', 'majorVersion' => '1.7'],
+            $parser::parseVersions('1.7.8.11')
+        );
+        $this->assertSame(
+            ['patchVersion' => '9.2.0', 'minorVersion' => '9.2', 'majorVersion' => '9'],
+            $parser::parseVersions('9.2.0')
+        );
+    }
 }
