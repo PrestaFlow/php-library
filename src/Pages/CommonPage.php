@@ -503,6 +503,9 @@ class CommonPage
         $this->getPage()->evaluate(
             "(function(){var s=document.createElement('style');s.id='pf-visual-masks';s.textContent={$css};document.head.appendChild(s);})()"
         )->getReturnValue();
+        // En plus du <style> (qui couvre les éléments insérés ensuite) : inline
+        // !important, seul à battre une règle !important en @layer.
+        $this->applyVisualInline('masks', $masks, 'visibility', 'hidden', true);
     }
 
     private function removeVisualMasks(array $masks): void
@@ -514,6 +517,45 @@ class CommonPage
             $this->getPage()->evaluate(
                 "(function(){var s=document.getElementById('pf-visual-masks');if(s){s.remove();}})()"
             )->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : ne doit jamais masquer l'exception d'origine de la capture
+        }
+        $this->restoreVisualInline('masks');
+    }
+
+    /**
+     * Style inline `$prop: $value !important` sur les éléments de $selectors
+     * (+ descendants si $deep), valeurs d'origine mémorisées côté page. Le
+     * <style> injecté ne suffit pas : une règle !important en @layer
+     * (utilitaires Bootstrap de Hummingbird) bat une règle !important hors
+     * couche ; l'inline !important gagne toujours. Best-effort.
+     */
+    private function applyVisualInline(string $kind, array $selectors, string $prop, string $value, bool $deep): void
+    {
+        try {
+            $this->getPage()->evaluate(sprintf(
+                '(%s)(%s, %s, %s, %s, %s)',
+                \PrestaFlow\Library\Visual\PageScripts::APPLY_INLINE,
+                json_encode($kind, JSON_THROW_ON_ERROR),
+                json_encode(array_values($selectors), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                json_encode($prop, JSON_THROW_ON_ERROR),
+                json_encode($value, JSON_THROW_ON_ERROR),
+                json_encode($deep, JSON_THROW_ON_ERROR)
+            ))->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : le <style> injecté reste en place
+        }
+    }
+
+    /** Restaure les styles inline posés par applyVisualInline() pour $kind (best-effort). */
+    private function restoreVisualInline(string $kind): void
+    {
+        try {
+            $this->getPage()->evaluate(sprintf(
+                '(%s)(%s)',
+                \PrestaFlow\Library\Visual\PageScripts::RESTORE_INLINE,
+                json_encode($kind, JSON_THROW_ON_ERROR)
+            ))->getReturnValue();
         } catch (\Throwable $e) {
             // best-effort : ne doit jamais masquer l'exception d'origine de la capture
         }
@@ -643,6 +685,10 @@ class CommonPage
      *
      * $hide : sélecteurs passés en `display: none` le temps de la capture
      * (popups, fonds de modale : libère la place au lieu de la griser).
+     * $hide et $masks sont posés via un <style> ET en style inline !important
+     * sur les éléments trouvés (une règle !important en @layer, ex. utilitaires
+     * Bootstrap de Hummingbird, bat le <style> hors couche) ; tout est restauré
+     * après la capture, y compris en cas d'échec.
      * $freezeTransitions : coupe les transitions/animations CSS avant le
      * réglage des animations (menu animé du BO). Styles retirés après la capture.
      */
@@ -688,6 +734,11 @@ class CommonPage
         try {
             // Une règle par sélecteur, comme les masques ; `display: none` libère la place.
             $this->injectVisualStyle('pf-visual-hide', implode("\n", array_map(fn ($h) => ":is({$h}) { display: none !important; }", $hide)));
+            if ($hide !== []) {
+                // Inline !important en plus : le <style> perd face à un utilitaire
+                // !important en @layer (`.d-md-block` de Hummingbird).
+                $this->applyVisualInline('hide', $hide, 'display', 'none', false);
+            }
             if ($selector !== null) {
                 $node = $page->dom()->querySelector($selector);
                 if ($node === null) {
@@ -729,6 +780,7 @@ class CommonPage
         } finally {
             $this->removeVisualMasks($masks);
             if ($hide !== []) {
+                $this->restoreVisualInline('hide');
                 $this->removeVisualStyle('pf-visual-hide');
             }
             if ($freezeTransitions) {
