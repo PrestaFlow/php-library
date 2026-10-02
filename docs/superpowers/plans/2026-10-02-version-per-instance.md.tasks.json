@@ -1,0 +1,40 @@
+{
+  "planPath": "docs/superpowers/plans/2026-10-02-version-per-instance.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: les pages prennent leur version à la construction",
+      "status": "pending",
+      "description": "**Goal:** initVersion() en tête des constructeurs CommonPage/BackOfficePage/FrontOfficePage ; InvalidVersionException importée dans Traits\\Version.\n\n```json:metadata\n{\"files\": [\"src/Traits/Version.php\", \"src/Pages/CommonPage.php\", \"src/Pages/BackOfficePage.php\", \"src/Pages/FrontOfficePage.php\", \"tests/Unit/Pages/PageVersionInitTest.php\"], \"verifyCommand\": \"php vendor/bin/phpunit tests/Unit/Pages/PageVersionInitTest.php\", \"acceptanceCriteria\": [\"patchVersion 1.7.8.11 -> majeure 1.7\", \"PS_VERSION des globals si patchVersion vide\", \"sans version -> InvalidVersionException\", \"8.1.10 -> InvalidVersionException, pas classe introuvable\", \"suite complète verte en 8.4\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: la version devient une propriété d'instance",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** suppression de public static $versions, plus de repli sur '8', tests adaptés.\n\n```json:metadata\n{\"files\": [\"src/Traits/Version.php\", \"tests/Unit/Pages/PageVersionIsolationTest.php\", \"tests/Unit/Traits/VersionOverrideTest.php\", \"tests/Unit/Resolvers/TranslationsCatalogTest.php\", \"tests/Unit/Pages/BackOfficeGoToMenuTest.php\"], \"verifyCommand\": \"\\\"$HOME/Library/Application Support/Herd/bin/php81\\\" vendor/bin/phpunit tests/Unit/Pages/PageVersionIsolationTest.php\", \"acceptanceCriteria\": [\"deux pages BO gardent leur majeure\", \"BO 8.1 puis FO 9.0 isolées en PHP 8.1\", \"aucun ::$versions\", \"getMajorVersion sans version lève\", \"setVersions ne garde que 3 clés\", \"suite verte 8.4 et 8.1\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: transmission explicite (scénario, import de page)",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Scenario reprend le tableau de versions de la suite et analyse PATCH_VERSION ; importPage ne recopie plus les versions.\n\n```json:metadata\n{\"files\": [\"src/Scenarios/Scenario.php\", \"src/Traits/ImportPage.php\", \"tests/Unit/Scenarios/ScenarioVersionTest.php\", \"tests/Unit/Tests/SuiteVersionWiringTest.php\"], \"verifyCommand\": \"php vendor/bin/phpunit tests/Unit/Scenarios/ScenarioVersionTest.php tests/Unit/Tests/SuiteVersionWiringTest.php\", \"acceptanceCriteria\": [\"scénario sur suite 1.7.8.11 -> 1.7\", \"PATCH_VERSION analysé en tableau\", \"scénario isolé de la suite\", \"deux suites importent v7 puis v9\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: la capture visuelle lit la version de sa page",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** retrait du contournement globals d'abord dans visualCheckpoint(), test Tag remplacé.\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"tests/Unit/Visual/VisualCheckpointTagTest.php\"], \"verifyCommand\": \"php vendor/bin/phpunit tests/Unit/Visual/\", \"acceptanceCriteria\": [\"tag issu de la version de la page\", \"1.7 -> auto-v1.7\", \"plus de commentaire cache statique\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: vérification sur PHP 8.1 à 8.4",
+      "status": "pending",
+      "blockedBy": [3, 4],
+      "description": "**Goal:** suite verte sous PHP 8.1/8.2/8.3/8.4 et en ordre aléatoire ; corrections de tests factices seulement.\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"php vendor/bin/phpunit (x 4 binaires)\", \"acceptanceCriteria\": [\"vert 8.1-8.4\", \"ordre aléatoire 3 graines vert en 8.1\", \"aucun ::$versions\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-10-02T15:00:00+02:00"
+}

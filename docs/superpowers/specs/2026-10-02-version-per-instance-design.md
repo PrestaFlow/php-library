@@ -69,8 +69,9 @@ La version de PrestaShop (majeure, mineure, patch) vit dans un attribut
 - Appelée **en premier** dans `CommonPage::__construct`, `BackOfficePage::__construct`
   et `FrontOfficePage::__construct`, avant `getSelectors()` / `getMessages()`.
 - `ImportPage::importPage()` continue de passer `patchVersion` et les globals ;
-  la copie des versions après construction devient
-  `$page->setVersions($this->getVersions())` (même effet, sans statique).
+  la recopie des versions après construction est supprimée : la page a pris
+  sa version dans son constructeur, et `initTranslations()` la recalcule déjà
+  à partir du même patch.
 
 ## 3. Scénarios
 
