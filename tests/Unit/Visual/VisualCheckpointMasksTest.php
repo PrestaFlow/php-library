@@ -185,4 +185,56 @@ final class VisualCheckpointMasksTest extends TestCase
 
         $this->assertSame([0, 0], TestsSuite::$visualResults[0]['origin']);
     }
+
+    public function test_hidden_elements_are_removed_from_layout_then_restored(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', [], null, ['.onboarding-popup', '.a, .b']);
+        $js = implode("\n", $page->evaluatedLog);
+
+        $this->assertStringContainsString('pf-visual-hide', $js);
+        $this->assertStringContainsString(':is(.onboarding-popup) { display: none !important; }', $js);
+        $this->assertStringContainsString(':is(.a, .b) { display: none !important; }', $js);
+        $this->assertStringContainsString("getElementById('pf-visual-hide')", $js);
+    }
+
+    public function test_transitions_are_frozen_before_settling_then_restored(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', [], null, [], true);
+        $log = $page->evaluatedLog;
+
+        $freeze = array_key_first(array_filter($log, fn ($s) => str_contains($s, 'transition: none !important')));
+        $settle = array_key_first(array_filter($log, fn ($s) => str_contains($s, 'getAnimations')));
+        $remove = array_key_first(array_filter($log, fn ($s) => str_contains($s, "getElementById('pf-visual-freeze')")));
+        $this->assertNotNull($freeze);
+        $this->assertNotNull($settle);
+        $this->assertNotNull($remove);
+        $this->assertLessThan($settle, $freeze);
+        $this->assertLessThan($remove, $settle);
+    }
+
+    public function test_no_hide_nor_freeze_style_by_default(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', ['.price']);
+        $js = implode("\n", $page->evaluatedLog);
+
+        $this->assertStringNotContainsString('pf-visual-hide', $js);
+        $this->assertStringNotContainsString('pf-visual-freeze', $js);
+    }
+
+    public function test_hide_and_freeze_styles_are_removed_when_the_capture_fails(): void
+    {
+        $page = $this->makePage(screenshotThrows: true);
+        try {
+            $page->visualCheckpoint('hdr', null, null, false, 'auto', [], null, ['.popup'], true);
+            $this->fail('la capture devait lever');
+        } catch (\RuntimeException) {
+        }
+        $js = implode("\n", $page->evaluatedLog);
+
+        $this->assertStringContainsString("getElementById('pf-visual-hide')", $js);
+        $this->assertStringContainsString("getElementById('pf-visual-freeze')", $js);
+    }
 }
