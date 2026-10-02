@@ -237,4 +237,98 @@ final class VisualCheckpointMasksTest extends TestCase
         $this->assertStringContainsString("getElementById('pf-visual-hide')", $js);
         $this->assertStringContainsString("getElementById('pf-visual-freeze')", $js);
     }
+    private static function firstIndex(array $log, callable $match): ?int
+    {
+        return array_key_first(array_filter($log, $match));
+    }
+
+    private static function isScreenshotMarker(string $js): bool
+    {
+        // le stub ne journalise pas screenshot() : en viewport, l'offset de scroll
+        // est lu juste avant la capture
+        return str_contains($js, 'window.scrollY');
+    }
+
+    public function test_hide_is_also_applied_inline_after_the_style_and_before_the_capture(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', [], null, ['.header-top', '.a, .b']);
+        $log = $page->evaluatedLog;
+
+        $style = self::firstIndex($log, fn ($s) => str_contains($s, ':is(.header-top) { display: none !important; }'));
+        $inline = self::firstIndex($log, fn ($s) => str_contains($s, '__pfVisualInline') && str_contains($s, '"hide"') && !str_contains($s, 'removeProperty'));
+        $shot = self::firstIndex($log, fn ($s) => self::isScreenshotMarker($s));
+        $this->assertNotNull($style);
+        $this->assertNotNull($inline);
+        $this->assertNotNull($shot);
+        $this->assertLessThan($inline, $style);
+        $this->assertLessThan($shot, $inline);
+
+        $js = $log[$inline];
+        $this->assertStringContainsString(json_encode(['.header-top', '.a, .b']), $js);
+        $this->assertStringContainsString('"display"', $js);
+        $this->assertStringContainsString('"none"', $js);
+        $this->assertStringContainsString("'important'", $js);
+        $this->assertStringContainsString('getPropertyPriority', $js);
+    }
+
+    public function test_hide_inline_styles_are_restored_after_the_capture(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', [], null, ['.popup']);
+        $log = $page->evaluatedLog;
+
+        $shot = self::firstIndex($log, fn ($s) => self::isScreenshotMarker($s));
+        $restore = self::firstIndex($log, fn ($s) => str_contains($s, '__pfVisualInline') && str_contains($s, '"hide"') && str_contains($s, 'removeProperty'));
+        $this->assertNotNull($restore);
+        $this->assertLessThan($restore, $shot);
+    }
+
+    public function test_masks_are_also_applied_inline_on_elements_and_descendants(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false, 'auto', ['#logos', '.a, .b']);
+        $log = $page->evaluatedLog;
+
+        $style = self::firstIndex($log, fn ($s) => str_contains($s, 'pf-visual-masks') && str_contains($s, 'createElement'));
+        $inline = self::firstIndex($log, fn ($s) => str_contains($s, '__pfVisualInline') && str_contains($s, '"masks"') && !str_contains($s, 'removeProperty'));
+        $shot = self::firstIndex($log, fn ($s) => self::isScreenshotMarker($s));
+        $restore = self::firstIndex($log, fn ($s) => str_contains($s, '__pfVisualInline') && str_contains($s, '"masks"') && str_contains($s, 'removeProperty'));
+        $this->assertNotNull($style);
+        $this->assertNotNull($inline);
+        $this->assertNotNull($restore);
+        $this->assertLessThan($inline, $style);
+        $this->assertLessThan($shot, $inline);
+        $this->assertLessThan($restore, $shot);
+
+        $js = $log[$inline];
+        $this->assertStringContainsString(json_encode(['#logos', '.a, .b']), $js);
+        $this->assertStringContainsString('"visibility"', $js);
+        $this->assertStringContainsString('"hidden"', $js);
+        $this->assertStringContainsString('true', $js); // descendants inclus
+        $this->assertStringContainsString("querySelectorAll('*')", $js);
+    }
+
+    public function test_inline_styles_are_restored_even_when_the_capture_throws(): void
+    {
+        $page = $this->makePage(screenshotThrows: true);
+        try {
+            $page->visualCheckpoint('hdr', null, null, false, 'auto', ['.carousel'], null, ['.popup']);
+            $this->fail('la capture devait lever');
+        } catch (\RuntimeException) {
+        }
+        $restores = array_filter($page->evaluatedLog, fn ($s) => str_contains($s, '__pfVisualInline') && str_contains($s, 'removeProperty'));
+        $joined = implode("\n", $restores);
+
+        $this->assertStringContainsString('"masks"', $joined);
+        $this->assertStringContainsString('"hide"', $joined);
+    }
+
+    public function test_no_inline_js_without_hide_nor_masks(): void
+    {
+        $page = $this->makePage();
+        $page->visualCheckpoint('hdr', null, null, false);
+
+        $this->assertStringNotContainsString('__pfVisualInline', implode("\n", $page->evaluatedLog));
+    }
 }
