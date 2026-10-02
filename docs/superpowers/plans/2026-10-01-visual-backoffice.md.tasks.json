@@ -1,0 +1,55 @@
+{
+  "planPath": "docs/superpowers/plans/2026-10-01-visual-backoffice.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: visualCheckpoint() — hide et gel des transitions",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 1 ».\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"tests/Unit/Visual/VisualCheckpointMasksTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Visual\", \"acceptanceCriteria\": []}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: BackOfficePage::goToMenu()",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 2 ».\n\n```json:metadata\n{\"files\": [\"src/Pages/BackOfficePage.php\", \"tests/Unit/Pages/BackOfficeGoToMenuTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit/Pages/BackOfficeGoToMenuTest.php\", \"acceptanceCriteria\": []}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 3: VisualTestsSuite — zone bo",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 3 ».\n\n```json:metadata\n{\"files\": [\"src/Tests/VisualTestsSuite.php\", \"tests/Unit/Visual/VisualTestsSuiteTest.php\", \"tests/Unit/Visual/VisualTestsSuiteBackOfficeTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit\", \"acceptanceCriteria\": []}\n```",
+      "blockedBy": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "subject": "Task 4: Suite BackOffice et vérification locale",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 4 ».\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/Visual/BackOffice.php\", \"tests/Unit/Visual/BackOfficeSuiteTest.php\"], \"verifyCommand\": \"vendor/bin/phpunit tests/Unit\", \"acceptanceCriteria\": []}\n```",
+      "blockedBy": [
+        2
+      ]
+    },
+    {
+      "id": 4,
+      "subject": "Task 5: Workflow visual.yml et README",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 5 ».\n\n```json:metadata\n{\"files\": [\".github/workflows/visual.yml\", \"README.md\"], \"verifyCommand\": \"ruby -ryaml -e \\\"YAML.load_file('.github/workflows/visual.yml')\\\"\", \"acceptanceCriteria\": []}\n```",
+      "blockedBy": [
+        3
+      ]
+    },
+    {
+      "id": 5,
+      "subject": "Task 6: PR et vérification en CI (coordinateur)",
+      "status": "pending",
+      "description": "Voir docs/superpowers/plans/2026-10-01-visual-backoffice.md, « Task 6 ».\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": []}\n```",
+      "blockedBy": [
+        4
+      ]
+    }
+  ],
+  "lastUpdated": "2026-10-02T08:00:00Z"
+}
