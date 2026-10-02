@@ -17,7 +17,8 @@ use PrestaFlow\Library\Visual\VisualDevices;
  * checkpoints `auth => false` (page de connexion) passent d'abord, les autres
  * sont résolus par le menu latéral (`menu` : sélecteurs séparés par des
  * virgules, null = racine du BO). `hide` (display:none pendant la capture)
- * vaut pour les deux zones.
+ * vaut pour les deux zones. `path` / `paths` sont ignorés en 'bo', `menu` /
+ * `auth` en 'fo' ; en 'bo', `auth => false` avec un `menu` est refusé.
  */
 abstract class VisualTestsSuite extends TestsSuite
 {
@@ -198,7 +199,7 @@ abstract class VisualTestsSuite extends TestsSuite
             'menu' => null, 'auth' => true, 'hide' => [],
         ], $cp);
         $cp['auth'] = (bool) $cp['auth'];
-        $cp['hide'] = array_values(array_filter(array_map('trim', (array) $cp['hide']), static fn (string $s) => $s !== ''));
+        $cp['hide'] = array_values(array_filter(array_map('trim', array_filter((array) $cp['hide'], 'is_string')), static fn (string $s) => $s !== ''));
         $cp['threshold'] = $hasThreshold ? max(0.5, min(1.0, (float) $cp['threshold'])) : null;
         $cp['maxDiffPixels'] = $hasBudget
             ? max(0, (int) $cp['maxDiffPixels'])
@@ -252,6 +253,13 @@ abstract class VisualTestsSuite extends TestsSuite
         $backOffice = $this->area === 'bo';
         $page = $this->pages[$backOffice ? 'backOfficePage' : 'frontOfficePage'] ?? null;
         $login = $this->pages['backOfficeLoginPage'] ?? null;
+        if ($backOffice) {
+            foreach ($this->checkpoints() as $cp) {
+                if ($cp['auth'] === false && $cp['menu'] !== null) {
+                    throw new \InvalidArgumentException(sprintf('%s : checkpoint « %s » : auth => false capture la page de connexion, menu interdit', static::class, (string) ($cp['name'] ?? '')));
+                }
+            }
+        }
         $device = $this->currentDevice();
         $locale = $this->currentLocale();
 
@@ -318,6 +326,10 @@ abstract class VisualTestsSuite extends TestsSuite
                         if ($cp['menu'] !== null) {
                             $page->goToMenu($cp['menu']);
                         }
+                    }
+                    if (!$cp['auth'] && !$this->loginFormPresent($page, $login)) {
+                        // pas de référence enregistrée sur le tableau de bord à la place
+                        throw new \RuntimeException('Session back-office déjà ouverte : la page de connexion ne peut pas être capturée');
                     }
                     $this->captureCheckpoint($page, $cp, $scope, $sameTarget);
 
@@ -399,9 +411,16 @@ abstract class VisualTestsSuite extends TestsSuite
                     throw new \RuntimeException('page BackOffice\\Login absente');
                 }
                 $login->goToPage('index');
+                if (!$this->loginFormPresent($login, $login)) {
+                    $this->boLoggedIn = true; // session déjà ouverte : racine = tableau de bord
+
+                    return;
+                }
                 $login->login(); // identifiants des globals BO_EMAIL / BO_PASSWD
                 if (!$login->isLoggedIn()) {
-                    throw new \RuntimeException('identifiants refusés ou page inattendue');
+                    $error = $this->readNow($login, sprintf('(function(){var e=document.querySelector(%s);return e?e.textContent:"";})()', json_encode((string) $login->getSelector('alertDangerDiv'))));
+                    $error = trim(is_string($error) ? $error : '');
+                    throw new \RuntimeException('identifiants refusés ou page inattendue'.($error !== '' ? ' : '.$error : ''));
                 }
                 $this->boLoggedIn = true;
 
@@ -412,6 +431,20 @@ abstract class VisualTestsSuite extends TestsSuite
         }
 
         throw new \RuntimeException('Connexion au back-office impossible : '.$this->boLoginError);
+    }
+
+    /** Formulaire de connexion affiché sur la page courante (lu sans attendre, sélecteur de la page Login). */
+    protected function loginFormPresent(object $page, ?object $login): bool
+    {
+        $selector = $login !== null ? (string) $login->getSelector('emailInput') : '#email';
+
+        return (bool) $this->readNow($page, sprintf('!!document.querySelector(%s)', json_encode($selector)));
+    }
+
+    /** Évalue une expression JS dans l'onglet de la page, sans attente. */
+    protected function readNow(object $page, string $js): mixed
+    {
+        return $page->getPage()->evaluate($js)->getReturnValue();
     }
 
     /** Surchargé en test unitaire (pas de navigateur). */

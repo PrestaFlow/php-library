@@ -9,8 +9,28 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
 {
     private array $envBackup = [];
 
+    /** Onglet Chrome factice partagé par les pages : formulaire de connexion affiché ?, texte d'erreur. */
+    private object $chrome;
+
     protected function setUp(): void
     {
+        $this->chrome = new class {
+            public bool $form = true;
+            public string $error = '';
+            public function evaluate(string $js): object
+            {
+                $value = match (true) {
+                    str_contains($js, '#email') => $this->form,
+                    str_contains($js, '.alert-danger') => $this->error,
+                    default => null,
+                };
+
+                return new class ($value) {
+                    public function __construct(private mixed $value) {}
+                    public function getReturnValue(): mixed { return $this->value; }
+                };
+            }
+        };
         $this->envBackup = $_ENV;
         unset($_ENV['PRESTAFLOW_VISUAL_ONLY']);
         putenv('PRESTAFLOW_VISUAL_ONLY');
@@ -63,9 +83,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
     /** Page factice : journalise navigation et captures dans un journal partagé. */
     private function page(\ArrayObject $log): object
     {
-        return new class ($log) {
+        return new class ($log, $this->chrome) {
             public array $calls = [];
-            public function __construct(public \ArrayObject $log) {}
+            public ?string $failOn = null;
+            public function __construct(public \ArrayObject $log, public object $chrome) {}
+            public function getPage(): object { return $this->chrome; }
             public function goToPage($page = null, $params = null): void { $this->log[] = 'page '.$page; }
             public function goToMenu(string $selectors): string { $this->log[] = 'menu '.$selectors; return 'http://shop.test/admin-dev/x?token=t'; }
             public function goToUrl(string $url): void { $this->log[] = 'goto '.$url; }
@@ -77,14 +99,25 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'capture '.$name;
                 $this->calls[$name] = [$hide, $freezeTransitions];
+                if ($this->failOn === $name) {
+                    throw new \RuntimeException('capture ratée');
+                }
             }
         };
     }
 
     private function login(\ArrayObject $log, bool $ok = true): object
     {
-        return new class ($log, $ok) {
-            public function __construct(public \ArrayObject $log, public bool $ok) {}
+        // Ne navigue pas l'onglet partagé : la présence du formulaire est fixée par
+        // le test ($this->chrome->form), comme l'afficherait la racine du BO pour la
+        // session courante. Suffisant : la suite ne la lit qu'après une navigation.
+        return new class ($log, $ok, $this->chrome) {
+            public function __construct(public \ArrayObject $log, public bool $ok, public object $chrome) {}
+            public function getPage(): object { return $this->chrome; }
+            public function getSelector($selector, $replacements = []): string
+            {
+                return ['emailInput' => '#email', 'alertDangerDiv' => '.alert-danger'][$selector];
+            }
             public function goToPage($page = null, $params = null): void { $this->log[] = 'login:page '.$page; }
             public function login($email = null, $password = null, $waitForNavigation = true): void { $this->log[] = 'login:submit'; }
             public function isLoggedIn(): bool { $this->log[] = 'login:check'; return $this->ok; }
@@ -122,6 +155,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->assertFalse($cp['auth']);
         $this->assertSame(['.popup'], $cp['hide']);
         $this->assertSame(['.a', '.b'], VisualTestsSuite::normalize(['name' => 'x', 'hide' => ['.a', '', ' ', '.b']])['hide']);
+        $this->assertSame(['.a'], VisualTestsSuite::normalize(['name' => 'x', 'hide' => [['.nested'], '.a', 3]])['hide']);
     }
 
     public function test_area_accessor(): void
@@ -258,5 +292,81 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->assertSame(['goto http://shop.test/', 'stable', 'capture backoffice.home', 'stable', 'top', 'capture backoffice.popup'], $log->getArrayCopy());
         $this->assertSame([[], false], $page->calls['backoffice.home']);
         $this->assertSame([['.modal'], false], $page->calls['backoffice.popup']);
+    }
+
+    public function test_logged_out_checkpoint_with_a_menu_is_refused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('login-menu');
+        $this->suite(checkpoints: [
+            ['name' => 'dashboard'],
+            ['name' => 'login-menu', 'auth' => false, 'menu' => '#subtab-AdminOrders'],
+        ])->init();
+    }
+
+    public function test_surviving_session_skips_login_and_proceeds(): void
+    {
+        $this->chrome->form = false; // session BO déjà ouverte
+        $log = new \ArrayObject();
+        $s = $this->suite(page: $this->page($log), login: $this->login($log), checkpoints: [
+            ['name' => 'dashboard'],
+            ['name' => 'orders', 'menu' => '#subtab-AdminOrders'],
+        ]);
+        $s->init();
+
+        $this->assertSame([], $this->runSteps($s));
+        $this->assertSame([
+            'login:page index',
+            'page index', 'stable', 'capture backoffice.dashboard',
+            'page index', 'menu #subtab-AdminOrders', 'stable', 'capture backoffice.orders',
+        ], $log->getArrayCopy());
+    }
+
+    public function test_logged_out_checkpoint_fails_when_a_session_is_open(): void
+    {
+        $this->chrome->form = false;
+        $log = new \ArrayObject();
+        $s = $this->suite(page: $this->page($log), login: $this->login($log), checkpoints: [
+            ['name' => 'login', 'auth' => false],
+        ]);
+        $s->init();
+
+        $this->assertSame(
+            ['capture visuelle : login' => 'Session back-office déjà ouverte : la page de connexion ne peut pas être capturée'],
+            $this->runSteps($s)
+        );
+        $this->assertNotContains('capture backoffice.login', $log->getArrayCopy());
+    }
+
+    public function test_refused_login_reports_the_form_error(): void
+    {
+        $this->chrome->error = '  The employee does not exist.  ';
+        $log = new \ArrayObject();
+        $s = $this->suite(page: $this->page($log), login: $this->login($log, ok: false), checkpoints: [['name' => 'dashboard']]);
+        $s->init();
+
+        $this->assertSame(
+            ['capture visuelle : dashboard' => 'Connexion au back-office impossible : identifiants refusés ou page inattendue : The employee does not exist.'],
+            $this->runSteps($s)
+        );
+    }
+
+    public function test_failed_checkpoint_forces_navigation_on_next_one_with_same_target(): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $page->failOn = 'backoffice.orders';
+        $s = $this->suite(page: $page, login: $this->login($log), checkpoints: [
+            ['name' => 'orders', 'menu' => '#subtab-AdminOrders'],
+            ['name' => 'orders-bis', 'menu' => '#subtab-AdminOrders'],
+        ]);
+        $s->init();
+        $this->runSteps($s);
+
+        $this->assertSame([
+            'login:page index', 'login:submit', 'login:check',
+            'page index', 'menu #subtab-AdminOrders', 'stable', 'capture backoffice.orders',
+            'page index', 'menu #subtab-AdminOrders', 'stable', 'capture backoffice.orders-bis',
+        ], $log->getArrayCopy());
     }
 }
