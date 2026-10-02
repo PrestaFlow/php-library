@@ -17,6 +17,7 @@ class BackOfficePage extends CommonPage
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
+        $this->initVersion(patchVersion: $patchVersion, globals: $globals);
         $this->globals = $globals;
         $this->customs = array_merge($this->customs, $customs);
         $this->initLocale(locale: $locale);
