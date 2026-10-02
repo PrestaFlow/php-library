@@ -4,13 +4,13 @@
     {
       "id": 1,
       "subject": "Task 1: Suites — panier en cart?action=show",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Le checkpoint cart-empty des deux suites visuelles capture la vraie page panier sur 1.7, 8 et 9 (en 1.7, /cart vide redirige vers l'accueil).\n\n**Files:**\n- src/Tests/Suites/Visual/FrontOfficeClassic.php\n- src/Tests/Suites/Visual/FrontOfficeHummingbird.php\n- tests/Unit/Visual/FrontOfficeSuitesTest.php\n\n**Acceptance Criteria:**\n- cart-empty : path cart?action=show, paths fr panier?action=show dans les deux suites ; reste inchangé\n- docblocks à jour (versions couvertes, raison du chemin)\n- FrontOfficeSuitesTest échoue avant, passe après (4 tests)\n- phpunit --testsuite Unit : OK, 469 tests\n- local ps17 (8017, EN, PREFIX_LOCALE=false) : desktop + mobile ×2 depuis un répertoire temporaire, 4 × exit 0, 8 diffs par device au 2e passage, cart-empty = page panier\n- local ps92 (8092/8093, PREFIX_LOCALE=true) : cart-empty seul, desktop, en + fr, ×2, 8 × exit 0\n- aucune sortie laissée dans le dépôt ni dans le répertoire temporaire\n\n**Verify:** cd /Users/jonathan/Documents/GitHub/PrestaFlow/php-library-visual && ./vendor/bin/phpunit --testsuite Unit  # OK (469 tests) ; puis vérifications locales des étapes 6 et 7\n\n```json:metadata\n{\"files\": [\"src/Tests/Suites/Visual/FrontOfficeClassic.php\", \"src/Tests/Suites/Visual/FrontOfficeHummingbird.php\", \"tests/Unit/Visual/FrontOfficeSuitesTest.php\"], \"verifyCommand\": \"cd /Users/jonathan/Documents/GitHub/PrestaFlow/php-library-visual && ./vendor/bin/phpunit --testsuite Unit  # OK (469 tests) ; puis vérifications locales des étapes 6 et 7\", \"acceptanceCriteria\": [\"cart-empty : path cart?action=show, paths fr panier?action=show dans les deux suites ; reste inchangé\", \"docblocks à jour (versions couvertes, raison du chemin)\", \"FrontOfficeSuitesTest échoue avant, passe après (4 tests)\", \"phpunit --testsuite Unit : OK, 469 tests\", \"local ps17 (8017, EN, PREFIX_LOCALE=false) : desktop + mobile ×2 depuis un répertoire temporaire, 4 × exit 0, 8 diffs par device au 2e passage, cart-empty = page panier\", \"local ps92 (8092/8093, PREFIX_LOCALE=true) : cart-empty seul, desktop, en + fr, ×2, 8 × exit 0\", \"aucune sortie laissée dans le dépôt ni dans le répertoire temporaire\"]}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Workflow — matrice 1.7.8.11 / 8.2.8 / 9.2.0",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
@@ -19,7 +19,7 @@
     {
       "id": 3,
       "subject": "Task 3: Vérification en CI sur la PR (sans merge)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2
       ],
@@ -28,12 +28,12 @@
     {
       "id": 4,
       "subject": "Task 4: Après la release — références v3 sur main, stabilité, protection",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         3
       ],
       "description": "**Goal:** Après accord et release de l'utilisateur : le push sur main sauvegarde les références v3 des 4 lignes, 2-3 workflow_dispatch comparent sans écart, et l'utilisateur reçoit la commande de protection à 13 checks.\n\n**Files:**\n- (aucun)\n\n**Acceptance Criteria:**\n- run push sur main vert, 4 caches visual-refs-v3-<ps>-<theme>-…\n- 2-3 runs workflow_dispatch verts, references restored from visual-refs-v3-… sur chaque job, 32 diffs par artefact\n- commande gh api PUT de protection (13 checks) donnée à l'utilisateur, non exécutée sans accord\n\n**Verify:** cd /Users/jonathan/Documents/GitHub/PrestaFlow/php-library-visual && gh cache list --key visual-refs-v3- --limit 20\n\n```json:metadata\n{\"files\": [\"(aucun)\"], \"verifyCommand\": \"cd /Users/jonathan/Documents/GitHub/PrestaFlow/php-library-visual && gh cache list --key visual-refs-v3- --limit 20\", \"acceptanceCriteria\": [\"run push sur main vert, 4 caches visual-refs-v3-<ps>-<theme>-…\", \"2-3 runs workflow_dispatch verts, references restored from visual-refs-v3-… sur chaque job, 32 diffs par artefact\", \"commande gh api PUT de protection (13 checks) donnée à l'utilisateur, non exécutée sans accord\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-10-01T15:12:00Z"
+  "lastUpdated": "2026-10-01T19:00:00Z"
 }

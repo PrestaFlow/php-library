@@ -1,7 +1,7 @@
 # Workflow « Visual » sur PrestaShop 1.7.8 et 8.2 : design
 
 Date : 2026-10-01
-Statut : validé en brainstorming, en attente de relecture
+Statut : implémenté (PR #101, release #102 ; suites #103 à #106)
 
 ## Objectif
 
@@ -126,6 +126,32 @@ mobile.
 
 - Une PR vers `dev`, puis la release `dev` → `main`.
 - Aucun changement dans l'app.
+
+## Notes d'implémentation
+
+Écarts et suites relevés après la livraison :
+
+- **Nom des références en 1.7** : le segment de version est `v1.7` (et non
+  `v1`), par exemple `…cart-empty--auto-v1.7-1920x1080-en.png`.
+- **Vérification après release** : 3 runs manuels sur `main`. 11 jobs sur 12
+  verts ; le job 8.2.8 d'un run a échoué une fois sur la première capture
+  (`header`, desktop EN) : « Operation timed out after 5s ». Aucune image en
+  écart.
+- **Réchauffage (#103, retiré par #105)** : charger chaque page des
+  checkpoints avant les passages n'a rien changé, les pages répondaient déjà
+  en 0 à 1 s. La lenteur venait de Chrome tout juste lancé, pas de la
+  boutique.
+- **Cause et correctif (#105)** : chrome-php attend 5 s par défaut dans
+  `saveToFile()` et pour chaque appel synchrone (`sendSyncDefaultTimeout`),
+  que la lib ne réglait pas.
+  - Les captures visuelles s'écrivent avec 30 s
+    (`CommonPage::SCREENSHOT_TIMEOUT_MS`).
+  - `PRESTAFLOW_CDP_TIMEOUT` (ms, défaut 5000) règle les appels synchrones,
+    au lancement comme à la reconnexion au navigateur partagé.
+  - Le workflow Visual la met à 15 s.
+  - Après la release #106, 3 runs manuels : 12 jobs sur 12 verts.
+- **Protection de `main`** : les deux nouveaux checks Visual sont requis
+  (13 checks au total).
 
 ## Hors périmètre
 

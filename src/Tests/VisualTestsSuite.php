@@ -11,6 +11,14 @@ use PrestaFlow\Library\Visual\VisualDevices;
  * déclarent que $devices, $locales et $checkpoints (littéraux, édités par l'app).
  * Une exécution couvre UNE combinaison device × locale (globals DEVICE / LOCALE,
  * ou env PRESTAFLOW_DEVICE / PRESTAFLOW_LOCALE en CLI).
+ *
+ * Zone 'fo' (défaut) : chaque checkpoint vise un chemin du front-office
+ * (`path` / `paths`). Zone 'bo' : connexion automatique au back-office ; les
+ * checkpoints `auth => false` (page de connexion) passent d'abord, les autres
+ * sont résolus par le menu latéral (`menu` : sélecteurs séparés par des
+ * virgules, null = racine du BO). `hide` (display:none pendant la capture)
+ * vaut pour les deux zones. `path` / `paths` sont ignorés en 'bo', `menu` /
+ * `auth` en 'fo' ; en 'bo', `auth => false` avec un `menu` est refusé.
  */
 abstract class VisualTestsSuite extends TestsSuite
 {
@@ -25,6 +33,23 @@ abstract class VisualTestsSuite extends TestsSuite
      * nom court de la classe (NouvelleScene → nouvelle-scene). Doit matcher [a-z0-9-]+.
      */
     protected string $visualScope = '';
+
+    /**
+     * Zone capturée : 'fo' (front-office, chemins d'URL) ou 'bo' (back-office :
+     * connexion automatique, checkpoints résolus par le menu latéral, car toute
+     * URL d'admin porte un jeton).
+     */
+    protected string $area = 'fo';
+
+    /** Gel des transitions CSS pendant la capture ; null = actif en 'bo' seulement (références 'fo' inchangées). */
+    protected ?bool $freezeTransitions = null;
+
+    /**
+     * État de la connexion BO (une seule tentative par exécution). Protégés et
+     * non privés : run() lie les étapes à la sous-classe concrète.
+     */
+    protected ?string $boLoginError = null;
+    protected bool $boLoggedIn = false;
 
     /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
@@ -138,6 +163,22 @@ abstract class VisualTestsSuite extends TestsSuite
     public function devices(): array { return $this->devices; }
     public function locales(): array { return $this->locales; }
     public function checkpoints(): array { return array_map([self::class, 'normalize'], $this->checkpoints); }
+    public function area(): string { return $this->area; }
+    public function freezesTransitions(): bool { return $this->freezeTransitions ?? ($this->area === 'bo'); }
+
+    /** Ordre d'exécution : en 'bo', les captures sans connexion (page de connexion) passent avant la connexion. */
+    public function orderedCheckpoints(): array
+    {
+        $checkpoints = $this->checkpoints();
+        if ($this->area !== 'bo') {
+            return $checkpoints;
+        }
+
+        return [
+            ...array_values(array_filter($checkpoints, static fn (array $cp) => $cp['auth'] === false)),
+            ...array_values(array_filter($checkpoints, static fn (array $cp) => $cp['auth'] !== false)),
+        ];
+    }
 
     /**
      * Valeurs par défaut d'un checkpoint. Règle de passage : budget de pixels
@@ -155,7 +196,10 @@ abstract class VisualTestsSuite extends TestsSuite
             'waitFor' => null, 'scrollBelow' => null, 'threshold' => null,
             'maxDiffPixels' => self::DEFAULT_MAX_DIFF_PIXELS,
             'excludeDevices' => [], 'masks' => [],
+            'menu' => null, 'auth' => true, 'hide' => [],
         ], $cp);
+        $cp['auth'] = (bool) $cp['auth'];
+        $cp['hide'] = array_values(array_filter(array_map('trim', array_filter((array) $cp['hide'], 'is_string')), static fn (string $s) => $s !== ''));
         $cp['threshold'] = $hasThreshold ? max(0.5, min(1.0, (float) $cp['threshold'])) : null;
         $cp['maxDiffPixels'] = $hasBudget
             ? max(0, (int) $cp['maxDiffPixels'])
@@ -202,8 +246,20 @@ abstract class VisualTestsSuite extends TestsSuite
     public function init()
     {
         parent::init();
+        if (!in_array($this->area, ['fo', 'bo'], true)) {
+            throw new \InvalidArgumentException(sprintf('%s : area « %s » inconnue (fo, bo)', static::class, $this->area));
+        }
         $this->importVisualPage();
-        $page = $this->pages['frontOfficePage'] ?? null;
+        $backOffice = $this->area === 'bo';
+        $page = $this->pages[$backOffice ? 'backOfficePage' : 'frontOfficePage'] ?? null;
+        $login = $this->pages['backOfficeLoginPage'] ?? null;
+        if ($backOffice) {
+            foreach ($this->checkpoints() as $cp) {
+                if ($cp['auth'] === false && $cp['menu'] !== null) {
+                    throw new \InvalidArgumentException(sprintf('%s : checkpoint « %s » : auth => false capture la page de connexion, menu interdit', static::class, (string) ($cp['name'] ?? '')));
+                }
+            }
+        }
         $device = $this->currentDevice();
         $locale = $this->currentLocale();
 
@@ -218,8 +274,10 @@ abstract class VisualTestsSuite extends TestsSuite
 
         $scope = $this->visualScope();
         $this->lastVisualUrl = null;
+        $this->boLoggedIn = false;
+        $this->boLoginError = null;
 
-        $checkpoints = $this->checkpoints();
+        $checkpoints = $this->orderedCheckpoints();
         $only = self::onlyFromEnv();
         if ($only !== []) {
             $checkpoints = array_values(array_filter($checkpoints, static fn (array $cp) => in_array((string) ($cp['name'] ?? ''), $only, true)));
@@ -239,6 +297,47 @@ abstract class VisualTestsSuite extends TestsSuite
 
         foreach ($checkpoints as $cp) {
             $title = 'capture visuelle : '.$cp['name'];
+
+            if ($backOffice) {
+                // path / paths ignorés : seul excludeDevices saute un checkpoint
+                if (in_array($device, $cp['excludeDevices'], true)) {
+                    $this->skip($title, function () {});
+                    continue;
+                }
+
+                // Les jetons changent les URL : « même page » = même couple (auth, menu).
+                // Les cookies sont vidés à la construction de la suite (TestsSuite,
+                // Network.clearBrowserCookies) : les checkpoints non connectés, joués
+                // d'abord, partent bien sans session (racine du BO = page de connexion).
+                $target = ($cp['auth'] ? 'in' : 'out').'|'.($cp['menu'] ?? '');
+                $this->it($title, function () use ($page, $login, $cp, $target, $scope) {
+                    if (Expect::$latestWarning === self::UNSTABLE_WARNING) {
+                        Expect::setWarning('');
+                    }
+
+                    $sameTarget = $this->lastVisualUrl === $target;
+                    $this->lastVisualUrl = null; // invalidé tant que ce checkpoint n'a pas abouti
+
+                    if ($cp['auth']) {
+                        $this->ensureBackOfficeLogin($login);
+                    }
+                    if (!$sameTarget) {
+                        $page->goToPage('index');
+                        if ($cp['menu'] !== null) {
+                            $page->goToMenu($cp['menu']);
+                        }
+                    }
+                    if (!$cp['auth'] && !$this->loginFormPresent($page, $login)) {
+                        // pas de référence enregistrée sur le tableau de bord à la place
+                        throw new \RuntimeException('Session back-office déjà ouverte : la page de connexion ne peut pas être capturée');
+                    }
+                    $this->captureCheckpoint($page, $cp, $scope, $sameTarget);
+
+                    $this->lastVisualUrl = $target;
+                });
+                continue;
+            }
+
             $path = $this->resolvePath($cp, $locale);
 
             if ($path === null || in_array($device, $cp['excludeDevices'], true)) {
@@ -260,26 +359,7 @@ abstract class VisualTestsSuite extends TestsSuite
                 if (!$sameUrl) {
                     $page->goToUrl($url);
                 }
-                if ($page->waitForStable() === false) {
-                    Expect::setWarning(self::UNSTABLE_WARNING);
-                }
-                if ($cp['waitFor']) {
-                    $page->waitVisible($cp['waitFor']);
-                }
-                if ($cp['scrollBelow'] && $cp['zone'] === 'viewport') {
-                    $page->scrollBelow($cp['scrollBelow']); // remet d'abord le scroll en haut
-                } elseif ($sameUrl) {
-                    $page->scrollToTop(); // ne pas hériter du scroll du checkpoint précédent
-                }
-                $page->visualCheckpoint(
-                    $scope.'.'.$cp['name'],
-                    $cp['zone'] === 'element' ? $cp['selector'] : null,
-                    $cp['threshold'],
-                    $cp['zone'] === 'full',
-                    'auto',
-                    $cp['masks'],
-                    $cp['maxDiffPixels'],
-                );
+                $this->captureCheckpoint($page, $cp, $scope, $sameUrl);
 
                 $this->lastVisualUrl = $url;
             });
@@ -288,9 +368,94 @@ abstract class VisualTestsSuite extends TestsSuite
         return $this;
     }
 
+    /**
+     * Déroulé commun aux deux zones, une fois sur la page : stabilité, attente,
+     * scroll, capture. Protégé (et non privé) : appelé depuis les étapes, que
+     * run() lie à la sous-classe concrète.
+     */
+    protected function captureCheckpoint(object $page, array $cp, string $scope, bool $samePage): void
+    {
+        if ($page->waitForStable() === false) {
+            Expect::setWarning(self::UNSTABLE_WARNING);
+        }
+        if ($cp['waitFor']) {
+            $page->waitVisible($cp['waitFor']);
+        }
+        if ($cp['scrollBelow'] && $cp['zone'] === 'viewport') {
+            $page->scrollBelow($cp['scrollBelow']); // remet d'abord le scroll en haut
+        } elseif ($samePage) {
+            $page->scrollToTop(); // ne pas hériter du scroll du checkpoint précédent
+        }
+        $page->visualCheckpoint(
+            $scope.'.'.$cp['name'],
+            $cp['zone'] === 'element' ? $cp['selector'] : null,
+            $cp['threshold'],
+            $cp['zone'] === 'full',
+            'auto',
+            $cp['masks'],
+            $cp['maxDiffPixels'],
+            $cp['hide'],
+            $this->freezesTransitions(),
+        );
+    }
+
+    /** Connexion unique au back-office avant le premier checkpoint connecté ; une erreur est rejouée sans nouvel essai. */
+    protected function ensureBackOfficeLogin(?object $login): void
+    {
+        if ($this->boLoggedIn) {
+            return;
+        }
+        if ($this->boLoginError === null) {
+            try {
+                if ($login === null) {
+                    throw new \RuntimeException('page BackOffice\\Login absente');
+                }
+                $login->goToPage('index');
+                if (!$this->loginFormPresent($login, $login)) {
+                    $this->boLoggedIn = true; // session déjà ouverte : racine = tableau de bord
+
+                    return;
+                }
+                $login->login(); // identifiants des globals BO_EMAIL / BO_PASSWD
+                if (!$login->isLoggedIn()) {
+                    $error = $this->readNow($login, sprintf('(function(){var e=document.querySelector(%s);return e?e.textContent:"";})()', json_encode((string) $login->getSelector('alertDangerDiv'))));
+                    $error = trim(is_string($error) ? $error : '');
+                    throw new \RuntimeException('identifiants refusés ou page inattendue'.($error !== '' ? ' : '.$error : ''));
+                }
+                $this->boLoggedIn = true;
+
+                return;
+            } catch (\Throwable $e) {
+                $this->boLoginError = $e->getMessage();
+            }
+        }
+
+        throw new \RuntimeException('Connexion au back-office impossible : '.$this->boLoginError);
+    }
+
+    /** Formulaire de connexion affiché sur la page courante (lu sans attendre, sélecteur de la page Login). */
+    protected function loginFormPresent(object $page, ?object $login): bool
+    {
+        $selector = $login !== null ? (string) $login->getSelector('emailInput') : '#email';
+
+        return (bool) $this->readNow($page, sprintf('!!document.querySelector(%s)', json_encode($selector)));
+    }
+
+    /** Évalue une expression JS dans l'onglet de la page, sans attente. */
+    protected function readNow(object $page, string $js): mixed
+    {
+        return $page->getPage()->evaluate($js)->getReturnValue();
+    }
+
     /** Surchargé en test unitaire (pas de navigateur). */
     protected function importVisualPage(): void
     {
+        if ($this->area === 'bo') {
+            $this->importPage('BackOffice');
+            $this->importPage('BackOffice\Login');
+
+            return;
+        }
         $this->importPage('FrontOffice');
     }
 
