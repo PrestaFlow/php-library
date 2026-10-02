@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Traits;
 
+use PrestaFlow\Library\Exceptions\InvalidVersionException;
 use PrestaFlow\Library\Utils\Env;
 
 trait Version
