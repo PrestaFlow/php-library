@@ -457,6 +457,34 @@ class CommonPage
         }
     }
 
+    /** Gel des transitions et animations CSS pendant la capture (mise en page du menu BO 9.x). */
+    private const FREEZE_CSS = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+
+    /** Ajoute un <style id=…> ; sans effet si $css est vide. */
+    private function injectVisualStyle(string $id, string $css): void
+    {
+        if ($css === '') {
+            return;
+        }
+        $this->getPage()->evaluate(sprintf(
+            "(function(){var s=document.createElement('style');s.id=%s;s.textContent=%s;document.head.appendChild(s);})()",
+            json_encode($id, JSON_THROW_ON_ERROR),
+            json_encode($css, JSON_THROW_ON_ERROR)
+        ))->getReturnValue();
+    }
+
+    private function removeVisualStyle(string $id): void
+    {
+        try {
+            $this->getPage()->evaluate(sprintf(
+                "(function(){var s=document.getElementById('%s');if(s){s.remove();}})()",
+                $id
+            ))->getReturnValue();
+        } catch (\Throwable $e) {
+            // best-effort : la page a pu changer entre-temps
+        }
+    }
+
     private function applyVisualMasks(array $masks): void
     {
         $masks = array_values(array_filter(array_map('trim', $masks)));
@@ -612,8 +640,13 @@ class CommonPage
      * tag de la version PS majeure + du viewport + de la locale (cf.
      * VisualTag::resolve()). Un tag libre est utilisé tel quel — il doit
      * matcher `^[a-z0-9._-]+$`, sinon exception explicite.
+     *
+     * $hide : sélecteurs passés en `display: none` le temps de la capture
+     * (popups, fonds de modale : libère la place au lieu de la griser).
+     * $freezeTransitions : coupe les transitions/animations CSS avant le
+     * réglage des animations (menu animé du BO). Styles retirés après la capture.
      */
-    public function visualCheckpoint(string $name, ?string $selector = null, ?float $threshold = null, bool $fullPage = true, string $tag = 'auto', array $masks = [], ?int $maxDiffPixels = null): void
+    public function visualCheckpoint(string $name, ?string $selector = null, ?float $threshold = null, bool $fullPage = true, string $tag = 'auto', array $masks = [], ?int $maxDiffPixels = null, array $hide = [], bool $freezeTransitions = false): void
     {
         $legacyRatio = $threshold !== null && $maxDiffPixels === null;
         $budget = $legacyRatio ? null : max(0, $maxDiffPixels ?? self::DEFAULT_MAX_DIFF_PIXELS);
@@ -644,9 +677,17 @@ class CommonPage
 
         $page = $this->getPage();
 
+        if ($freezeTransitions) {
+            // Avant le gel des animations : la capture pleine page déclenche elle-même
+            // des `resize`, et une transition lancée à ce moment fausserait l'image.
+            $this->injectVisualStyle('pf-visual-freeze', self::FREEZE_CSS);
+        }
         $this->settleAnimations();
         $this->applyVisualMasks($masks);
+        $hide = array_values(array_filter(array_map('trim', $hide)));
         try {
+            // Une règle par sélecteur, comme les masques ; `display: none` libère la place.
+            $this->injectVisualStyle('pf-visual-hide', implode("\n", array_map(fn ($h) => ":is({$h}) { display: none !important; }", $hide)));
             if ($selector !== null) {
                 $node = $page->dom()->querySelector($selector);
                 if ($node === null) {
@@ -687,6 +728,12 @@ class CommonPage
             }
         } finally {
             $this->removeVisualMasks($masks);
+            if ($hide !== []) {
+                $this->removeVisualStyle('pf-visual-hide');
+            }
+            if ($freezeTransitions) {
+                $this->removeVisualStyle('pf-visual-freeze');
+            }
         }
 
         $hadReference = is_file($refPath);

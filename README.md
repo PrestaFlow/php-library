@@ -67,6 +67,20 @@ PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run te
 PRESTAFLOW_VISUAL_ONLY=home,footer PRESTAFLOW_VISUAL_UPDATE=1 ./vendor/bin/prestaflow run tests/Visual
 ```
 
+### Back-office suites
+
+A visual suite with `protected string $area = 'bo';` captures the back office. Every admin URL carries a token, so a checkpoint names a sidebar entry instead of a path:
+
+| Key | Default | Effect |
+|---|---|---|
+| `menu` | `null` | Sidebar entry selector, or a comma-separated list (first present wins). The suite reads its link, which carries the token, and opens it. `null`: back-office root. |
+| `auth` | `true` | `false`: captured logged out (the login page). Logged-out checkpoints run first; the suite then logs in once with `PRESTAFLOW_BO_EMAIL` / `PRESTAFLOW_BO_PASSWD`. |
+| `hide` | `[]` | Selectors set to `display: none` during the capture (popups, modal backdrops). Works in both areas. |
+
+The back-office area also uses `PRESTAFLOW_BO_URL` (admin URL), `PRESTAFLOW_BO_EMAIL` and `PRESTAFLOW_BO_PASSWD` (login).
+
+CSS transitions are frozen during back-office captures (`protected ?bool $freezeTransitions`; `null` = on for `bo`, off for `fo`). See `src/Tests/Suites/Visual/BackOffice.php`.
+
 ## Run a suite against a throwaway shop
 
 `docker-compose.yml` boots a disposable PrestaShop from the official

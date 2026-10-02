@@ -175,4 +175,39 @@ class BackOfficePage extends CommonPage
             $page->navigate($href)->waitForNavigation();
         }
     }
+
+    /**
+     * Va sur une entrée du menu latéral. Les URL du back-office portent un jeton :
+     * on lit le lien de l'entrée (qui le contient) au lieu de construire l'URL.
+     * $selectors : liste séparée par des virgules, la première entrée présente
+     * gagne (ex. `#subtab-AdminDashboard, #tab-AdminDashboard` selon la version).
+     * Pas de virgule interne à un sélecteur (`:is(a, b)`) : le découpage la couperait.
+     * Une entrée parente n'a qu'une ancre `#collapse-N` sur la page courante :
+     * ce n'est pas un lien.
+     *
+     * @return string l'URL visitée
+     */
+    public function goToMenu(string $selectors): string
+    {
+        $page = $this->getPage();
+        $current = (string) $page->evaluate('location.href')->getReturnValue();
+        $currentBase = explode('#', $current, 2)[0];
+
+        foreach (array_filter(array_map('trim', explode(',', $selectors))) as $selector) {
+            $sel = json_encode($selector, JSON_THROW_ON_ERROR);
+            $href = $page->evaluate(sprintf(
+                '(function(){var e=document.querySelector(%s+" a")||document.querySelector(%s);return e&&e.href?e.href:null;})()',
+                $sel,
+                $sel
+            ))->getReturnValue();
+            if (!is_string($href) || $href === '' || (str_contains($href, '#') && explode('#', $href, 2)[0] === $currentBase)) {
+                continue;
+            }
+            $page->navigate($href)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED);
+
+            return $href;
+        }
+
+        throw new \RuntimeException(sprintf('Entrée du menu introuvable : %s', $selectors));
+    }
 }
