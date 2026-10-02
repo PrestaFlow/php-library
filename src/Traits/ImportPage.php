@@ -6,8 +6,6 @@ trait ImportPage
 {
     public function importPage($pageName, $userAgent = 'PrestaFlow', $globals = null, $domain = '\\PrestaFlow\\Library')
     {
-        $pageClass = $domain.'\\Pages\\v'.$this->getMajorVersion(namespace: true).'\\'.$pageName.'\\Page';
-
         if ($globals === null || !is_array($globals)) {
             $globals = $this->globals;
         } else {
@@ -27,7 +25,12 @@ trait ImportPage
         }
 
         $locale = $globals['LOCALE'] ?? $this->getLocale();
-        $patchVersion = $globals['PATCH_VERSION'] ?? $this->getPatchVersion();
+        $patchVersion = $globals['PATCH_VERSION'] ?? null;
+        if (!is_string($patchVersion) || $patchVersion === '') {
+            $patchVersion = (string) ($this->getPatchVersion() ?? '');
+        }
+
+        $pageClass = $domain.'\\Pages\\v'.$this->pageNamespaceVersion($patchVersion).'\\'.$pageName.'\\Page';
 
         $customs = [];
         if (isset($this->customs) && is_array($this->customs)) {
@@ -58,5 +61,15 @@ trait ImportPage
         if ($pageInstance->lastThemeWarning !== '') {
             fwrite(STDERR, $pageInstance->lastThemeWarning . PHP_EOL);
         }
+    }
+
+    /** Segment de namespace (7, 8, 9…) d'une version '1.7.8.11' / '9.2.0'. */
+    private function pageNamespaceVersion(string $patchVersion): string
+    {
+        if ($patchVersion === '') {
+            return (string) $this->getMajorVersion(namespace: true);
+        }
+
+        return preg_match('/^1\.(\d+)/', $patchVersion, $m) === 1 ? $m[1] : explode('.', $patchVersion)[0];
     }
 }
