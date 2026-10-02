@@ -68,7 +68,7 @@ class CommonPage
      * PS_VERSION des globals. Appelée en tête des constructeurs, avant que
      * getSelectors()/getMessages() ne choisissent les fichiers par majeure.
      */
-    public function initVersion(string $patchVersion, array $globals): void
+    protected function initVersion(string $patchVersion, array $globals): void
     {
         $version = $patchVersion !== '' ? $patchVersion : ($globals['PS_VERSION'] ?? null);
 
