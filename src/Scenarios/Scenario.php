@@ -30,9 +30,11 @@ class Scenario
         }
 
         $locale = $this->globals['LOCALE'] ?? $testSuite->getLocale();
-        $versions = $this->globals['PATCH_VERSION'] ?? $testSuite->getVersions();
 
-        $this->setVersions(versions: $versions);
+        $this->setVersions(versions: $testSuite->getVersions());
+        if (is_string($this->globals['PATCH_VERSION'] ?? null) && $this->globals['PATCH_VERSION'] !== '') {
+            $this->exctractVersions($this->globals['PATCH_VERSION']);
+        }
         $this->setLocale(locale: $locale);
         $this->steps($testSuite);
     }

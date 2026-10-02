@@ -38,10 +38,9 @@ trait ImportPage
         $pageInstance->setGlobals($globals);
         $pageInstance->setUserAgent($userAgent);
         $pageInstance->setLocale(locale: $locale);
-        $pageInstance->setPatchVersion($patchVersion);
-        $pageInstance->setMinorVersion($this->getMinorVersion());
-        $pageInstance->setMajorVersion($this->getMajorVersion());
 
+        // La page a pris sa version à sa construction (patchVersion) ;
+        // initTranslations() la recalcule à partir du même patch.
         $pageInstance->initTranslations(
             locale: $locale,
             patchVersion: $pageInstance->getPatchVersion(),
