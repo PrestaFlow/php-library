@@ -717,13 +717,10 @@ class CommonPage
         $legacyRatio = $threshold !== null && $maxDiffPixels === null;
         $budget = $legacyRatio ? null : max(0, $maxDiffPixels ?? self::DEFAULT_MAX_DIFF_PIXELS);
 
-        // globals PS_VERSION d'abord (vérité de la suite courante ; le cache statique
-        // de Version peut venir d'une suite précédente du worker), puis le cache.
-        // '1.7' / '1.6' sont des majeures valides (auparavant rejetées → « v? »).
+        // Majeure de cette page ; '1.7' / '1.6' sont des majeures valides
+        // (auparavant rejetées → « v? »).
         $rawMajorVersion = $this->getMajorVersion();
         $majorVersion = \PrestaFlow\Library\Visual\VisualTag::majorFromVersion(
-            is_string($this->globals['PS_VERSION'] ?? null) ? $this->globals['PS_VERSION'] : null
-        ) ?? \PrestaFlow\Library\Visual\VisualTag::majorFromVersion(
             is_scalar($rawMajorVersion) ? (string) $rawMajorVersion : null
         );
 
