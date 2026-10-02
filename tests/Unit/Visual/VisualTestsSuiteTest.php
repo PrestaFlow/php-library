@@ -193,6 +193,9 @@ final class VisualTestsSuiteTest extends TestCase
         $this->assertSame(100, $cp['maxDiffPixels']);
         $this->assertSame([], $cp['masks']);
         $this->assertSame([], $cp['excludeDevices']);
+        $this->assertNull($cp['menu']);
+        $this->assertTrue($cp['auth']);
+        $this->assertSame([], $cp['hide']);
     }
 
     /** Page factice : enregistre les appels à visualCheckpoint() sans navigateur. */
