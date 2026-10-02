@@ -91,4 +91,22 @@ final class SuiteVersionWiringTest extends TestCase
 
         $this->assertSame('1.7', $suite->getMajorVersion());
     }
+
+    public function test_two_suites_import_pages_of_their_own_version(): void
+    {
+        $old = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '1.7.8.11';
+        };
+        $old->importPage('FrontOffice\Home');
+
+        $new = new class (loadGlobals: true, getBrowser: false) extends TestsSuite {
+            protected $psVersion = '9.0.0';
+        };
+        $new->importPage('FrontOffice\Home');
+
+        $this->assertInstanceOf(\PrestaFlow\Library\Pages\v7\FrontOffice\Home\Page::class, $old->pages['frontOfficeHomePage']);
+        $this->assertInstanceOf(\PrestaFlow\Library\Pages\v9\FrontOffice\Home\Page::class, $new->pages['frontOfficeHomePage']);
+        $this->assertSame('1.7', $old->pages['frontOfficeHomePage']->getMajorVersion());
+        $this->assertSame('9', $new->pages['frontOfficeHomePage']->getMajorVersion());
+    }
 }
