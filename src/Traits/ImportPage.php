@@ -36,7 +36,7 @@ trait ImportPage
 
         if (!class_exists($pageClass)) {
             throw new InvalidVersionException(
-                'Version PrestaShop non prise en charge pour ' . $pageName . ' (' . $patchVersion . ') : ' . $pageClass . ' introuvable.'
+                'Page ' . $pageName . ' introuvable pour PrestaShop ' . $patchVersion . ' (' . $pageClass . ') : version non prise en charge ou nom de page erroné.'
             );
         }
 

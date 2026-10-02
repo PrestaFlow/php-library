@@ -60,6 +60,7 @@ final class PageVersionIsolationTest extends TestCase
             $object->getVersions()
         );
     }
+
     public function test_parse_versions_splits_a_patch_version(): void
     {
         // Appelé via une classe qui utilise le trait : appeler un statique de
