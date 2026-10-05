@@ -38,9 +38,9 @@ final class VisualCheckpointTagTest extends TestCase
         imagedestroy($img);
     }
 
-    private function makePage(array $globals = [], ?string $major = '9'): CommonPage
+    private function makePage(array $globals = [], string $patchVersion = '9.0.0'): CommonPage
     {
-        $page = new class ('en', '8.1.0', $globals) extends CommonPage {
+        $page = new class ('en', $patchVersion, $globals) extends CommonPage {
             public function getPage()
             {
                 return new class {
@@ -75,9 +75,6 @@ final class VisualCheckpointTagTest extends TestCase
             }
         };
 
-        if ($major !== null) {
-            $page->setMajorVersion($major);
-        }
         $page->setLocale('fr');
 
         return $page;
@@ -115,7 +112,7 @@ final class VisualCheckpointTagTest extends TestCase
     public function testPs17MajorVersionIsNotRenderedAsQuestionMark(): void
     {
         // Régression : getMajorVersion() vaut '1.7' en 1.7.x → rejeté par ctype_digit → « v? ».
-        $page = $this->makePage(['PS_VERSION' => '1.7.8.11'], '1.7');
+        $page = $this->makePage([], '1.7.8.11');
 
         $page->visualCheckpoint('scene.header');
 
@@ -124,11 +121,9 @@ final class VisualCheckpointTagTest extends TestCase
 
     public function testMajorVersionComesFromThisPageOnly(): void
     {
-        // makePage() construit la page avec patchVersion '8.1.0'. Une autre
-        // page passée en 1.7 ensuite ne doit pas changer son tag.
-        $page = $this->makePage([], null);
-        $other = $this->makePage([], null);
-        $other->setMajorVersion('1.7');
+        // Deux pages de versions différentes : le tag de l'une ne dépend pas de l'autre.
+        $page = $this->makePage([], '8.1.0');
+        $other = $this->makePage([], '1.7.8.11');
 
         $page->visualCheckpoint('home');
 
