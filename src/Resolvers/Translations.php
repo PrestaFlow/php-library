@@ -77,13 +77,11 @@ trait Translations
             }
         }
 
-        if ($this->getMajorVersion() !== null) {
-            $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
-            if (file_exists($pathToCatalog)) {
-                $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
-                if (!is_array($majorCatalog)) {
-                    $majorCatalog = [];
-                }
+        $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
+        if (file_exists($pathToCatalog)) {
+            $majorCatalog = json_decode(file_get_contents($pathToCatalog), true);
+            if (!is_array($majorCatalog)) {
+                $majorCatalog = [];
             }
         }
 

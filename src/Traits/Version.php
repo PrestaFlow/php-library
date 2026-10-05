@@ -127,6 +127,12 @@ trait Version
         $this->versions['majorVersion'] = $majorVersion;
     }
 
+    /** Segment de namespace des pages pour une majeure : '1.7' → '7', '1.6' → '6', '9' → '9'. */
+    public static function namespaceFromMajor(string $majorVersion): string
+    {
+        return str_starts_with($majorVersion, '1.') ? substr($majorVersion, strlen('1.')) : $majorVersion;
+    }
+
     /**
      * Majeure de cet objet ('1.7', '8', '9'). Si elle n'a jamais été posée,
      * elle se déduit du PS_VERSION des globals ; sans lui, erreur explicite
@@ -148,11 +154,7 @@ trait Version
 
         $majorVersion = $this->versions['majorVersion'];
 
-        if ($namespace && str_starts_with($majorVersion, '1.')) {
-            return substr($majorVersion, strlen('1.'));
-        }
-
-        return $majorVersion;
+        return $namespace ? self::namespaceFromMajor($majorVersion) : $majorVersion;
     }
 
     public function exctractVersions(string $patchVersion)
