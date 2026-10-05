@@ -1,7 +1,7 @@
 # Version PrestaShop : restes de la relecture : design
 
 Date : 2026-10-05
-Statut : validé en conversation, en attente de relecture
+Statut : implémenté (branche chore/version-namespace-helper)
 
 ## Contexte
 

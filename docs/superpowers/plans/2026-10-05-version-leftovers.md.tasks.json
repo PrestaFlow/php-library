@@ -4,13 +4,13 @@
     {
       "id": 1,
       "subject": "Task 1: namespaceFromMajor et Translations",
-      "status": "pending",
+      "status": "completed",
       "description": "Voir le plan.\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": []}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: montage du test des tags",
-      "status": "pending",
+      "status": "completed",
       "description": "Voir le plan.\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": []}\n```",
       "blockedBy": [
         1
@@ -19,12 +19,12 @@
     {
       "id": 3,
       "subject": "Task 3: livraison",
-      "status": "pending",
+      "status": "completed",
       "description": "Voir le plan.\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": []}\n```",
       "blockedBy": [
         2
       ]
     }
   ],
-  "lastUpdated": "2026-10-05T15:26:52+02:00"
+  "lastUpdated": "2026-10-05T15:33:59+02:00"
 }
