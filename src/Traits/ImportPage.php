@@ -78,8 +78,6 @@ trait ImportPage
             return (string) $this->getMajorVersion(namespace: true);
         }
 
-        $major = self::parseVersions($patchVersion)['majorVersion'];
-
-        return str_starts_with($major, '1.') ? substr($major, 2) : $major;
+        return self::namespaceFromMajor(self::parseVersions($patchVersion)['majorVersion']);
     }
 }

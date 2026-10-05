@@ -79,4 +79,18 @@ final class PageVersionIsolationTest extends TestCase
             $parser::parseVersions('9.2.0')
         );
     }
+
+    public function test_namespace_from_major_drops_the_leading_1(): void
+    {
+        // Un appel statique direct sur un trait est déprécié : on passe par une classe qui l'utilise.
+        $parser = new class {
+            use Version;
+            public array $globals = [];
+        };
+
+        $this->assertSame('7', $parser::namespaceFromMajor('1.7'));
+        $this->assertSame('6', $parser::namespaceFromMajor('1.6'));
+        $this->assertSame('8', $parser::namespaceFromMajor('8'));
+        $this->assertSame('9', $parser::namespaceFromMajor('9'));
+    }
 }
