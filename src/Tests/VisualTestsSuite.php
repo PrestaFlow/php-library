@@ -418,9 +418,10 @@ abstract class VisualTestsSuite extends TestsSuite
                 }
                 $login->login(); // identifiants des globals BO_EMAIL / BO_PASSWD
                 if (!$login->isLoggedIn()) {
-                    $error = $this->readNow($login, sprintf('(function(){var e=document.querySelector(%s);return e?e.textContent:"";})()', json_encode((string) $login->getSelector('alertDangerDiv'))));
-                    $error = trim(is_string($error) ? $error : '');
-                    throw new \RuntimeException('identifiants refusés ou page inattendue'.($error !== '' ? ' : '.$error : ''));
+                    // 9.2 : .alert-text, sans le bouton de fermeture (« close ») ; 1.7 et 8 : l'alerte entière.
+                    $error = $this->readNow($login, sprintf('(function(){var e=document.querySelector(%s);if(!e)return "";return (e.querySelector(".alert-text")||e).textContent;})()', json_encode((string) $login->getSelector('alertDangerDiv'))));
+                    $error = trim(preg_replace('/\s+/', ' ', is_string($error) ? $error : ''));
+                    throw new \RuntimeException('identifiants refusés ou page inattendue'.($error !== '' ? ' : '.$error : $this->whereIs($login)));
                 }
                 $this->boLoggedIn = true;
 
@@ -431,6 +432,17 @@ abstract class VisualTestsSuite extends TestsSuite
         }
 
         throw new \RuntimeException('Connexion au back-office impossible : '.$this->boLoginError);
+    }
+
+    /**
+     * Sans alerte, la connexion n'a pas été refusée : l'onglet est ailleurs. On
+     * donne le chemin et le contrôleur, jamais le jeton de l'URL.
+     */
+    protected function whereIs(object $page): string
+    {
+        $where = $this->readNow($page, '(function(){var c=new URLSearchParams(location.search).get("controller");return location.pathname+(c?"?controller="+c:"");})()');
+
+        return is_string($where) && $where !== '' ? ' (page : '.$where.')' : '';
     }
 
     /** Formulaire de connexion affiché sur la page courante (lu sans attendre, sélecteur de la page Login). */

@@ -17,11 +17,13 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->chrome = new class {
             public bool $form = true;
             public string $error = '';
+            public string $location = '';
             public function evaluate(string $js): object
             {
                 $value = match (true) {
                     str_contains($js, '#email') => $this->form,
                     str_contains($js, '.alert-danger') => $this->error,
+                    str_contains($js, 'location.pathname') => $this->location,
                     default => null,
                 };
 
@@ -347,6 +349,36 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
 
         $this->assertSame(
             ['capture visuelle : dashboard' => 'Connexion au back-office impossible : identifiants refusés ou page inattendue : The employee does not exist.'],
+            $this->runSteps($s)
+        );
+    }
+
+    public function test_refused_login_reports_the_form_error_on_one_line(): void
+    {
+        // 9.2 : bouton de fermeture puis .alert-text, sur plusieurs lignes ; seule
+        // la première ligne (« close ») apparaissait dans le rapport.
+        $this->chrome->error = "\n  The employee does not exist,\n   or the password provided is incorrect.\n";
+        $log = new \ArrayObject();
+        $s = $this->suite(page: $this->page($log), login: $this->login($log, ok: false), checkpoints: [['name' => 'dashboard']]);
+        $s->init();
+
+        $this->assertSame(
+            ['capture visuelle : dashboard' => 'Connexion au back-office impossible : identifiants refusés ou page inattendue : The employee does not exist, or the password provided is incorrect.'],
+            $this->runSteps($s)
+        );
+    }
+
+    public function test_unexpected_page_reports_where_the_browser_is(): void
+    {
+        // Pas d'alerte : la connexion n'a pas été refusée, l'onglet est ailleurs.
+        // Le chemin et le contrôleur suffisent au diagnostic, pas le jeton.
+        $this->chrome->location = '/admin-dev/?controller=AdminDashboard';
+        $log = new \ArrayObject();
+        $s = $this->suite(page: $this->page($log), login: $this->login($log, ok: false), checkpoints: [['name' => 'dashboard']]);
+        $s->init();
+
+        $this->assertSame(
+            ['capture visuelle : dashboard' => 'Connexion au back-office impossible : identifiants refusés ou page inattendue (page : /admin-dev/?controller=AdminDashboard)'],
             $this->runSteps($s)
         );
     }

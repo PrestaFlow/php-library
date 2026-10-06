@@ -54,9 +54,39 @@ class Page extends BasePage
         if ($waitForNavigation) {
             $this->click($this->getSelector('submitLoginButton'));
             $this->waitForPageReload();
+            $this->waitForLoginOutcome();
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
+    }
+
+    /**
+     * Wait until the login has an outcome: the logout link (session open) or
+     * an error alert with text in it (credentials refused).
+     *
+     * waitForPageReload() alone is a fixed 10 s, and isLoggedIn() then looks
+     * for 5 s more. The first dashboard after a cache clear can take longer
+     * than that on a loaded CI runner: the session was open, the dashboard was
+     * still loading, and the login was reported as refused (PS 9.2, reproduced
+     * with a CPU-throttled shop). Waiting on the outcome costs nothing when
+     * the shop is fast — either signal ends the wait as soon as it shows — and
+     * the ceiling is only reached by a shop that is actually broken.
+     *
+     * The alert must have TEXT: 1.7 and 8 ship an empty .alert-danger in the
+     * login page (see getLoginError()). Returns whether an outcome was seen;
+     * callers still assert with isLoggedIn() / getLoginError().
+     */
+    public function waitForLoginOutcome(int $timeout = 60000, int $interval = 200): bool
+    {
+        return $this->waitForJsCondition(
+            sprintf(
+                '!!document.querySelector(%s) || (function(){var e=document.querySelector(%s);return !!e && e.textContent.trim() !== "";})()',
+                json_encode($this->getSelector('logoutLink')),
+                json_encode($this->getSelector('alertDangerTextBlock'))
+            ),
+            $timeout,
+            $interval
+        );
     }
 
     /**
