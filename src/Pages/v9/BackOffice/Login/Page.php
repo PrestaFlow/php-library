@@ -8,6 +8,20 @@ class Page extends BasePage
 {
     public string $pageTitle = 'PrestaShop';
 
+    /**
+     * Plafond (ms) de l'attente de l'issue de la connexion dans login().
+     * 60 s pour un run (premier tableau de bord lent en CI, voir
+     * waitForLoginOutcome()) ; le sélecteur visuel de l'app le baisse.
+     */
+    public int $loginOutcomeTimeout = 60000;
+
+    /**
+     * Issue de la dernière connexion de login() : true = vue (session ouverte
+     * ou alerte d'erreur), false = plafond atteint sans issue, null = pas encore
+     * attendue. isLoggedIn() reste le constat de la session.
+     */
+    public ?bool $loginOutcomeSeen = null;
+
     public function defineSelectors()
     {
         return [
@@ -40,6 +54,8 @@ class Page extends BasePage
      */
     public function login($email = null, $password = null, $waitForNavigation = true)
     {
+        // Issue de CETTE connexion seulement : sans attente, elle reste inconnue.
+        $this->loginOutcomeSeen = null;
         if ($email === null) {
             $email = $this->getGlobal('BO_EMAIL');
         }
@@ -54,7 +70,7 @@ class Page extends BasePage
         if ($waitForNavigation) {
             $this->click($this->getSelector('submitLoginButton'));
             $this->waitForPageReload();
-            $this->waitForLoginOutcome();
+            $this->loginOutcomeSeen = $this->waitForLoginOutcome($this->loginOutcomeTimeout);
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }

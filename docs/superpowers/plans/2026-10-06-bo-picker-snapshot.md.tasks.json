@@ -1,0 +1,39 @@
+{
+    "planPath": "docs/superpowers/plans/2026-10-06-bo-picker-snapshot.md",
+    "tasks": [
+        {
+            "id": 1,
+            "subject": "Task 1 : `PageSnapshot::captureCurrent()`",
+            "status": "completed",
+            "description": "Voir le plan, section « Task 1 : `PageSnapshot::captureCurrent()` ».\n\n```json:metadata\n{\"files\": [\"src/Visual/PageSnapshot.php\", \"tests/Unit/Visual/PageSnapshotTest.php\"], \"verifyCommand\": \"`php vendor/bin/phpunit tests/Unit/Visual/PageSnapshotTest.php` → OK (8 tests)\", \"acceptanceCriteria\": [\"`captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult` fait, dans l'ordre : stabilité, `SETTLE_ANIMATIONS`, statut, dimensions (hauteur plafonnée à `MAX_HEIGHT`), `scrollTo(0, 0)`, `ELEMENT_MAP`, capture JPEG qualité 80.\", \"Elle ne navigue pas et ne ferme pas le navigateur.\", \"`take()` crée le navigateur, navigue (même message d'erreur), appelle `captureCurrent($page, $timeoutMs)` et ferme le navigateur dans son `finally`.\", \"Les 6 tests existants de `PageSnapshotTest` passent sans modification de leurs assertions.\", \"`take()` et `captureCurrent()` donnent le même `SnapshotResult` sur la même page factice.\"]}\n```"
+        },
+        {
+            "id": 2,
+            "subject": "Task 2 : plafonds de navigation et de connexion, sans changer le run",
+            "status": "completed",
+            "description": "Voir le plan, section « Task 2 : plafonds de navigation et de connexion, sans changer le run ».\n\n```json:metadata\n{\"files\": [\"src/Pages/CommonPage.php\", \"src/Pages/BackOfficePage.php\", \"src/Pages/v9/BackOffice/Login/Page.php\", \"tests/Unit/Pages/BackOfficeGoToMenuTest.php\", \"tests/Unit/Pages/BackOfficeLoginOutcomeTest.php\"], \"verifyCommand\": \"`php vendor/bin/phpunit tests/Unit/Pages/BackOfficeGoToMenuTest.php tests/Unit/Pages/BackOfficeLoginOutcomeTest.php` → OK\", \"acceptanceCriteria\": [\"`public ?int $navigationTimeout = null;` sur `CommonPage`, transmis comme 2e argument de `waitForNavigation()` par `goToUrl()`, `BackOfficePage::goToPage()` et `BackOfficePage::goToMenu()`. `null` = défaut chrome-php (30 s), donc comportement actuel.\", \"`public int $loginOutcomeTimeout = 60000;` et `public ?bool $loginOutcomeSeen = null;` sur `v9\\\\BackOffice\\\\Login\\\\Page` (hérités par v7 et v8).\", \"`login()` (avec `$waitForNavigation`) appelle `waitForLoginOutcome($this->loginOutcomeTimeout)` et range le booléen renvoyé dans `$loginOutcomeSeen`.\", \"Signatures de `login()`, `waitForLoginOutcome()`, `goToPage()`, `goToMenu()` et `goToUrl()` inchangées.\"]}\n```",
+            "blockedBy": [
+                1
+            ]
+        },
+        {
+            "id": 3,
+            "subject": "Task 3 : `openBackOfficeCheckpoint()`, `closeBackOfficeSession()` et `BackOfficeTimeoutException`",
+            "status": "completed",
+            "description": "Voir le plan, section « Task 3 : `openBackOfficeCheckpoint()`, `closeBackOfficeSession()` et `BackOfficeTimeoutException` ».\n\n```json:metadata\n{\"files\": [\"src/Exceptions/BackOfficeTimeoutException.php\", \"src/Tests/VisualTestsSuite.php\", \"tests/Unit/Visual/VisualTestsSuiteBackOfficeTest.php\"], \"verifyCommand\": \"`php vendor/bin/phpunit tests/Unit/Visual/VisualTestsSuiteBackOfficeTest.php` → OK\", \"acceptanceCriteria\": [\"`openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): string` :\", \"`closeBackOfficeSession(int $timeoutMs = 5000): void` appelle `logout()` de la page Login une seule fois si une session est ouverte, sous le plafond donné (rétabli ensuite), et ne lève jamais.\", \"Les tests existants de `VisualTestsSuiteBackOfficeTest` passent sans changement de leurs assertions (journaux identiques).\"]}\n```",
+            "blockedBy": [
+                2
+            ]
+        },
+        {
+            "id": 4,
+            "subject": "Task 4 : livraison (coordinateur)",
+            "status": "in_progress",
+            "description": "Voir le plan, section « Task 4 : livraison (coordinateur) ».\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": [\"Relecture finale (`rtk proxy git diff dev...HEAD > /private/tmp/claude-501/-Users-jonathan-Documents-GitHub-PrestaFlow-app/2393cd17-28d4-44c5-96f2-fa24f981a8c8/scratchpad/lib-branch.diff`). Points à vérifier :\", \"Suite complète verte en 8.4 et en 8.1 (sorties redirigées).\", \"Push de `feat/bo-picker-snapshot`, PR vers `dev` (titre : « Capture du sélecteur visuel en back-office »), description terminée par la ligne d'attribution prévue. CI verte.\", \"Sur demande seulement, dans cet ordre :\"]}\n```",
+            "blockedBy": [
+                3
+            ]
+        }
+    ],
+    "lastUpdated": "2026-10-06T13:51:03+00:00"
+}

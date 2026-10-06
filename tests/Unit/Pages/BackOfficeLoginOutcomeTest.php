@@ -45,6 +45,16 @@ final class FakeLoginOutcomePage extends LoginPage
     public array $evaluated = [];
     public array $log = [];
 
+    /** Plafond reçu par chaque waitForLoginOutcome(). */
+    public array $outcomeTimeouts = [];
+
+    public function waitForLoginOutcome(int $timeout = 60000, int $interval = 200): bool
+    {
+        $this->outcomeTimeouts[] = $timeout;
+
+        return parent::waitForLoginOutcome($timeout, $interval);
+    }
+
     public function settled(): bool
     {
         return !$this->neverSettles && $this->polls >= $this->settlesOnPoll;
@@ -142,5 +152,50 @@ final class BackOfficeLoginOutcomeTest extends TestCase
 
         $this->assertSame(['set #email', 'set #passwd', 'click #submit_login'], $page->log);
         $this->assertSame(0, $page->polls);
+    }
+
+    public function testLoginKeepsTheRunCeilingByDefault(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+
+        $page->login();
+
+        $this->assertSame([60000], $page->outcomeTimeouts);
+        $this->assertTrue($page->loginOutcomeSeen);
+    }
+
+    public function testLoginUsesTheCeilingSetOnThePage(): void
+    {
+        $page = $this->page();
+        $page->loginOutcomeTimeout = 150;
+        $page->settlesOnPoll = 1;
+
+        $page->login();
+
+        $this->assertSame([150], $page->outcomeTimeouts);
+    }
+
+    public function testAnOutcomeNotSeenWithinTheCeilingIsRecorded(): void
+    {
+        $page = $this->page();
+        $page->loginOutcomeTimeout = 150;
+        $page->neverSettles = true;
+
+        $page->login();
+
+        $this->assertFalse($page->loginOutcomeSeen);
+    }
+
+    public function testALoginWithoutWaitForgetsThePreviousOutcome(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->login();
+        $this->assertTrue($page->loginOutcomeSeen);
+
+        $page->login(waitForNavigation: false);
+
+        $this->assertNull($page->loginOutcomeSeen);
     }
 }

@@ -43,6 +43,16 @@ class CommonPage
     public string $url = '';
     public string $pageTitle = '';
 
+    /**
+     * Plafond (ms) des navigations de goToUrl() et, en back-office, de
+     * goToPage() / goToMenu() ; null = défaut de chrome-php (30 s). Posé puis
+     * rétabli par VisualTestsSuite::openBackOfficeCheckpoint() pour le
+     * sélecteur visuel de l'app, qui doit rester sous les 60 s de nginx.
+     * FrontOfficePage::goToUrl() redéfinit goToUrl() et ne l'applique pas
+     * (goToUrlInPlace(), qui passe par CommonPage::goToUrl(), l'applique).
+     */
+    public ?int $navigationTimeout = null;
+
     protected $patchVersion = null;
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
@@ -909,7 +919,7 @@ class CommonPage
         // DOM_CONTENT_LOADED (au lieu du LOAD par défaut) : on n'attend pas les
         // assets tardifs (images, tracking, iframes). Les getters ont chacun leur
         // waitUntilContainsElement, donc c'est safe pour la majorité des cas.
-        $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
+        $this->getPage()->navigate($url)->waitForNavigation(DomPage::DOM_CONTENT_LOADED, $this->navigationTimeout);
     }
 
     /**
