@@ -48,6 +48,8 @@ class CommonPage
      * goToPage() / goToMenu() ; null = défaut de chrome-php (30 s). Posé puis
      * rétabli par VisualTestsSuite::openBackOfficeCheckpoint() pour le
      * sélecteur visuel de l'app, qui doit rester sous les 60 s de nginx.
+     * FrontOfficePage::goToUrl() redéfinit goToUrl() et ne l'applique pas
+     * (goToUrlInPlace(), qui passe par CommonPage::goToUrl(), l'applique).
      */
     public ?int $navigationTimeout = null;
 

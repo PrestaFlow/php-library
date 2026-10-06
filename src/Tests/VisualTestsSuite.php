@@ -71,6 +71,13 @@ abstract class VisualTestsSuite extends TestsSuite
      */
     private const PAGE_RELOAD_MS = 10000;
 
+    /**
+     * Constat de la session après l'issue de la connexion
+     * (Login\Page::isLoggedIn(), lien de déconnexion attendu 5 s au plus) :
+     * réservé lui aussi dans le budget de openBackOfficeCheckpoint().
+     */
+    private const LOGIN_CHECK_MS = 5000;
+
     /** Plus petit plafond d'étape accordé par openBackOfficeCheckpoint(). */
     private const MIN_STEP_MS = 1000;
 
@@ -485,13 +492,15 @@ abstract class VisualTestsSuite extends TestsSuite
      * (BackOfficeTimeoutException) :
      * - navigation de la page de connexion, du tableau de bord, du menu :
      *   min($menuTimeoutMs, reste) (CommonPage::$navigationTimeout) ;
-     * - envoi du formulaire : seulement s'il reste au moins PAGE_RELOAD_MS + 1 s,
-     *   car Login\Page::login() attend d'abord un rechargement de 10 s fixes
-     *   (CommonPage::waitForPageReload()) ; l'issue de la connexion
-     *   (Login\Page::$loginOutcomeTimeout) reçoit
-     *   max(1 s, min($loginTimeoutMs - 10 s, reste - 10 s)).
-     * Pire cas : échéance + 5 s (Login\Page::isLoggedIn(), qui suit l'issue sans
-     * plafond réglable), plus les lectures JS et le remplissage du formulaire.
+     * - envoi du formulaire : seulement s'il reste au moins 16 s
+     *   (PAGE_RELOAD_MS + LOGIN_CHECK_MS + 1 s), car Login\Page::login() attend
+     *   d'abord un rechargement de 10 s fixes (CommonPage::waitForPageReload()),
+     *   et Login\Page::isLoggedIn() jusqu'à 5 s après l'issue ; l'issue de la
+     *   connexion (Login\Page::$loginOutcomeTimeout) reçoit
+     *   max(1 s, min($loginTimeoutMs, reste) - 10 s - 5 s). Si $loginTimeoutMs +
+     *   $menuTimeoutMs < 17 s, le formulaire n'est donc jamais envoyé.
+     * Pire cas : échéance + lectures JS et remplissage du formulaire (≤ 5 s
+     * chacun), non plafonnés par ce budget.
      * La capture (PageSnapshot::captureCurrent()) et la déconnexion
      * (closeBackOfficeSession()) sont hors de ce budget. Les plafonds d'avant
      * l'appel (ceux du run) sont rétablis avant de rendre la main, même en cas
@@ -550,8 +559,8 @@ abstract class VisualTestsSuite extends TestsSuite
                 if ($login !== null) {
                     $login->navigationTimeout = $left($menuTimeoutMs);
                     $this->boBeforeLoginSubmit = static function (object $login) use ($left, $loginTimeoutMs): void {
-                        $rest = $left(PHP_INT_MAX, self::PAGE_RELOAD_MS + self::MIN_STEP_MS);
-                        $login->loginOutcomeTimeout = max(self::MIN_STEP_MS, min($loginTimeoutMs, $rest) - self::PAGE_RELOAD_MS);
+                        $rest = $left(PHP_INT_MAX, self::PAGE_RELOAD_MS + self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
+                        $login->loginOutcomeTimeout = max(self::MIN_STEP_MS, min($loginTimeoutMs, $rest) - self::PAGE_RELOAD_MS - self::LOGIN_CHECK_MS);
                     };
                 }
                 try {
@@ -667,14 +676,16 @@ abstract class VisualTestsSuite extends TestsSuite
     }
 
     /**
-     * Masque jetons (`token=`, `_token=`) et identifiants d'URL
+     * Masque jetons (`token=`, `_token=`, encodés ou en entité HTML) et identifiants d'URL
      * (`scheme://user:pass@`) d'un message relayé à l'utilisateur.
      */
     private static function redactUrls(string $message): string
     {
-        $message = preg_replace('~([?&]_?token=)[^&"\s]+~i', '$1…', $message) ?? $message;
+        // Jeton en clair, encodé (%26token%3D, %3F_token%3D) ou en entité HTML (&amp;token=).
+        $message = preg_replace('~((?:[?&;]|%26|%3F)_?token(?:=|%3D))[^&"\'\s%<>]+~i', '$1…', $message) ?? $message;
 
-        return preg_replace('~\b([a-z][a-z0-9+.\-]*://)[^\s/"@]+@~i', '$1…@', $message) ?? $message;
+        // Identifiants avant l'hôte seulement : un « @ » de requête (?email=a@b.com) reste.
+        return preg_replace('~\b([a-z][a-z0-9+.\-]*://)[^\s/?#"\'@]+@~i', '$1…@', $message) ?? $message;
     }
 
     /**

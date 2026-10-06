@@ -54,6 +54,8 @@ class Page extends BasePage
      */
     public function login($email = null, $password = null, $waitForNavigation = true)
     {
+        // Issue de CETTE connexion seulement : sans attente, elle reste inconnue.
+        $this->loginOutcomeSeen = null;
         if ($email === null) {
             $email = $this->getGlobal('BO_EMAIL');
         }

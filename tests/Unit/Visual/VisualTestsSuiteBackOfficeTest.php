@@ -23,8 +23,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public string $location = '';
             /** Horloge factice (ms) lue par la suite (nowMs()), avancée par les doubles. */
             public int $now = 0;
+            /** Durée simulée de chaque lecture JS (≤ 5 s, comme une lecture réelle bornée). */
+            public int $evalCostMs = 0;
             public function evaluate(string $js): object
             {
+                $this->now += $this->evalCostMs;
                 $value = match (true) {
                     str_contains($js, '#email') => $this->form,
                     str_contains($js, '.alert-danger') => $this->error,
@@ -111,6 +114,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'page '.$page;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                // Fidèle à chrome-php : au-delà du plafond, la navigation expire.
+                if ($this->navigationTimeout !== null && $this->navCostMs > $this->navigationTimeout) {
+                    $this->chrome->now += $this->navigationTimeout;
+                    throw new OperationTimedOut('Operation timed out after '.$this->navigationTimeout.'ms');
+                }
                 $this->chrome->now += $this->navCostMs;
                 if ($this->navThrows !== null) {
                     throw $this->navThrows;
@@ -120,6 +128,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'menu '.$selectors;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                // Fidèle à chrome-php : au-delà du plafond, la navigation expire.
+                if ($this->navigationTimeout !== null && $this->navCostMs > $this->navigationTimeout) {
+                    $this->chrome->now += $this->navigationTimeout;
+                    throw new OperationTimedOut('Operation timed out after '.$this->navigationTimeout.'ms');
+                }
                 $this->chrome->now += $this->navCostMs;
                 if ($this->menuThrows !== null) {
                     throw $this->menuThrows;
@@ -160,7 +173,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public array $navTimeouts = [];
             public array $outcomeTimeouts = [];
             public array $logoutTimeouts = [];
-            /** Durées simulées : navigation, envoi du formulaire (rechargement + issue). */
+            /** Durées simulées : navigation, envoi du formulaire (rechargement + issue + constat). */
             public int $navCostMs = 0;
             public int $submitCostMs = 0;
             public function __construct(public \ArrayObject $log, public bool $ok, public object $chrome) {}
@@ -173,6 +186,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'login:page '.$page;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                // Fidèle à chrome-php : au-delà du plafond, la navigation expire.
+                if ($this->navigationTimeout !== null && $this->navCostMs > $this->navigationTimeout) {
+                    $this->chrome->now += $this->navigationTimeout;
+                    throw new OperationTimedOut('Operation timed out after '.$this->navigationTimeout.'ms');
+                }
                 $this->chrome->now += $this->navCostMs;
                 if ($this->navThrows !== null) {
                     throw $this->navThrows;
@@ -182,8 +200,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'login:submit';
                 $this->outcomeTimeouts[] = $this->loginOutcomeTimeout;
-                $this->loginOutcomeSeen = $this->outcome;
-                $this->chrome->now += $this->submitCostMs;
+                // Fidèle à Login\Page : rechargement (10 s) + issue (plafond) + isLoggedIn() (5 s)
+                // au plus ; au-delà, l'issue n'est pas vue.
+                $max = 10000 + $this->loginOutcomeTimeout + 5000;
+                $this->loginOutcomeSeen = $this->outcome && $this->submitCostMs <= $max;
+                $this->chrome->now += min($this->submitCostMs, $max);
             }
             public function isLoggedIn(): bool { $this->log[] = 'login:check'; return $this->ok; }
             public function logout(): void
@@ -490,8 +511,9 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         // Chemin et contrôleur, jamais le jeton.
         $this->assertSame('/admin-dev/index.php?controller=AdminProducts', $where);
         // Plafonds pendant l'ouverture, valeurs du run rétablies ensuite. L'issue de
-        // la connexion a le plafond moins les 10 s du rechargement qui la précède.
-        $this->assertSame([15000], $login->outcomeTimeouts);
+        // la connexion a le plafond moins les 10 s du rechargement qui la précède et
+        // les 5 s du constat (isLoggedIn()) qui la suit.
+        $this->assertSame([10000], $login->outcomeTimeouts);
         $this->assertSame([15000], $login->navTimeouts);
         $this->assertSame([15000, 15000], $page->navTimeouts);
         $this->assertNull($page->navigationTimeout);
@@ -700,46 +722,52 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         // Échéance = 25 + 15 = 40 s après le début.
         $log = new \ArrayObject();
         $page = $this->page($log);
-        $page->navCostMs = 10000;
+        $page->navCostMs = 3000;
         $login = $this->login($log);
-        $login->navCostMs = 12000;   // page de connexion : t = 12 s
-        $login->submitCostMs = 14000; // rechargement + issue : t = 26 s
+        $login->navCostMs = 12000;    // page de connexion (plafond 15 s) : t = 12 s
+        $login->submitCostMs = 14000; // rechargement + issue + constat (≤ 25 s) : t = 26 s
         $s = $this->suite(page: $page, login: $login);
 
         $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
 
         $this->assertSame([15000], $login->navTimeouts);
-        // Reste 28 s à l'envoi : issue = min(25 - 10, 28 - 10) = 15 s.
-        $this->assertSame([15000], $login->outcomeTimeouts);
-        // Tableau de bord : reste 14 s ; menu (t = 36 s) : reste 4 s.
-        $this->assertSame([14000, 4000], $page->navTimeouts);
+        // Reste 28 s à l'envoi : issue = min(25, 28) - 10 - 5 = 10 s.
+        $this->assertSame([10000], $login->outcomeTimeouts);
+        // Tableau de bord : reste 14 s ; menu (t = 29 s) : reste 11 s.
+        $this->assertSame([14000, 11000], $page->navTimeouts);
     }
 
     public function test_open_checkpoint_caps_the_login_outcome_to_what_is_left(): void
     {
         $log = new \ArrayObject();
+        // Navigation au plafond (15 s) puis lecture du formulaire (4 s) : reste 21 s à
+        // l'envoi, moins que le plafond de connexion (25 s).
+        $this->chrome->evalCostMs = 4000;
         $login = $this->login($log);
-        $login->navCostMs = 20000; // reste 20 s à l'envoi
+        $login->navCostMs = 15000;
         $s = $this->suite(page: $this->page($log), login: $login);
 
         $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
 
-        // min(25 - 10, 20 - 10) = 10 s : rechargement + issue tiennent dans le reste.
-        $this->assertSame([10000], $login->outcomeTimeouts);
+        // min(25, 21) - 10 - 5 = 6 s : rechargement, issue et constat tiennent dans le reste.
+        $this->assertSame([6000], $login->outcomeTimeouts);
     }
 
     public function test_open_checkpoint_does_not_submit_the_login_when_the_reload_no_longer_fits(): void
     {
         $log = new \ArrayObject();
+        // Échéance 10 + 15 = 25 s ; page de connexion en 12 s (plafond 15 s) : reste
+        // 13 s < 10 s de rechargement + 5 s de constat + 1 s.
         $login = $this->login($log);
-        $login->navCostMs = 30000; // reste 10 s < 10 s de rechargement + 1 s
+        $login->navCostMs = 12000;
         $s = $this->suite(page: $this->page($log), login: $login);
 
         try {
-            $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 10000, 15000);
             $this->fail('BackOfficeTimeoutException attendue');
         } catch (BackOfficeTimeoutException $e) {
-            $this->assertStringContainsString('délai imparti (40 s au total)', $e->getMessage());
+            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (25 s au total).", $e->getMessage());
+            $this->assertNull($e->getPrevious());
         }
         $this->assertNotContains('login:submit', $log->getArrayCopy());
         $this->assertSame(60000, $login->loginOutcomeTimeout);
@@ -751,7 +779,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $page = $this->page($log);
         $login = $this->login($log);
         $login->navCostMs = 15000;
-        $login->submitCostMs = 25000; // t = 40 s : échéance atteinte
+        $login->submitCostMs = 25000; // 10 + 10 + 5 s au plus : t = 40 s, échéance atteinte
         $s = $this->suite(page: $page, login: $login);
 
         try {
@@ -854,5 +882,64 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $s->openBackOfficeCheckpoint(['name' => 'picker']);
 
         $this->assertSame(['login:page index', 'login:submit', 'login:check', 'page index'], $log->getArrayCopy());
+    }
+
+    public function test_the_login_ceiling_hook_does_not_outlive_its_opening(): void
+    {
+        // Ouverture refusée par la closure (reste insuffisant à l'envoi), puis run
+        // sur la même instance : le plafond du run (60 s) s'applique de nouveau.
+        $login = $this->login($log = new \ArrayObject());
+        $login->navCostMs = 12000;
+        $page = $this->page($log);
+        $s = $this->suite(page: $page, login: $login);
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 10000, 15000);
+            $this->fail('BackOfficeTimeoutException attendue');
+        } catch (BackOfficeTimeoutException) {
+        }
+        $log->exchangeArray([]);
+
+        $s->init();
+        $this->runSteps($s);
+
+        $fresh = new \ArrayObject();
+        $other = $this->suite(page: $this->page($fresh), login: $this->login($fresh));
+        $other->init();
+        $this->runSteps($other);
+
+        $this->assertSame(60000, end($login->outcomeTimeouts));
+        $this->assertSame($fresh->getArrayCopy(), $log->getArrayCopy());
+    }
+
+    public static function urlsToRedact(): array
+    {
+        return [
+            'jeton' => ['http://shop.test/admin-dev/index.php?controller=AdminProducts&token=abc123', 'http://shop.test/admin-dev/index.php?controller=AdminProducts&token=…'],
+            'jeton _token en tête' => ['http://shop.test/admin-dev/?_token=abc123', 'http://shop.test/admin-dev/?_token=…'],
+            'jeton encodé %26' => ['http://shop.test/r?back=x%26token%3Dabc123', 'http://shop.test/r?back=x%26token%3D…'],
+            'jeton encodé %3F' => ['http://shop.test/r?back=y%3F_token%3Dxyz789', 'http://shop.test/r?back=y%3F_token%3D…'],
+            'jeton en entité HTML' => ['http://shop.test/a?controller=X&amp;token=html123', 'http://shop.test/a?controller=X&amp;token=…'],
+            "guillemet simple conservé" => ["'http://shop.test/a?token=abc123'", "'http://shop.test/a?token=…'"],
+            'identifiants' => ['https://admin:s3cret@shop.test/admin-dev/', 'https://…@shop.test/admin-dev/'],
+            'arobase de requête, hôte gardé' => ['https://shop.test?email=a@b.com', 'https://shop.test?email=a@b.com'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('urlsToRedact')]
+    public function test_open_checkpoint_redacts_relayed_urls(string $url, string $expected): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $page->menuThrows = new ResponseHasError('Cannot load page for url: "'.$url.'". Reason: net::ERR_ABORTED');
+        $s = $this->suite(page: $page, login: $this->login($log));
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts']);
+            $this->fail('RuntimeException attendue');
+        } catch (BackOfficeTimeoutException $e) {
+            $this->fail('Pas un délai : '.$e->getMessage());
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Cannot load page for url: "'.$expected.'". Reason: net::ERR_ABORTED', $e->getMessage());
+        }
     }
 }

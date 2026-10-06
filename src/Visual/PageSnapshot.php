@@ -84,6 +84,11 @@ class PageSnapshot
      * son navigateur appartiennent à l'appelant (take(), ou l'app qui a ouvert
      * une page back-office avec VisualTestsSuite::openBackOfficeCheckpoint()).
      *
+     * Modifie l'onglet : animations et transitions figées, défilement remis en
+     * haut de page. Les exceptions de chrome-php (délai, onglet fermé…) remontent
+     * brutes : seul take() enveloppe en SnapshotException le lancement du
+     * navigateur et la navigation, rien après.
+     *
      * @param object $page onglet chrome-php (\HeadlessChromium\Page) ; typé object
      *                     pour les doubles de test, comme waitUntilStable()
      */

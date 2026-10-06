@@ -186,4 +186,16 @@ final class BackOfficeLoginOutcomeTest extends TestCase
 
         $this->assertFalse($page->loginOutcomeSeen);
     }
+
+    public function testALoginWithoutWaitForgetsThePreviousOutcome(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->login();
+        $this->assertTrue($page->loginOutcomeSeen);
+
+        $page->login(waitForNavigation: false);
+
+        $this->assertNull($page->loginOutcomeSeen);
+    }
 }
