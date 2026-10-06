@@ -23,7 +23,7 @@ connexion et le menu n'existent qu'à l'intérieur du run de `VisualTestsSuite`
 ### `PageSnapshot::captureCurrent()`
 
 - Nouvelle méthode publique :
-  `captureCurrent(\HeadlessChromium\Page $page, int $timeoutMs = 15000): SnapshotResult`.
+  `captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult` (typé `object` pour les doubles de test ; en pratique une `\HeadlessChromium\Page`).
 - Elle contient tout ce que `take()` fait après la navigation :
   - attente de stabilité ;
   - `PageScripts::SETTLE_ANIMATIONS` ;
@@ -73,8 +73,10 @@ connexion et le menu n'existent qu'à l'intérieur du run de `VisualTestsSuite`
   `#header_logout` de la page courante (`BackOffice\Login\Page::logout()`) si une
   session est ouverte. Elle ne lève jamais : un échec de déconnexion ne doit pas
   faire échouer la capture.
-- Aucune autre méthode du run ne change. `ensureBackOfficeLogin` et `goToMenu`
-  restent la seule implémentation de la connexion et du menu.
+- Aucune autre méthode du run ne change de comportement. `ensureBackOfficeLogin` et
+  `goToMenu` restent la seule implémentation de la connexion et du menu ;
+  `ensureBackOfficeLogin` gagne seulement la cause en `previous` et un point
+  d’accroche privé avant l’envoi du formulaire, inactif pendant un run.
 
 ### Tests de la lib
 

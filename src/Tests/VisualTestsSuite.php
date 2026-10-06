@@ -484,7 +484,9 @@ abstract class VisualTestsSuite extends TestsSuite
      * qui capture ensuite la page avec PageSnapshot::captureCurrent().
      *
      * Une ouverture par instance de suite : l'état de connexion (boLoggedIn,
-     * erreur, cause) est remis à zéro à chaque appel, qui se reconnecte donc.
+     * erreur, cause) est remis à zéro à chaque appel ; une session encore ouverte
+     * dans le navigateur est reprise telle quelle (appeler closeBackOfficeSession()
+     * avant un checkpoint auth: false).
      *
      * Budget : échéance globale = début + $loginTimeoutMs + $menuTimeoutMs
      * (40 s par défaut). Chaque étape plafonnée reçoit min(son plafond, reste
