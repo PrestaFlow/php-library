@@ -36,7 +36,9 @@ connexion et le menu n'existent qu'à l'intérieur du run de `VisualTestsSuite`
 
 ### `VisualTestsSuite::openBackOfficeCheckpoint()` et `closeBackOfficeSession()`
 
-- `openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): void`, publique.
+- `openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): string`, publique.
+  Elle renvoie le chemin et le contrôleur de la page ouverte, sans jeton (`''` si
+  illisible).
   - Elle ouvre, dans le navigateur courant de la suite (`TestsSuite::getPage()`),
     la page d'un checkpoint BO, **avec le même code que le run** :
     - le checkpoint est normalisé par `normalize()` ;
@@ -44,15 +46,27 @@ connexion et le menu n'existent qu'à l'intérieur du run de `VisualTestsSuite`
       formulaire de connexion est absent ;
     - sinon : `ensureBackOfficeLogin()`, puis `goToPage('index')` et, si `menu` est
       défini, `goToMenu($menu)`.
-  - Les plafonds bornent l'attente de l'issue de la connexion (`waitForLoginOutcome`)
-    et la navigation du menu. Un dépassement lève une exception de délai dédiée,
-    au message lisible.
+  - Budget global : échéance = début + `$loginTimeoutMs` + `$menuTimeoutMs` (40 s
+    par défaut). Chaque étape plafonnée reçoit min(son plafond, reste avant
+    l'échéance). Une étape n'est pas lancée s'il reste moins de 1 s.
+    - Navigations (page de connexion, tableau de bord, menu) : min(`$menuTimeoutMs`, reste).
+    - Envoi du formulaire : seulement s'il reste au moins 11 s, car `login()` attend
+      d'abord un rechargement de 10 s fixes (`waitForPageReload()`). L'issue de la
+      connexion (`waitForLoginOutcome`) reçoit max(1 s, min(`$loginTimeoutMs` − 10 s,
+      reste − 10 s)).
+    - Pire cas : échéance + 5 s (`isLoggedIn()`). La capture et la déconnexion sont
+      hors de ce budget.
+    - Un dépassement lève une exception de délai dédiée
+      (`BackOfficeTimeoutException`), au message lisible (« … dans le délai
+      imparti (N s) »).
+  - Les messages relayés ne portent ni jeton ni identifiants d'URL (`user:pass@`).
+    La cause d'origine reste en `previous`.
   - Les erreurs sont celles du run (identifiants refusés avec le message du
     formulaire, page inattendue avec son chemin, entrée de menu introuvable). Elles
     sont relevées comme `\RuntimeException`, avec le message déjà formulé par le
     run.
   - Elle exige `area === 'bo'`, sinon `\LogicException`.
-- `closeBackOfficeSession(): void`, publique : déconnexion par le lien
+- `closeBackOfficeSession(int $timeoutMs = 5000): void`, publique : déconnexion par le lien
   `#header_logout` de la page courante (`BackOffice\Login\Page::logout()`) si une
   session est ouverte. Elle ne lève jamais : un échec de déconnexion ne doit pas
   faire échouer la capture.
