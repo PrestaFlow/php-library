@@ -2,6 +2,9 @@
 
 namespace PrestaFlow\Library\Tests;
 
+use HeadlessChromium\Exception\OperationTimedOut;
+use PrestaFlow\Library\Exceptions\BackOfficeTimeoutException;
+use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Visual\VisualDevices;
@@ -19,6 +22,10 @@ use PrestaFlow\Library\Visual\VisualDevices;
  * virgules, null = racine du BO). `hide` (display:none pendant la capture)
  * vaut pour les deux zones. `path` / `paths` sont ignorés en 'bo', `menu` /
  * `auth` en 'fo' ; en 'bo', `auth => false` avec un `menu` est refusé.
+ *
+ * Sélecteur visuel de l'app : openBackOfficeCheckpoint() ouvre la page d'un
+ * checkpoint BO avec ce même code (connexion, menu), sous des plafonds courts ;
+ * closeBackOfficeSession() referme la session employé.
  */
 abstract class VisualTestsSuite extends TestsSuite
 {
@@ -50,6 +57,18 @@ abstract class VisualTestsSuite extends TestsSuite
      */
     protected ?string $boLoginError = null;
     protected bool $boLoggedIn = false;
+
+    /** Cause de l'échec de connexion, gardée comme `previous` de l'erreur relevée (délai ≠ refus). */
+    protected ?\Throwable $boLoginCause = null;
+
+    /** Chemin et contrôleur de la page courante : jamais le jeton de l'URL. */
+    private const LOCATION_JS = '(function(){var c=new URLSearchParams(location.search).get("controller");return location.pathname+(c?"?controller="+c:"");})()';
+
+    /**
+     * Rechargement attendu par Login\Page::login() avant l'issue de la connexion
+     * (CommonPage::waitForPageReload(), 10 s fixes) : déduit du plafond de connexion.
+     */
+    private const PAGE_RELOAD_MS = 10000;
 
     /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
@@ -276,6 +295,7 @@ abstract class VisualTestsSuite extends TestsSuite
         $this->lastVisualUrl = null;
         $this->boLoggedIn = false;
         $this->boLoginError = null;
+        $this->boLoginCause = null;
 
         $checkpoints = $this->orderedCheckpoints();
         $only = self::onlyFromEnv();
@@ -428,10 +448,177 @@ abstract class VisualTestsSuite extends TestsSuite
                 return;
             } catch (\Throwable $e) {
                 $this->boLoginError = $e->getMessage();
+                $this->boLoginCause = $e;
             }
         }
 
-        throw new \RuntimeException('Connexion au back-office impossible : '.$this->boLoginError);
+        throw new \RuntimeException('Connexion au back-office impossible : '.$this->boLoginError, 0, $this->boLoginCause);
+    }
+
+    /**
+     * Ouvre, dans le navigateur courant (TestsSuite::getPage()), la page d'un
+     * checkpoint BO avec le code du run : connexion (ensureBackOfficeLogin()),
+     * racine du BO, puis entrée du menu (goToMenu()) ; `auth => false` : racine
+     * du BO sans session (page de connexion). Pour le sélecteur visuel de l'app,
+     * qui capture ensuite la page avec PageSnapshot::captureCurrent().
+     *
+     * $loginTimeoutMs borne la connexion après le chargement de la page de
+     * connexion : rechargement qui suit l'envoi du formulaire (10 s fixes,
+     * PAGE_RELOAD_MS) + issue de la connexion (Login\Page::$loginOutcomeTimeout,
+     * le reste, 1 s au minimum). $menuTimeoutMs borne chaque navigation
+     * (CommonPage::$navigationTimeout). Les valeurs du run sont rétablies avant
+     * de rendre la main, même en cas d'erreur.
+     *
+     * @return string chemin et contrôleur de la page ouverte, sans jeton ('' si illisible)
+     *
+     * @throws \LogicException            hors zone 'bo' ; \InvalidArgumentException pour auth => false avec un menu
+     * @throws BackOfficeTimeoutException plafond dépassé (message lisible)
+     * @throws \RuntimeException          erreur du run, message déjà formulé (identifiants refusés, page inattendue, menu introuvable)
+     */
+    public function openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): string
+    {
+        if ($this->area !== 'bo') {
+            throw new \LogicException(sprintf('%s : openBackOfficeCheckpoint() exige la zone « bo » (zone « %s »)', static::class, $this->area));
+        }
+        $cp = self::normalize($checkpoint);
+        if ($cp['auth'] === false && $cp['menu'] !== null) {
+            throw new \InvalidArgumentException(sprintf('%s : checkpoint « %s » : auth => false capture la page de connexion, menu interdit', static::class, (string) ($cp['name'] ?? '')));
+        }
+
+        // init() n'est pas appelé (il enregistrerait les étapes du run) : pages importées ici.
+        if (!isset($this->pages['backOfficePage'])) {
+            $this->importVisualPage();
+        }
+        $page = $this->pages['backOfficePage'] ?? null;
+        $login = $this->pages['backOfficeLoginPage'] ?? null;
+        if ($page === null) {
+            throw new \RuntimeException('page BackOffice absente');
+        }
+
+        // Une ouverture = une tentative de connexion, comme une exécution (init()).
+        $this->boLoggedIn = false;
+        $this->boLoginError = null;
+        $this->boLoginCause = null;
+        $this->lastVisualUrl = null;
+
+        $restore = $this->capBackOfficeWaits($page, $login, $loginTimeoutMs, $menuTimeoutMs);
+        try {
+            if ($cp['auth']) {
+                try {
+                    $this->ensureBackOfficeLogin($login);
+                } catch (\RuntimeException $e) {
+                    if ($login !== null && ($login->loginOutcomeSeen ?? null) === false) {
+                        throw new BackOfficeTimeoutException(sprintf("Le back-office n'a pas répondu à la connexion en %d s.", intdiv($loginTimeoutMs, 1000)), 0, $e);
+                    }
+                    throw $e;
+                }
+            }
+            $page->goToPage('index');
+            if ($cp['menu'] !== null) {
+                $page->goToMenu($cp['menu']);
+            }
+            if (!$cp['auth'] && !$this->loginFormPresent($page, $login)) {
+                throw new \RuntimeException('Session back-office déjà ouverte : la page de connexion ne peut pas être capturée');
+            }
+
+            return $this->locationOf($page);
+        } catch (BackOfficeTimeoutException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            if (self::isTimeout($e)) {
+                throw new BackOfficeTimeoutException(sprintf("Le back-office n'a pas répondu en %d s (chargement d'une page).", intdiv($menuTimeoutMs, 1000)), 0, $e);
+            }
+            if ($e instanceof \RuntimeException || !$e instanceof \Exception) {
+                throw $e; // erreur du run telle quelle ; un \Error (défaut de code) n'est pas masqué
+            }
+            throw new \RuntimeException($e->getMessage(), 0, $e); // exceptions chrome-php (ResponseHasError…)
+        } finally {
+            $restore();
+        }
+    }
+
+    /**
+     * Déconnexion par le lien #header_logout de la page courante
+     * (BackOffice\Login\Page::logout()) si une session est ouverte. Ne lève
+     * jamais : un échec de déconnexion ne doit pas faire échouer la capture
+     * (le navigateur de l'app est fermé juste après). $timeoutMs borne la
+     * navigation de déconnexion.
+     */
+    public function closeBackOfficeSession(int $timeoutMs = 5000): void
+    {
+        if (!$this->boLoggedIn) {
+            return;
+        }
+        $this->boLoggedIn = false;
+        $login = $this->pages['backOfficeLoginPage'] ?? null;
+        if ($login === null) {
+            return;
+        }
+
+        $before = $login->navigationTimeout ?? null;
+        try {
+            $login->navigationTimeout = $timeoutMs;
+            $login->logout();
+        } catch (\Throwable) {
+            // session laissée ouverte : rien d'autre à faire
+        } finally {
+            try {
+                $login->navigationTimeout = $before;
+            } catch (\Throwable) {
+            }
+        }
+    }
+
+    /**
+     * Pose les plafonds de openBackOfficeCheckpoint() sur les pages et renvoie
+     * de quoi rétablir les valeurs d'avant (celles du run).
+     */
+    private function capBackOfficeWaits(object $page, ?object $login, int $loginTimeoutMs, int $navigationTimeoutMs): \Closure
+    {
+        $pageBefore = $page->navigationTimeout ?? null;
+        $loginBefore = $login?->navigationTimeout ?? null;
+        $outcomeBefore = $login?->loginOutcomeTimeout ?? null;
+
+        $page->navigationTimeout = $navigationTimeoutMs;
+        if ($login !== null) {
+            $login->navigationTimeout = $navigationTimeoutMs;
+            $login->loginOutcomeTimeout = max(1000, $loginTimeoutMs - self::PAGE_RELOAD_MS);
+            $login->loginOutcomeSeen = null;
+        }
+
+        return static function () use ($page, $login, $pageBefore, $loginBefore, $outcomeBefore): void {
+            $page->navigationTimeout = $pageBefore;
+            if ($login !== null) {
+                $login->navigationTimeout = $loginBefore;
+                if ($outcomeBefore !== null) {
+                    $login->loginOutcomeTimeout = $outcomeBefore;
+                }
+            }
+        };
+    }
+
+    /** Délai de chrome-php ou de la lib quelque part dans la chaîne des causes. */
+    private static function isTimeout(\Throwable $e): bool
+    {
+        for ($t = $e; $t !== null; $t = $t->getPrevious()) {
+            if ($t instanceof OperationTimedOut || $t instanceof TimeoutException) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Chemin et contrôleur de la page courante, sans jeton ; '' si illisible. */
+    protected function locationOf(object $page): string
+    {
+        try {
+            $where = $this->readNow($page, self::LOCATION_JS);
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return is_string($where) ? $where : '';
     }
 
     /**
@@ -440,7 +627,7 @@ abstract class VisualTestsSuite extends TestsSuite
      */
     protected function whereIs(object $page): string
     {
-        $where = $this->readNow($page, '(function(){var c=new URLSearchParams(location.search).get("controller");return location.pathname+(c?"?controller="+c:"");})()');
+        $where = $this->readNow($page, self::LOCATION_JS);
 
         return is_string($where) && $where !== '' ? ' (page : '.$where.')' : '';
     }
