@@ -13,6 +13,9 @@ final class PageSnapshotTest extends TestCase
     /** @var array{log: string[], closed: bool, options: array|null, clip: Clip|null, shot: array|null} */
     private array $rec;
 
+    /** @var \Closure(array): object fabrique de navigateur du dernier snapshot() (pour obtenir une page factice) */
+    private \Closure $factory;
+
     private function snapshot(array $values = [], ?\Throwable $navigateThrows = null, bool $factoryThrows = false): PageSnapshot
     {
         $this->rec = ['log' => [], 'event' => null, 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null];
@@ -123,6 +126,8 @@ final class PageSnapshotTest extends TestCase
             };
         };
 
+        $this->factory = $factory;
+
         return new PageSnapshot($factory, stableTimeoutMs: 50, pollMs: 10);
     }
 
@@ -190,5 +195,31 @@ final class PageSnapshotTest extends TestCase
         $this->expectExceptionMessage('Navigateur');
 
         $snapshot->take('https://shop.test/', 'desktop');
+    }
+
+    public function test_capture_current_captures_the_open_page_without_navigating_or_closing(): void
+    {
+        $snapshot = $this->snapshot(['status' => 404, 'size' => [1280, 2000]]);
+        $page = ($this->factory)([])->createPage();
+
+        $result = $snapshot->captureCurrent($page);
+
+        $this->assertSame(['stable', 'settle', 'status', 'size', 'top', 'map', 'screenshot'], $this->rec['log']);
+        $this->assertFalse($this->rec['closed']);
+        $this->assertSame('JPEGDATA', $result->image);
+        $this->assertSame('image/jpeg', $result->mime);
+        $this->assertSame([1280, 2000], [$result->width, $result->height]);
+        $this->assertSame(404, $result->status);
+        $this->assertSame('body', $result->elements[0]['selector']);
+    }
+
+    public function test_take_gives_what_capture_current_gives_after_navigating(): void
+    {
+        $taken = $this->snapshot()->take('https://shop.test/', 'desktop');
+
+        $snapshot = $this->snapshot();
+        $current = $snapshot->captureCurrent(($this->factory)([])->createPage());
+
+        $this->assertEquals($taken, $current);
     }
 }
