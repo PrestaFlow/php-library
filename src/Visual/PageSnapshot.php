@@ -11,8 +11,10 @@ use HeadlessChromium\Page;
  * (animations figées, comme au run ; bien plus léger qu'un PNG pleine page)
  * + carte des éléments visibles avec un sélecteur CSS proposé.
  *
- * Navigateur DÉDIÉ (jamais l'instance statique de TestsSuite) : une capture ne
- * doit pas perturber un run en cours, et inversement.
+ * take() : navigateur DÉDIÉ (jamais l'instance statique de TestsSuite) : une
+ * capture ne doit pas perturber un run en cours, et inversement.
+ * captureCurrent() : page déjà ouverte par l'appelant (sélecteur visuel BO de
+ * l'app, navigateur à portée « picker-… »).
  */
 class PageSnapshot
 {
@@ -65,33 +67,7 @@ class PageSnapshot
                 throw new SnapshotException(sprintf("La page %s n'a pas répondu en %d s.", $url, intdiv($timeoutMs, 1000)), 0, $e);
             }
 
-            $stable = $this->waitUntilStable($page);
-            $page->evaluate(PageScripts::SETTLE_ANIMATIONS)->getReturnValue();
-
-            $status = (int) $page->evaluate(
-                "(function(){var n=performance.getEntriesByType('navigation')[0];return n&&n.responseStatus?n.responseStatus:0;})()"
-            )->getReturnValue();
-            // Une page en erreur (404, 500…) est capturée comme les autres : un point de
-            // contrôle peut légitimement cibler une page d'erreur. Le statut est renvoyé.
-
-            [$width, $height] = $page->evaluate(
-                '[Math.ceil(document.documentElement.scrollWidth), Math.ceil(document.documentElement.scrollHeight)]'
-            )->getReturnValue();
-            $width = max(1, (int) $width);
-            $height = max(1, min((int) $height, self::MAX_HEIGHT));
-
-            $page->evaluate('window.scrollTo(0, 0)')->getReturnValue();
-            $json = $page->evaluate(PageScripts::ELEMENT_MAP.'('.self::MAX_ELEMENTS.', '.$height.')')->getReturnValue($timeoutMs);
-            $elements = is_string($json) ? json_decode($json, true) : null;
-
-            $image = base64_decode((string) $page->screenshot([
-                'format' => 'jpeg',
-                'quality' => self::JPEG_QUALITY,
-                'captureBeyondViewport' => true,
-                'clip' => new Clip(0, 0, $width, $height),
-            ])->getBase64($timeoutMs), true);
-
-            return new SnapshotResult((string) $image, 'image/jpeg', $width, $height, is_array($elements) ? $elements : [], $stable, $status);
+            return $this->captureCurrent($page, $timeoutMs);
         } finally {
             try {
                 $browser->close();
@@ -99,6 +75,52 @@ class PageSnapshot
                 // le navigateur est peut-être déjà mort : rien à faire
             }
         }
+    }
+
+    /**
+     * Capture de la page déjà ouverte dans $page : stabilité (bornée par
+     * stableTimeoutMs), animations figées, statut HTTP, carte des éléments et
+     * capture pleine page en JPEG. Ne navigue pas et ne ferme rien : l'onglet et
+     * son navigateur appartiennent à l'appelant (take(), ou l'app qui a ouvert
+     * une page back-office avec VisualTestsSuite::openBackOfficeCheckpoint()).
+     *
+     * Modifie l'onglet : animations et transitions figées, défilement remis en
+     * haut de page. Les exceptions de chrome-php (délai, onglet fermé…) remontent
+     * brutes : seul take() enveloppe en SnapshotException le lancement du
+     * navigateur et la navigation, rien après.
+     *
+     * @param object $page onglet chrome-php (\HeadlessChromium\Page) ; typé object
+     *                     pour les doubles de test, comme waitUntilStable()
+     */
+    public function captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult
+    {
+        $stable = $this->waitUntilStable($page);
+        $page->evaluate(PageScripts::SETTLE_ANIMATIONS)->getReturnValue();
+
+        $status = (int) $page->evaluate(
+            "(function(){var n=performance.getEntriesByType('navigation')[0];return n&&n.responseStatus?n.responseStatus:0;})()"
+        )->getReturnValue();
+        // Une page en erreur (404, 500…) est capturée comme les autres : un point de
+        // contrôle peut légitimement cibler une page d'erreur. Le statut est renvoyé.
+
+        [$width, $height] = $page->evaluate(
+            '[Math.ceil(document.documentElement.scrollWidth), Math.ceil(document.documentElement.scrollHeight)]'
+        )->getReturnValue();
+        $width = max(1, (int) $width);
+        $height = max(1, min((int) $height, self::MAX_HEIGHT));
+
+        $page->evaluate('window.scrollTo(0, 0)')->getReturnValue();
+        $json = $page->evaluate(PageScripts::ELEMENT_MAP.'('.self::MAX_ELEMENTS.', '.$height.')')->getReturnValue($timeoutMs);
+        $elements = is_string($json) ? json_decode($json, true) : null;
+
+        $image = base64_decode((string) $page->screenshot([
+            'format' => 'jpeg',
+            'quality' => self::JPEG_QUALITY,
+            'captureBeyondViewport' => true,
+            'clip' => new Clip(0, 0, $width, $height),
+        ])->getBase64($timeoutMs), true);
+
+        return new SnapshotResult((string) $image, 'image/jpeg', $width, $height, is_array($elements) ? $elements : [], $stable, $status);
     }
 
     private function waitUntilStable(object $page): bool

@@ -13,9 +13,13 @@ final class PageSnapshotTest extends TestCase
     /** @var array{log: string[], closed: bool, options: array|null, clip: Clip|null, shot: array|null} */
     private array $rec;
 
+    /** @var \Closure(array): object fabrique de navigateur du dernier snapshot() (pour obtenir une page factice) */
+    private \Closure $factory;
+
     private function snapshot(array $values = [], ?\Throwable $navigateThrows = null, bool $factoryThrows = false): PageSnapshot
     {
-        $this->rec = ['log' => [], 'event' => null, 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null];
+        // timeouts : délais reçus par getReturnValue() / getBase64() (null non noté)
+        $this->rec = ['log' => [], 'event' => null, 'closed' => false, 'options' => null, 'clip' => null, 'shot' => null, 'timeouts' => []];
         $rec = &$this->rec;
         $values += [
             'stable' => true,
@@ -88,13 +92,19 @@ final class PageSnapshotTest extends TestCase
                                 $v = $this->values['map'];
                             }
 
-                            return new class ($v) {
-                                public function __construct(private $v)
+                            $rec = &$this->rec;
+
+                            return new class ($rec, $v) {
+                                public function __construct(private array &$rec, private $v)
                                 {
                                 }
 
                                 public function getReturnValue($timeout = null)
                                 {
+                                    if ($timeout !== null) {
+                                        $this->rec['timeouts'][] = 'value '.$timeout;
+                                    }
+
                                     return $this->v;
                                 }
                             };
@@ -106,9 +116,19 @@ final class PageSnapshotTest extends TestCase
                             $this->rec['clip'] = $opts['clip'] ?? null;
                             $this->rec['shot'] = $opts;
 
-                            return new class {
+                            $rec = &$this->rec;
+
+                            return new class ($rec) {
+                                public function __construct(private array &$rec)
+                                {
+                                }
+
                                 public function getBase64($timeout = null)
                                 {
+                                    if ($timeout !== null) {
+                                        $this->rec['timeouts'][] = 'base64 '.$timeout;
+                                    }
+
                                     return base64_encode('JPEGDATA');
                                 }
                             };
@@ -122,6 +142,8 @@ final class PageSnapshotTest extends TestCase
                 }
             };
         };
+
+        $this->factory = $factory;
 
         return new PageSnapshot($factory, stableTimeoutMs: 50, pollMs: 10);
     }
@@ -190,5 +212,46 @@ final class PageSnapshotTest extends TestCase
         $this->expectExceptionMessage('Navigateur');
 
         $snapshot->take('https://shop.test/', 'desktop');
+    }
+
+    public function test_capture_current_captures_the_open_page_without_navigating_or_closing(): void
+    {
+        $snapshot = $this->snapshot(['status' => 404, 'size' => [1280, 2000]]);
+        $page = ($this->factory)([])->createPage();
+
+        $result = $snapshot->captureCurrent($page);
+
+        $this->assertSame(['stable', 'settle', 'status', 'size', 'top', 'map', 'screenshot'], $this->rec['log']);
+        $this->assertFalse($this->rec['closed']);
+        $this->assertSame('JPEGDATA', $result->image);
+        $this->assertSame('image/jpeg', $result->mime);
+        $this->assertSame([1280, 2000], [$result->width, $result->height]);
+        $this->assertSame(404, $result->status);
+        $this->assertSame('body', $result->elements[0]['selector']);
+    }
+
+    public function test_take_gives_what_capture_current_gives_after_navigating(): void
+    {
+        $taken = $this->snapshot()->take('https://shop.test/', 'desktop');
+
+        $snapshot = $this->snapshot();
+        $current = $snapshot->captureCurrent(($this->factory)([])->createPage());
+
+        $this->assertEquals($taken, $current);
+    }
+
+    public function test_take_bounds_the_map_and_the_screenshot_by_its_default_timeout(): void
+    {
+        $this->snapshot()->take('https://shop.test/', 'desktop');
+
+        $this->assertSame(['value 20000', 'base64 20000'], $this->rec['timeouts']);
+    }
+
+    public function test_capture_current_bounds_the_map_and_the_screenshot_by_its_default_timeout(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot->captureCurrent(($this->factory)([])->createPage());
+
+        $this->assertSame(['value 15000', 'base64 15000'], $this->rec['timeouts']);
     }
 }

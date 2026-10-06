@@ -47,7 +47,7 @@ class BackOfficePage extends CommonPage
         // FrontOffice (ou au 1er appel) — évite un close+createPage inutile
         // pour deux navigations BO consécutives.
         TestsSuite::recreatePageIfContextChanged('BO');
-        $this->getPage()->navigate($url)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED);
+        $this->getPage()->navigate($url)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED, $this->navigationTimeout);
     }
 
     public function getPageURL($page, $params = null): string
@@ -204,7 +204,7 @@ class BackOfficePage extends CommonPage
             if (!is_string($href) || $href === '' || (str_contains($href, '#') && explode('#', $href, 2)[0] === $currentBase)) {
                 continue;
             }
-            $page->navigate($href)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED);
+            $page->navigate($href)->waitForNavigation(\HeadlessChromium\Page::DOM_CONTENT_LOADED, $this->navigationTimeout);
 
             return $href;
         }
