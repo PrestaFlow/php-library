@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Tests\Unit\Visual;
 
+use HeadlessChromium\Exception\CommunicationException\ResponseHasError;
 use HeadlessChromium\Exception\OperationTimedOut;
 use PHPUnit\Framework\TestCase;
 use PrestaFlow\Library\Exceptions\BackOfficeTimeoutException;
@@ -20,6 +21,8 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public bool $form = true;
             public string $error = '';
             public string $location = '';
+            /** Horloge factice (ms) lue par la suite (nowMs()), avancée par les doubles. */
+            public int $now = 0;
             public function evaluate(string $js): object
             {
                 $value = match (true) {
@@ -50,6 +53,9 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $suite = new class (loadGlobals: false, getBrowser: false) extends VisualTestsSuite {
             public ?object $fakePage = null;
             public ?object $fakeLogin = null;
+            /** Horloge factice : l'onglet partagé ($this->chrome->now). */
+            public ?object $clock = null;
+            protected function nowMs(): int { return $this->clock?->now ?? 0; }
             protected array $devices = ['desktop'];
             protected array $locales = ['en'];
             protected string $visualScope = 'backoffice';
@@ -74,6 +80,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $suite->setArea($area, $freeze);
         $suite->fakePage = $page;
         $suite->fakeLogin = $login;
+        $suite->clock = $this->chrome;
         if ($checkpoints !== null) {
             $suite->useDefinition(['desktop'], ['en'], $checkpoints);
         }
@@ -96,12 +103,15 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public array $navTimeouts = [];
             public ?\Throwable $navThrows = null;
             public ?\Throwable $menuThrows = null;
+            /** Durée simulée de chaque navigation (avance l'horloge factice). */
+            public int $navCostMs = 0;
             public function __construct(public \ArrayObject $log, public object $chrome) {}
             public function getPage(): object { return $this->chrome; }
             public function goToPage($page = null, $params = null): void
             {
                 $this->log[] = 'page '.$page;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                $this->chrome->now += $this->navCostMs;
                 if ($this->navThrows !== null) {
                     throw $this->navThrows;
                 }
@@ -110,6 +120,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'menu '.$selectors;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                $this->chrome->now += $this->navCostMs;
                 if ($this->menuThrows !== null) {
                     throw $this->menuThrows;
                 }
@@ -149,6 +160,9 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public array $navTimeouts = [];
             public array $outcomeTimeouts = [];
             public array $logoutTimeouts = [];
+            /** Durées simulées : navigation, envoi du formulaire (rechargement + issue). */
+            public int $navCostMs = 0;
+            public int $submitCostMs = 0;
             public function __construct(public \ArrayObject $log, public bool $ok, public object $chrome) {}
             public function getPage(): object { return $this->chrome; }
             public function getSelector($selector, $replacements = []): string
@@ -159,6 +173,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             {
                 $this->log[] = 'login:page '.$page;
                 $this->navTimeouts[] = $this->navigationTimeout;
+                $this->chrome->now += $this->navCostMs;
                 if ($this->navThrows !== null) {
                     throw $this->navThrows;
                 }
@@ -168,6 +183,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
                 $this->log[] = 'login:submit';
                 $this->outcomeTimeouts[] = $this->loginOutcomeTimeout;
                 $this->loginOutcomeSeen = $this->outcome;
+                $this->chrome->now += $this->submitCostMs;
             }
             public function isLoggedIn(): bool { $this->log[] = 'login:check'; return $this->ok; }
             public function logout(): void
@@ -561,7 +577,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             $this->fail('BackOfficeTimeoutException attendue');
         } catch (BackOfficeTimeoutException $e) {
             $this->assertInstanceOf(\RuntimeException::class, $e);
-            $this->assertStringContainsString('connexion en 25 s', $e->getMessage());
+            $this->assertStringContainsString('à la connexion dans le délai imparti (25 s)', $e->getMessage());
         }
         $this->assertSame(60000, $login->loginOutcomeTimeout);
         $this->assertNull($login->navigationTimeout);
@@ -677,5 +693,166 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         // 5 s ne couvrent pas les 10 s du rechargement : 1 s d'attente de l'issue au minimum.
         $this->assertSame([1000], $login->outcomeTimeouts);
         $this->assertSame(60000, $login->loginOutcomeTimeout);
+    }
+
+    public function test_open_checkpoint_caps_each_step_to_what_is_left_of_the_global_budget(): void
+    {
+        // Échéance = 25 + 15 = 40 s après le début.
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $page->navCostMs = 10000;
+        $login = $this->login($log);
+        $login->navCostMs = 12000;   // page de connexion : t = 12 s
+        $login->submitCostMs = 14000; // rechargement + issue : t = 26 s
+        $s = $this->suite(page: $page, login: $login);
+
+        $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
+
+        $this->assertSame([15000], $login->navTimeouts);
+        // Reste 28 s à l'envoi : issue = min(25 - 10, 28 - 10) = 15 s.
+        $this->assertSame([15000], $login->outcomeTimeouts);
+        // Tableau de bord : reste 14 s ; menu (t = 36 s) : reste 4 s.
+        $this->assertSame([14000, 4000], $page->navTimeouts);
+    }
+
+    public function test_open_checkpoint_caps_the_login_outcome_to_what_is_left(): void
+    {
+        $log = new \ArrayObject();
+        $login = $this->login($log);
+        $login->navCostMs = 20000; // reste 20 s à l'envoi
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
+
+        // min(25 - 10, 20 - 10) = 10 s : rechargement + issue tiennent dans le reste.
+        $this->assertSame([10000], $login->outcomeTimeouts);
+    }
+
+    public function test_open_checkpoint_does_not_submit_the_login_when_the_reload_no_longer_fits(): void
+    {
+        $log = new \ArrayObject();
+        $login = $this->login($log);
+        $login->navCostMs = 30000; // reste 10 s < 10 s de rechargement + 1 s
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
+            $this->fail('BackOfficeTimeoutException attendue');
+        } catch (BackOfficeTimeoutException $e) {
+            $this->assertStringContainsString('délai imparti (40 s au total)', $e->getMessage());
+        }
+        $this->assertNotContains('login:submit', $log->getArrayCopy());
+        $this->assertSame(60000, $login->loginOutcomeTimeout);
+    }
+
+    public function test_open_checkpoint_stops_before_a_step_once_the_deadline_is_reached(): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $login = $this->login($log);
+        $login->navCostMs = 15000;
+        $login->submitCostMs = 25000; // t = 40 s : échéance atteinte
+        $s = $this->suite(page: $page, login: $login);
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
+            $this->fail('BackOfficeTimeoutException attendue');
+        } catch (BackOfficeTimeoutException $e) {
+            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (40 s au total).", $e->getMessage());
+        }
+        $this->assertNotContains('page index', $log->getArrayCopy());
+        $this->assertSame([], $page->navTimeouts);
+        $this->assertNull($page->navigationTimeout);
+    }
+
+    public function test_open_checkpoint_restores_the_run_ceilings_even_on_error(): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $page->navigationTimeout = 30000;
+        $page->menuThrows = new \RuntimeException('Entrée du menu introuvable : #subtab-Nope');
+        $login = $this->login($log);
+        $login->navigationTimeout = 30000;
+        $login->loginOutcomeTimeout = 45000;
+        $s = $this->suite(page: $page, login: $login);
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-Nope'], 25000, 15000);
+            $this->fail('RuntimeException attendue');
+        } catch (\RuntimeException) {
+        }
+
+        $this->assertSame([15000, 15000], $page->navTimeouts);
+        $this->assertSame(30000, $page->navigationTimeout);
+        $this->assertSame(30000, $login->navigationTimeout);
+        $this->assertSame(45000, $login->loginOutcomeTimeout);
+    }
+
+    public function test_open_checkpoint_masks_the_token_of_a_failed_page_load(): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $cause = new ResponseHasError('Cannot load page for url: "http://shop.test/admin-dev/index.php?controller=AdminProducts&token=abc123def". Reason: net::ERR_CONNECTION_RESET');
+        $page->menuThrows = $cause;
+        $s = $this->suite(page: $page, login: $this->login($log));
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts']);
+            $this->fail('RuntimeException attendue');
+        } catch (BackOfficeTimeoutException $e) {
+            $this->fail('Pas un délai : '.$e->getMessage());
+        } catch (\RuntimeException $e) {
+            $this->assertStringNotContainsString('abc123def', $e->getMessage());
+            $this->assertStringContainsString('controller=AdminProducts&token=…', $e->getMessage());
+            $this->assertSame($cause, $e->getPrevious());
+        }
+    }
+
+    public function test_open_checkpoint_masks_url_credentials_and_tokens_of_a_login_error(): void
+    {
+        $log = new \ArrayObject();
+        $login = $this->login($log);
+        $login->navThrows = new ResponseHasError('Cannot load page for url: "https://admin:s3cret@shop.test/admin-dev/index.php?_token=xyz789". Reason: net::ERR_ABORTED');
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker']);
+            $this->fail('RuntimeException attendue');
+        } catch (\RuntimeException $e) {
+            $this->assertStringStartsWith('Connexion au back-office impossible : ', $e->getMessage());
+            $this->assertStringNotContainsString('s3cret', $e->getMessage());
+            $this->assertStringNotContainsString('xyz789', $e->getMessage());
+            $this->assertStringContainsString('https://…@shop.test/admin-dev/index.php?_token=…', $e->getMessage());
+            $this->assertNotNull($e->getPrevious());
+        }
+    }
+
+    public function test_open_checkpoint_treats_a_timed_out_page_load_as_a_timeout(): void
+    {
+        $log = new \ArrayObject();
+        $page = $this->page($log);
+        $page->navThrows = new ResponseHasError('Cannot load page for url: "http://shop.test/admin-dev/?token=abc". Reason: net::ERR_TIMED_OUT');
+        $s = $this->suite(page: $page, login: $this->login($log));
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
+            $this->fail('BackOfficeTimeoutException attendue');
+        } catch (BackOfficeTimeoutException $e) {
+            $this->assertStringContainsString('délai imparti', $e->getMessage());
+            $this->assertInstanceOf(ResponseHasError::class, $e->getPrevious());
+        }
+    }
+
+    public function test_open_checkpoint_accepts_a_login_seen_late_by_is_logged_in(): void
+    {
+        // Issue non vue dans le plafond, mais le lien de déconnexion est là ensuite.
+        $log = new \ArrayObject();
+        $login = $this->login($log, ok: true);
+        $login->outcome = false;
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        $s->openBackOfficeCheckpoint(['name' => 'picker']);
+
+        $this->assertSame(['login:page index', 'login:submit', 'login:check', 'page index'], $log->getArrayCopy());
     }
 }
