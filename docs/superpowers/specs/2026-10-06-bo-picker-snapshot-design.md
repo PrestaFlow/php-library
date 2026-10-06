@@ -50,11 +50,14 @@ connexion et le menu n'existent qu'à l'intérieur du run de `VisualTestsSuite`
     par défaut). Chaque étape plafonnée reçoit min(son plafond, reste avant
     l'échéance). Une étape n'est pas lancée s'il reste moins de 1 s.
     - Navigations (page de connexion, tableau de bord, menu) : min(`$menuTimeoutMs`, reste).
-    - Envoi du formulaire : seulement s'il reste au moins 11 s, car `login()` attend
-      d'abord un rechargement de 10 s fixes (`waitForPageReload()`). L'issue de la
-      connexion (`waitForLoginOutcome`) reçoit max(1 s, min(`$loginTimeoutMs` − 10 s,
-      reste − 10 s)).
-    - Pire cas : échéance + 5 s (`isLoggedIn()`). La capture et la déconnexion sont
+    - Envoi du formulaire : seulement s'il reste au moins 16 s. `login()` attend
+      d'abord un rechargement de 10 s fixes (`waitForPageReload()`), et
+      `isLoggedIn()` jusqu'à 5 s après l'issue. L'issue de la connexion
+      (`waitForLoginOutcome`) reçoit max(1 s, min(`$loginTimeoutMs`, reste) − 10 s
+      − 5 s). Si `$loginTimeoutMs` + `$menuTimeoutMs` < 17 s, le formulaire n'est
+      jamais envoyé.
+    - Pire cas : échéance + lectures JS et remplissage du formulaire (≤ 5 s
+      chacun), non plafonnés par ce budget. La capture et la déconnexion sont
       hors de ce budget.
     - Un dépassement lève une exception de délai dédiée
       (`BackOfficeTimeoutException`), au message lisible (« … dans le délai
