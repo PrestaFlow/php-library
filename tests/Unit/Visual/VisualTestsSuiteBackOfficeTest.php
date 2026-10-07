@@ -162,9 +162,10 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         // le test ($this->chrome->form), comme l'afficherait la racine du BO pour la
         // session courante. Suffisant : la suite ne la lit qu'après une navigation.
         return new class ($log, $ok, $this->chrome) {
-            /** Plafonds posés par la suite (CommonPage::$navigationTimeout, Login\Page::$loginOutcomeTimeout). */
+            /** Plafonds posés par la suite (CommonPage::$navigationTimeout, Login\Page::$loginOutcomeDeadline). */
             public ?int $navigationTimeout = null;
             public int $loginOutcomeTimeout = 60000;
+            public ?int $loginOutcomeDeadline = null;
             public ?bool $loginOutcomeSeen = null;
             /** Issue vue par login() dans le plafond (false = délai). */
             public bool $outcome = true;
@@ -172,10 +173,18 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public ?\Throwable $navThrows = null;
             public array $navTimeouts = [];
             public array $outcomeTimeouts = [];
+            /** Échéance de l'issue vue à chaque envoi du formulaire. */
+            public array $outcomeDeadlines = [];
             public array $logoutTimeouts = [];
-            /** Durées simulées : navigation, envoi du formulaire (rechargement + issue + constat). */
+            /**
+             * Durées simulées : navigation ; rechargement après l'envoi (10 s au plus,
+             * comme CommonPage::waitForPageReload()) ; apparition de l'issue ;
+             * constat de la session (isLoggedIn(), 5 s au plus).
+             */
             public int $navCostMs = 0;
-            public int $submitCostMs = 0;
+            public int $reloadCostMs = 0;
+            public int $outcomeCostMs = 0;
+            public int $checkCostMs = 0;
             public function __construct(public \ArrayObject $log, public bool $ok, public object $chrome) {}
             public function getPage(): object { return $this->chrome; }
             public function getSelector($selector, $replacements = []): string
@@ -199,14 +208,25 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             public function login($email = null, $password = null, $waitForNavigation = true): void
             {
                 $this->log[] = 'login:submit';
-                $this->outcomeTimeouts[] = $this->loginOutcomeTimeout;
-                // Fidèle à Login\Page : rechargement (10 s) + issue (plafond) + isLoggedIn() (5 s)
-                // au plus ; au-delà, l'issue n'est pas vue.
-                $max = 10000 + $this->loginOutcomeTimeout + 5000;
-                $this->loginOutcomeSeen = $this->outcome && $this->submitCostMs <= $max;
-                $this->chrome->now += min($this->submitCostMs, $max);
+                $this->outcomeDeadlines[] = $this->loginOutcomeDeadline;
+                // Fidèle à Login\Page::login() : rechargement (10 s au plus), puis issue
+                // plafonnée par le temps restant avant l'échéance (1 s au moins), ou par
+                // $loginOutcomeTimeout sans échéance ; au-delà du plafond, l'issue n'est pas vue.
+                $this->chrome->now += min($this->reloadCostMs, 10000);
+                $ceiling = $this->loginOutcomeDeadline === null
+                    ? $this->loginOutcomeTimeout
+                    : max(1000, $this->loginOutcomeDeadline - $this->chrome->now);
+                $this->outcomeTimeouts[] = $ceiling;
+                $this->loginOutcomeSeen = $this->outcome && $this->outcomeCostMs <= $ceiling;
+                $this->chrome->now += min($this->outcomeCostMs, $ceiling);
             }
-            public function isLoggedIn(): bool { $this->log[] = 'login:check'; return $this->ok; }
+            public function isLoggedIn(): bool
+            {
+                $this->log[] = 'login:check';
+                $this->chrome->now += min($this->checkCostMs, 5000);
+
+                return $this->ok;
+            }
             public function logout(): void
             {
                 $this->log[] = 'login:logout';
@@ -510,14 +530,16 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         ], $log->getArrayCopy());
         // Chemin et contrôleur, jamais le jeton.
         $this->assertSame('/admin-dev/index.php?controller=AdminProducts', $where);
-        // Plafonds pendant l'ouverture, valeurs du run rétablies ensuite. L'issue de
-        // la connexion a le plafond moins les 10 s du rechargement qui la précède et
-        // les 5 s du constat (isLoggedIn()) qui la suit.
-        $this->assertSame([10000], $login->outcomeTimeouts);
+        // Plafonds pendant l'ouverture, valeurs du run rétablies ensuite. Échéance de
+        // l'issue : début + 25 s - 5 s de constat (isLoggedIn()) ; rechargement
+        // instantané : toute l'attente revient à l'issue.
+        $this->assertSame([20000], $login->outcomeDeadlines);
+        $this->assertSame([20000], $login->outcomeTimeouts);
         $this->assertSame([15000], $login->navTimeouts);
         $this->assertSame([15000, 15000], $page->navTimeouts);
         $this->assertNull($page->navigationTimeout);
         $this->assertNull($login->navigationTimeout);
+        $this->assertNull($login->loginOutcomeDeadline);
         $this->assertSame(60000, $login->loginOutcomeTimeout);
     }
 
@@ -602,6 +624,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             $this->assertStringContainsString('à la connexion dans le délai imparti (25 s)', $e->getMessage());
         }
         $this->assertSame(60000, $login->loginOutcomeTimeout);
+        $this->assertNull($login->loginOutcomeDeadline);
         $this->assertNull($login->navigationTimeout);
     }
 
@@ -712,7 +735,8 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
 
         $s->openBackOfficeCheckpoint(['name' => 'picker'], 5000, 15000);
 
-        // 5 s ne couvrent pas les 10 s du rechargement : 1 s d'attente de l'issue au minimum.
+        // Échéance de l'issue = début + 5 s - 5 s de constat : 1 s d'attente au minimum.
+        $this->assertSame([0], $login->outcomeDeadlines);
         $this->assertSame([1000], $login->outcomeTimeouts);
         $this->assertSame(60000, $login->loginOutcomeTimeout);
     }
@@ -725,52 +749,87 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $page->navCostMs = 3000;
         $login = $this->login($log);
         $login->navCostMs = 12000;    // page de connexion (plafond 15 s) : t = 12 s
-        $login->submitCostMs = 14000; // rechargement + issue + constat (≤ 25 s) : t = 26 s
+        $login->reloadCostMs = 4000;  // t = 16 s
+        $login->outcomeCostMs = 4000; // t = 20 s
+        $login->checkCostMs = 5000;   // t = 25 s
         $s = $this->suite(page: $page, login: $login);
 
         $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
 
         $this->assertSame([15000], $login->navTimeouts);
-        // Reste 28 s à l'envoi : issue = min(25, 28) - 10 - 5 = 10 s.
-        $this->assertSame([10000], $login->outcomeTimeouts);
-        // Tableau de bord : reste 14 s ; menu (t = 29 s) : reste 11 s.
-        $this->assertSame([14000, 11000], $page->navTimeouts);
+        // Échéance de l'issue 20 s ; rechargement fini à 16 s : 4 s pour l'issue.
+        $this->assertSame([4000], $login->outcomeTimeouts);
+        // Tableau de bord : reste 15 s ; menu (t = 28 s) : reste 12 s.
+        $this->assertSame([15000, 12000], $page->navTimeouts);
     }
 
     public function test_open_checkpoint_caps_the_login_outcome_to_what_is_left(): void
     {
         $log = new \ArrayObject();
-        // Navigation au plafond (15 s) puis lecture du formulaire (4 s) : reste 21 s à
-        // l'envoi, moins que le plafond de connexion (25 s).
-        $this->chrome->evalCostMs = 4000;
+        // Navigation de 15 s puis lecture du formulaire (2 s) : envoi à t = 17 s, à
+        // 3 s de l'échéance de l'issue (25 - 5 = 20 s).
+        $this->chrome->evalCostMs = 2000;
         $login = $this->login($log);
         $login->navCostMs = 15000;
         $s = $this->suite(page: $this->page($log), login: $login);
 
         $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
 
-        // min(25, 21) - 10 - 5 = 6 s : rechargement, issue et constat tiennent dans le reste.
-        $this->assertSame([6000], $login->outcomeTimeouts);
+        $this->assertSame([20000], $login->outcomeDeadlines);
+        $this->assertSame([3000], $login->outcomeTimeouts);
     }
 
-    public function test_open_checkpoint_does_not_submit_the_login_when_the_reload_no_longer_fits(): void
+    public function test_open_checkpoint_leaves_the_rest_of_the_budget_to_the_outcome_after_a_short_reload(): void
+    {
+        // Rechargement d'1 s : l'issue reçoit tout le reste avant son échéance (16 s),
+        // et un premier tableau de bord de 14 s est vu (l'ancien calcul donnait 10 s).
+        $log = new \ArrayObject();
+        $login = $this->login($log);
+        $login->navCostMs = 3000;
+        $login->reloadCostMs = 1000;
+        $login->outcomeCostMs = 14000;
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        $s->openBackOfficeCheckpoint(['name' => 'picker'], 25000, 15000);
+
+        $this->assertSame([16000], $login->outcomeTimeouts);
+        $this->assertTrue($login->loginOutcomeSeen);
+        $this->assertSame(['login:page index', 'login:submit', 'login:check', 'page index'], $log->getArrayCopy());
+    }
+
+    public function test_open_checkpoint_does_not_submit_the_login_with_less_than_the_check_and_one_second_left(): void
     {
         $log = new \ArrayObject();
-        // Échéance 10 + 15 = 25 s ; page de connexion en 12 s (plafond 15 s) : reste
-        // 13 s < 10 s de rechargement + 5 s de constat + 1 s.
+        // Échéance 5 + 5 = 10 s ; page de connexion en 4,5 s : reste 5,5 s < 5 s de
+        // constat + 1 s.
         $login = $this->login($log);
-        $login->navCostMs = 12000;
+        $login->navCostMs = 4500;
         $s = $this->suite(page: $this->page($log), login: $login);
 
         try {
-            $s->openBackOfficeCheckpoint(['name' => 'picker'], 10000, 15000);
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 5000, 5000);
             $this->fail('BackOfficeTimeoutException attendue');
         } catch (BackOfficeTimeoutException $e) {
-            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (25 s au total).", $e->getMessage());
+            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (10 s au total).", $e->getMessage());
             $this->assertNull($e->getPrevious());
         }
         $this->assertNotContains('login:submit', $log->getArrayCopy());
+        $this->assertNull($login->loginOutcomeDeadline);
         $this->assertSame(60000, $login->loginOutcomeTimeout);
+    }
+
+    public function test_open_checkpoint_submits_the_login_once_the_check_and_one_second_are_left(): void
+    {
+        $log = new \ArrayObject();
+        // Échéance 10 s ; page de connexion en 4 s : reste 6 s = constat + 1 s, envoi.
+        $login = $this->login($log);
+        $login->navCostMs = 4000;
+        $s = $this->suite(page: $this->page($log), login: $login);
+
+        $s->openBackOfficeCheckpoint(['name' => 'picker'], 5000, 5000);
+
+        $this->assertSame(['login:page index', 'login:submit', 'login:check', 'page index'], $log->getArrayCopy());
+        $this->assertSame([1000], $login->outcomeTimeouts);
     }
 
     public function test_open_checkpoint_stops_before_a_step_once_the_deadline_is_reached(): void
@@ -778,16 +837,21 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $log = new \ArrayObject();
         $page = $this->page($log);
         $login = $this->login($log);
-        $login->navCostMs = 15000;
-        $login->submitCostMs = 25000; // 10 + 10 + 5 s au plus : t = 40 s, échéance atteinte
+        // Pire cas : envoi à 6 s de l'échéance (10 s), rechargement au plafond de 10 s,
+        // issue 1 s, constat 5 s : t = 20 s = échéance + 10 s (PAGE_RELOAD_MS).
+        $login->navCostMs = 4000;
+        $login->reloadCostMs = 10000;
+        $login->outcomeCostMs = 1000;
+        $login->checkCostMs = 5000;
         $s = $this->suite(page: $page, login: $login);
 
         try {
-            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 5000, 5000);
             $this->fail('BackOfficeTimeoutException attendue');
         } catch (BackOfficeTimeoutException $e) {
-            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (40 s au total).", $e->getMessage());
+            $this->assertSame("Le back-office n'a pas répondu dans le délai imparti (10 s au total).", $e->getMessage());
         }
+        $this->assertSame(20000, $this->chrome->now);
         $this->assertNotContains('page index', $log->getArrayCopy());
         $this->assertSame([], $page->navTimeouts);
         $this->assertNull($page->navigationTimeout);
@@ -802,6 +866,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $login = $this->login($log);
         $login->navigationTimeout = 30000;
         $login->loginOutcomeTimeout = 45000;
+        $login->loginOutcomeDeadline = 123;
         $s = $this->suite(page: $page, login: $login);
 
         try {
@@ -814,6 +879,9 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->assertSame(30000, $page->navigationTimeout);
         $this->assertSame(30000, $login->navigationTimeout);
         $this->assertSame(45000, $login->loginOutcomeTimeout);
+        // Échéance posée pour l'envoi (début + 25 - 5 s), celle d'avant rétablie ensuite.
+        $this->assertSame([20000], $login->outcomeDeadlines);
+        $this->assertSame(123, $login->loginOutcomeDeadline);
     }
 
     public function test_open_checkpoint_masks_the_token_of_a_failed_page_load(): void
@@ -889,11 +957,11 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         // Ouverture refusée par la closure (reste insuffisant à l'envoi), puis run
         // sur la même instance : le plafond du run (60 s) s'applique de nouveau.
         $login = $this->login($log = new \ArrayObject());
-        $login->navCostMs = 12000;
+        $login->navCostMs = 4500;
         $page = $this->page($log);
         $s = $this->suite(page: $page, login: $login);
         try {
-            $s->openBackOfficeCheckpoint(['name' => 'picker'], 10000, 15000);
+            $s->openBackOfficeCheckpoint(['name' => 'picker'], 5000, 5000);
             $this->fail('BackOfficeTimeoutException attendue');
         } catch (BackOfficeTimeoutException) {
         }
@@ -908,6 +976,7 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->runSteps($other);
 
         $this->assertSame(60000, end($login->outcomeTimeouts));
+        $this->assertNull(end($login->outcomeDeadlines));
         $this->assertSame($fresh->getArrayCopy(), $log->getArrayCopy());
     }
 

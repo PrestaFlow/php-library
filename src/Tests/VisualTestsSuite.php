@@ -66,8 +66,12 @@ abstract class VisualTestsSuite extends TestsSuite
     private const LOCATION_JS = '(function(){var c=new URLSearchParams(location.search).get("controller");return location.pathname+(c?"?controller="+c:"");})()';
 
     /**
-     * Rechargement attendu par Login\Page::login() avant l'issue de la connexion
-     * (CommonPage::waitForPageReload(), 10 s fixes) : déduit du plafond de connexion.
+     * Plafond fixe du rechargement attendu par Login\Page::login() avant l'issue
+     * de la connexion (CommonPage::waitForPageReload(), 10 s au plus). N'entre
+     * plus dans le calcul du budget : l'issue attend jusqu'à son échéance
+     * (Login\Page::$loginOutcomeDeadline), si bien qu'un rechargement court lui
+     * laisse le reste. Il borne le dépassement du pire cas de
+     * openBackOfficeCheckpoint().
      */
     private const PAGE_RELOAD_MS = 10000;
 
@@ -83,8 +87,8 @@ abstract class VisualTestsSuite extends TestsSuite
 
     /**
      * Appelé par ensureBackOfficeLogin() juste avant l'envoi du formulaire :
-     * openBackOfficeCheckpoint() y pose le plafond de l'issue selon le reste du
-     * budget (null pendant un run).
+     * openBackOfficeCheckpoint() y pose l'échéance de l'issue
+     * (Login\Page::$loginOutcomeDeadline) selon le budget (null pendant un run).
      */
     private ?\Closure $boBeforeLoginSubmit = null;
 
@@ -494,15 +498,19 @@ abstract class VisualTestsSuite extends TestsSuite
      * (BackOfficeTimeoutException) :
      * - navigation de la page de connexion, du tableau de bord, du menu :
      *   min($menuTimeoutMs, reste) (CommonPage::$navigationTimeout) ;
-     * - envoi du formulaire : seulement s'il reste au moins 16 s
-     *   (PAGE_RELOAD_MS + LOGIN_CHECK_MS + 1 s), car Login\Page::login() attend
-     *   d'abord un rechargement de 10 s fixes (CommonPage::waitForPageReload()),
-     *   et Login\Page::isLoggedIn() jusqu'à 5 s après l'issue ; l'issue de la
-     *   connexion (Login\Page::$loginOutcomeTimeout) reçoit
-     *   max(1 s, min($loginTimeoutMs, reste) - 10 s - 5 s). Si $loginTimeoutMs +
-     *   $menuTimeoutMs < 17 s, le formulaire n'est donc jamais envoyé.
-     * Pire cas : échéance + lectures JS et remplissage du formulaire (≤ 5 s
-     * chacun), non plafonnés par ce budget.
+     * - envoi du formulaire : seulement s'il reste au moins 6 s
+     *   (LOGIN_CHECK_MS + 1 s). Login\Page::login() attend alors le rechargement
+     *   (CommonPage::waitForPageReload(), 10 s au plus), puis l'issue de la
+     *   connexion jusqu'à l'échéance Login\Page::$loginOutcomeDeadline =
+     *   min(début + $loginTimeoutMs, échéance globale) - 5 s (1 s au moins après
+     *   le rechargement), et Login\Page::isLoggedIn() jusqu'à 5 s après l'issue.
+     *   Un rechargement court laisse donc le reste du plafond de connexion à
+     *   l'issue. Si $loginTimeoutMs + $menuTimeoutMs < 6 s, le formulaire n'est
+     *   jamais envoyé.
+     * Pire cas : échéance + 10 s (formulaire envoyé à 6 s de l'échéance,
+     * rechargement au plafond PAGE_RELOAD_MS, issue 1 s, constat 5 s), plus les
+     * lectures JS et le remplissage du formulaire (≤ 5 s chacun), non plafonnés
+     * par ce budget.
      * La capture (PageSnapshot::captureCurrent()) et la déconnexion
      * (closeBackOfficeSession()) sont hors de ce budget. Les plafonds d'avant
      * l'appel (ceux du run) sont rétablis avant de rendre la main, même en cas
@@ -544,7 +552,8 @@ abstract class VisualTestsSuite extends TestsSuite
         $this->lastVisualUrl = null;
 
         $budgetMs = $loginTimeoutMs + $menuTimeoutMs;
-        $deadline = $this->nowMs() + $budgetMs;
+        $start = $this->nowMs();
+        $deadline = $start + $budgetMs;
         // Reste avant l'échéance, plafonné à $stepMs ; délai si moins de $neededMs.
         $left = function (int $stepMs, int $neededMs = self::MIN_STEP_MS) use ($deadline, $budgetMs): int {
             $left = $deadline - $this->nowMs();
@@ -560,9 +569,10 @@ abstract class VisualTestsSuite extends TestsSuite
             if ($cp['auth']) {
                 if ($login !== null) {
                     $login->navigationTimeout = $left($menuTimeoutMs);
-                    $this->boBeforeLoginSubmit = static function (object $login) use ($left, $loginTimeoutMs): void {
-                        $rest = $left(PHP_INT_MAX, self::PAGE_RELOAD_MS + self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
-                        $login->loginOutcomeTimeout = max(self::MIN_STEP_MS, min($loginTimeoutMs, $rest) - self::PAGE_RELOAD_MS - self::LOGIN_CHECK_MS);
+                    $this->boBeforeLoginSubmit = static function (object $login) use ($left, $start, $deadline, $loginTimeoutMs): void {
+                        // Délai s'il ne reste pas de quoi attendre l'issue (1 s) puis la constater (5 s).
+                        $left(PHP_INT_MAX, self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
+                        $login->loginOutcomeDeadline = min($start + $loginTimeoutMs, $deadline) - self::LOGIN_CHECK_MS;
                     };
                 }
                 try {
@@ -654,25 +664,24 @@ abstract class VisualTestsSuite extends TestsSuite
     }
 
     /**
-     * Note les plafonds d'avant openBackOfficeCheckpoint() (ceux du run) et
-     * renvoie de quoi les rétablir. Les plafonds sont posés étape par étape.
+     * Note les plafonds d'avant openBackOfficeCheckpoint() (ceux du run :
+     * navigations, échéance de l'issue de connexion) et renvoie de quoi les
+     * rétablir. Les plafonds sont posés étape par étape.
      */
     private function capBackOfficeWaits(object $page, ?object $login): \Closure
     {
         $pageBefore = $page->navigationTimeout ?? null;
         $loginBefore = $login?->navigationTimeout ?? null;
-        $outcomeBefore = $login?->loginOutcomeTimeout ?? null;
+        $deadlineBefore = $login?->loginOutcomeDeadline ?? null;
         if ($login !== null) {
             $login->loginOutcomeSeen = null;
         }
 
-        return static function () use ($page, $login, $pageBefore, $loginBefore, $outcomeBefore): void {
+        return static function () use ($page, $login, $pageBefore, $loginBefore, $deadlineBefore): void {
             $page->navigationTimeout = $pageBefore;
             if ($login !== null) {
                 $login->navigationTimeout = $loginBefore;
-                if ($outcomeBefore !== null) {
-                    $login->loginOutcomeTimeout = $outcomeBefore;
-                }
+                $login->loginOutcomeDeadline = $deadlineBefore;
             }
         };
     }
