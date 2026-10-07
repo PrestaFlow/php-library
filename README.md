@@ -90,7 +90,12 @@ protected ?string $shopUrl = 'http://localhost:8093/';
 protected ?string $backOfficeUrl = 'admin123/'; // relative: appended to the effective shop URL
 ```
 
-`null` or empty: the environment URL. Only `http(s)` URLs; a relative back-office URL is appended to the shop URL (query and fragment dropped), like a relative `PRESTAFLOW_BO_URL`. Credentials (`user:pass@`) are refused at launch, without echoing the URL: use `PRESTAFLOW_BASIC_USER` / `PRESTAFLOW_BASIC_PASS`.
+`null` or empty: the environment URL. Rules:
+
+- Only `http(s)` URLs with a host; no whitespace; `$shopUrl` takes no query (`?`) or fragment (`#`).
+- A relative back-office URL is appended to the effective shop URL: the shop path is kept, its query and fragment are dropped (`http://x.test/shop/` + `admin123/` gives `http://x.test/shop/admin123/`). `//host/admin` takes the shop URL scheme. A relative path must be safe: no `?`/`#`, no segment starting with a dot, no dot in the first segment unless it starts with `/` (`shop.test/admin` is refused, not guessed). It needs an `http(s)` shop URL, else it is refused.
+- When only `$shopUrl` is set, a back-office URL that the library completed from the environment shop URL (relative `PRESTAFLOW_BO_URL`, or the default `admin-dev/`) follows the new shop URL; an absolute `PRESTAFLOW_BO_URL`, or one sent by the app, is kept.
+- Credentials (`user:pass@`) are refused at launch, without echoing the URL: use `PRESTAFLOW_BASIC_USER` / `PRESTAFLOW_BASIC_PASS`. The same goes for every other refusal: the message names the property, never the value.
 
 ### Visual picker API
 

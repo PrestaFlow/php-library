@@ -24,13 +24,20 @@ un run en CI avec la lib seule ignore l'URL choisie.
 - URL BO relative (ex. `admin123/`, sans schéma) : complétée par l'URL FO effective (propriété,
   sinon globals) avec la règle de l'app (`App\Support\BackOfficeUrl::resolve`) : URL FO sans
   requête ni fragment, puis le chemin relatif ; `//hôte/admin` prend le schéma de l'URL FO ;
-  toujours terminée par « / ». Même règle qu'un `PRESTAFLOW_BO_URL` relatif.
+  toujours terminée par « / ». Le chemin d'une BO relative doit être sûr (règle de
+  `BackOfficeUrl::isValid` : pas de blanc, `?` ni `#`, pas de segment commençant par un point, pas de
+  point dans le premier segment sans « / » initial) ; sinon refusée, jamais devinée.
+- Avec `$shopUrl` seule : une URL BO que `loadGlobals()` a complétée sur l'URL FO de l'environnement
+  (`PRESTAFLOW_BO_URL` relatif, ou défaut `admin-dev/`) est recalculée sur la nouvelle URL FO
+  (valeur brute mémorisée par `loadGlobals()`, remise à null par `setGlobals()` quand `BO` est fourni) ;
+  une BO absolue ou fournie par l'app reste telle quelle.
 - Refusées au lancement (`InvalidArgumentException`), avec un message qui nomme la propriété mais
   jamais la valeur :
   - identifiants dans l'URL (`scheme://user:pass@…`, `//user@…`) : l'authentification HTTP passe
     par `PRESTAFLOW_BASIC_USER` / `PRESTAFLOW_BASIC_PASS` ;
-  - schéma autre que `http` / `https` (FO sans schéma compris) ;
-  - BO relative sans URL FO pour la compléter.
+  - schéma autre que `http` / `https` (FO sans schéma compris), ou hôte absent ;
+  - blanc interne ; `?` ou `#` dans `$shopUrl` ; chemin BO relatif non sûr ;
+  - BO relative (`admin123/`, `//hôte/admin`) sans URL FO http(s) pour la compléter.
 - Les suites qui ne déclarent pas ces propriétés gardent exactement leur comportement.
 
 ## API

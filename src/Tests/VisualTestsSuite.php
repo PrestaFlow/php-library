@@ -439,11 +439,16 @@ abstract class VisualTestsSuite extends TestsSuite
     /**
      * Applique $shopUrl et $backOfficeUrl aux globals FO.URL et BO.URL ; une
      * propriété null ou vide laisse l'URL reçue. Appelée par init() et
-     * openBackOfficeCheckpoint(), avant l'import des pages. Idempotente.
+     * openBackOfficeCheckpoint(), avant l'import des pages : une page déjà
+     * importée garde les globals copiées à sa construction. Idempotente.
      *
-     * @throws \InvalidArgumentException URL à identifiants (`user:pass@`), schéma autre que
-     *                                   http(s), ou BO relative sans URL FO ; le message ne cite
-     *                                   jamais la valeur
+     * Avec $shopUrl seule, une URL BO que loadGlobals() a complétée sur l'URL FO de
+     * l'environnement (PRESTAFLOW_BO_URL relative, ou défaut) suit la nouvelle URL FO ;
+     * une BO absolue, ou fournie par setGlobals() (app), reste telle quelle.
+     *
+     * @throws \InvalidArgumentException URL à identifiants (`user:pass@`), blanc interne, schéma
+     *                                   autre que http(s), chemin BO relatif non sûr, ou BO relative
+     *                                   sans URL FO http(s) ; le message ne cite jamais la valeur
      */
     public function applySuiteUrls(): void
     {
@@ -460,11 +465,13 @@ abstract class VisualTestsSuite extends TestsSuite
         }
         if ($backOffice !== '') {
             $this->assertSuiteUrl('backOfficeUrl', $backOffice, true);
-            $fo = trim((string) ($globals['FO']['URL'] ?? ''));
-            if ($fo === '' && preg_match('#^(?:https?:)?//#i', $backOffice) !== 1) {
-                throw new \InvalidArgumentException(sprintf('%s : $backOfficeUrl relative sans URL de la boutique pour la compléter', static::class));
+            $resolved = self::resolveBackOfficeUrl($backOffice, trim((string) ($globals['FO']['URL'] ?? '')));
+            if (preg_match('#^https?://#i', $resolved) !== 1) {
+                throw new \InvalidArgumentException(sprintf('%s : $backOfficeUrl relative sans URL de la boutique http(s) pour la compléter', static::class));
             }
-            $globals['BO']['URL'] = self::resolveBackOfficeUrl($backOffice, $fo);
+            $globals['BO']['URL'] = $resolved;
+        } elseif ($shop !== '' && $this->backOfficeRelative !== null) {
+            $globals['BO']['URL'] = self::resolveBackOfficeUrl($this->backOfficeRelative, $globals['FO']['URL']);
         }
         $this->globals = $globals;
     }
@@ -491,9 +498,12 @@ abstract class VisualTestsSuite extends TestsSuite
         return str_ends_with($backOffice, '/') ? $backOffice : $backOffice.'/';
     }
 
-    /** Refuse identifiants et schéma non http(s), sans citer l'URL (elle peut porter un mot de passe). */
+    /** Refuse blancs, identifiants, schéma non http(s) et chemin relatif non sûr, sans citer l'URL (elle peut porter un mot de passe). */
     private function assertSuiteUrl(string $property, string $url, bool $relativeAllowed): void
     {
+        if (preg_match('/\s/u', $url) === 1) {
+            throw new \InvalidArgumentException(sprintf('%s : $%s refusée : espace ou blanc interdit dans l\'URL', static::class, $property));
+        }
         if (preg_match('#^(?:[a-z][a-z0-9+.\-]*:)?//[^/?\#]*@#i', $url) === 1) {
             throw new \InvalidArgumentException(sprintf(
                 '%s : $%s refusée : identifiants (user:pass@) interdits dans l\'URL ; authentification HTTP par PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS',
@@ -501,9 +511,26 @@ abstract class VisualTestsSuite extends TestsSuite
                 $property
             ));
         }
-        $absolute = preg_match('#^https?://[^/?\#\s]+#i', $url) === 1;
-        $otherScheme = !$absolute && preg_match('#^[a-z][a-z0-9+.\-]*:#i', $url) === 1;
-        if ($otherScheme || (!$absolute && !$relativeAllowed)) {
+        $absolute = preg_match('#^https?://#i', $url) === 1;
+        if ($absolute) {
+            if ((string) parse_url($url, PHP_URL_HOST) === '') {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : URL http(s) avec un hôte attendue', static::class, $property));
+            }
+            if (!$relativeAllowed && preg_match('/[?#]/', $url) === 1) {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : requête (?) et fragment (#) interdits', static::class, $property));
+            }
+
+            return;
+        }
+        if ($relativeAllowed && str_starts_with($url, '//')) {
+            if ((string) parse_url($url, PHP_URL_HOST) === '') {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : URL http(s) avec un hôte attendue', static::class, $property));
+            }
+
+            return;
+        }
+        $otherScheme = preg_match('#^[a-z][a-z0-9+.\-]*:#i', $url) === 1;
+        if ($otherScheme || !$relativeAllowed) {
             throw new \InvalidArgumentException(sprintf(
                 '%s : $%s refusée : URL http:// ou https:// attendue%s',
                 static::class,
@@ -511,6 +538,28 @@ abstract class VisualTestsSuite extends TestsSuite
                 $relativeAllowed ? ' (ou chemin relatif à la boutique, ex. admin123/)' : ''
             ));
         }
+        if (!self::isSafeRelativePath($url)) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s : $%s refusée : chemin relatif invalide (ex. admin123/ : sans espace, ni ? ou #, ni segment commençant par un point, ni point dans le premier segment sans « / » initial)',
+                static::class,
+                $property
+            ));
+        }
+    }
+
+    /** Chemin relatif sûr : même règle que App\Support\BackOfficeUrl::isValid() hors URL absolue. */
+    private static function isSafeRelativePath(string $url): bool
+    {
+        if (preg_match('#^/?[A-Za-z0-9_~%-][A-Za-z0-9._~%-]*(/[A-Za-z0-9_~%-][A-Za-z0-9._~%-]*)*/?\z#', $url) !== 1) {
+            return false;
+        }
+        foreach (explode('/', trim($url, '/')) as $segment) {
+            if (str_starts_with(rawurldecode($segment), '.')) {
+                return false;
+            }
+        }
+
+        return str_starts_with($url, '/') || !str_contains(explode('/', $url)[0], '.');
     }
 
     /**
