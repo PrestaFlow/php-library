@@ -265,6 +265,14 @@ class TestsSuite implements OutputStates
     protected $draft = false;
     protected $groups = 'all';
 
+    /**
+     * Valeur brute de l'URL BO quand loadGlobals() l'a complétée à partir de
+     * l'URL FO de l'environnement (PRESTAFLOW_BO_URL relative, ou défaut
+     * `admin-dev/`) ; null sinon (BO absolue, globals fournies). Permet à
+     * VisualTestsSuite::applySuiteUrls() de suivre une $shopUrl du fichier.
+     */
+    protected ?string $backOfficeRelative = null;
+
     public function __construct(bool $loadGlobals = true, bool $getBrowser = true)
     {
         if ($loadGlobals) {
@@ -1100,6 +1108,10 @@ class TestsSuite implements OutputStates
     public function setGlobals(array $globals = [])
     {
         $this->globals = array_merge($this->globals, $globals);
+        if (isset($globals['BO'])) {
+            // URL BO fournie : plus de valeur brute à recompléter.
+            $this->backOfficeRelative = null;
+        }
 
         $this->resolveVersion();
         $this->setLocale($this->globals['LOCALE'] ?? 'en');
@@ -1174,7 +1186,9 @@ class TestsSuite implements OutputStates
         }
 
         $backOfficeUrl = Env::get('PRESTAFLOW_BO_URL', $frontOfficeUrl . 'admin-dev/');
+        $this->backOfficeRelative = Env::has('PRESTAFLOW_BO_URL') ? null : 'admin-dev/';
         if (!str_starts_with($backOfficeUrl, 'https://') && !str_starts_with($backOfficeUrl, 'http://')) {
+            $this->backOfficeRelative = (string) $backOfficeUrl;
             $backOfficeUrl = $frontOfficeUrl . $backOfficeUrl;
         }
         if (!str_ends_with($backOfficeUrl, '/')) {

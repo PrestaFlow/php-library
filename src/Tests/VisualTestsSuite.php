@@ -12,7 +12,9 @@ use PrestaFlow\Library\Visual\VisualDevices;
 
 /**
  * Suite de régression visuelle pilotée par données. Les sous-classes ne
- * déclarent que $devices, $locales et $checkpoints (littéraux, édités par l'app).
+ * déclarent que $devices, $locales et $checkpoints (littéraux, édités par l'app),
+ * et au besoin $shopUrl / $backOfficeUrl : URL propres à la suite, prioritaires
+ * sur celles de l'environnement ou de l'app (applySuiteUrls()).
  * Une exécution couvre UNE combinaison device × locale (globals DEVICE / LOCALE,
  * ou env PRESTAFLOW_DEVICE / PRESTAFLOW_LOCALE en CLI).
  *
@@ -51,6 +53,24 @@ abstract class VisualTestsSuite extends TestsSuite
 
     /** Gel des transitions CSS pendant la capture ; null = actif en 'bo' seulement (références 'fo' inchangées). */
     protected ?bool $freezeTransitions = null;
+
+    /**
+     * URL de la boutique propre à la suite (écrite par l'éditeur de l'app).
+     * Chaîne non vide : remplace l'URL FO reçue (globals FO.URL : app, ou
+     * PRESTAFLOW_FO_URL en CLI) avant le premier checkpoint. null ou vide :
+     * URL de l'environnement. http(s) seulement, sans identifiants (refusée au
+     * lancement, applySuiteUrls()).
+     */
+    protected ?string $shopUrl = null;
+
+    /**
+     * URL du back-office propre à la suite. Chaîne non vide : remplace l'URL BO
+     * reçue (globals BO.URL, ou PRESTAFLOW_BO_URL). Absolue http(s), ou
+     * relative (ex. `admin123/`) complétée par l'URL FO effective
+     * (resolveBackOfficeUrl()). Sans identifiants : l'authentification HTTP
+     * passe par PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS.
+     */
+    protected ?string $backOfficeUrl = null;
 
     /**
      * État de la connexion BO (une seule tentative par exécution). Protégés et
@@ -294,6 +314,8 @@ abstract class VisualTestsSuite extends TestsSuite
         if (!in_array($this->area, ['fo', 'bo'], true)) {
             throw new \InvalidArgumentException(sprintf('%s : area « %s » inconnue (fo, bo)', static::class, $this->area));
         }
+        // Avant l'import : les pages copient les globals à leur construction.
+        $this->applySuiteUrls();
         $this->importVisualPage();
         $backOffice = $this->area === 'bo';
         $page = $this->pages[$backOffice ? 'backOfficePage' : 'frontOfficePage'] ?? null;
@@ -412,6 +434,132 @@ abstract class VisualTestsSuite extends TestsSuite
         }
 
         return $this;
+    }
+
+    /**
+     * Applique $shopUrl et $backOfficeUrl aux globals FO.URL et BO.URL ; une
+     * propriété null ou vide laisse l'URL reçue. Appelée par init() et
+     * openBackOfficeCheckpoint(), avant l'import des pages : une page déjà
+     * importée garde les globals copiées à sa construction. Idempotente.
+     *
+     * Avec $shopUrl seule, une URL BO que loadGlobals() a complétée sur l'URL FO de
+     * l'environnement (PRESTAFLOW_BO_URL relative, ou défaut) suit la nouvelle URL FO ;
+     * une BO absolue, ou fournie par setGlobals() (app), reste telle quelle.
+     *
+     * @throws \InvalidArgumentException URL à identifiants (`user:pass@`), blanc interne, schéma
+     *                                   autre que http(s), chemin BO relatif non sûr, ou BO relative
+     *                                   sans URL FO http(s) ; le message ne cite jamais la valeur
+     */
+    public function applySuiteUrls(): void
+    {
+        $shop = trim((string) $this->shopUrl);
+        $backOffice = trim((string) $this->backOfficeUrl);
+        if ($shop === '' && $backOffice === '') {
+            return;
+        }
+
+        $globals = $this->getGlobals();
+        if ($shop !== '') {
+            $this->assertSuiteUrl('shopUrl', $shop, false);
+            $globals['FO']['URL'] = str_ends_with($shop, '/') ? $shop : $shop.'/';
+        }
+        if ($backOffice !== '') {
+            $this->assertSuiteUrl('backOfficeUrl', $backOffice, true);
+            $resolved = self::resolveBackOfficeUrl($backOffice, trim((string) ($globals['FO']['URL'] ?? '')));
+            if (preg_match('#^https?://#i', $resolved) !== 1) {
+                throw new \InvalidArgumentException(sprintf('%s : $backOfficeUrl relative sans URL de la boutique http(s) pour la compléter', static::class));
+            }
+            $globals['BO']['URL'] = $resolved;
+        } elseif ($shop !== '' && $this->backOfficeRelative !== null) {
+            $globals['BO']['URL'] = self::resolveBackOfficeUrl($this->backOfficeRelative, $globals['FO']['URL']);
+        }
+        $this->globals = $globals;
+    }
+
+    /**
+     * URL BO effective, règle de l'app (App\Support\BackOfficeUrl::resolve) :
+     * absolue http(s) gardée ; relative au protocole (`//hôte/admin`) : schéma
+     * de l'URL FO ; relative (`admin123/`, `/admin123`) : URL FO sans requête
+     * ni fragment, puis le chemin. Toujours terminée par « / ».
+     */
+    public static function resolveBackOfficeUrl(string $backOffice, string $frontOffice): string
+    {
+        $backOffice = trim($backOffice);
+        $frontOffice = trim($frontOffice);
+        if (str_starts_with($backOffice, '//')) {
+            if (preg_match('#^(https?)://#i', $frontOffice, $m) === 1) {
+                $backOffice = strtolower($m[1]).':'.$backOffice;
+            }
+        } elseif (preg_match('#^https?://#i', $backOffice) !== 1) {
+            $frontOffice = (string) preg_replace('/[?#].*\z/s', '', $frontOffice);
+            $backOffice = rtrim($frontOffice, '/').'/'.ltrim($backOffice, '/');
+        }
+
+        return str_ends_with($backOffice, '/') ? $backOffice : $backOffice.'/';
+    }
+
+    /** Refuse blancs, identifiants, schéma non http(s) et chemin relatif non sûr, sans citer l'URL (elle peut porter un mot de passe). */
+    private function assertSuiteUrl(string $property, string $url, bool $relativeAllowed): void
+    {
+        if (preg_match('/\s/u', $url) === 1) {
+            throw new \InvalidArgumentException(sprintf('%s : $%s refusée : espace ou blanc interdit dans l\'URL', static::class, $property));
+        }
+        if (preg_match('#^(?:[a-z][a-z0-9+.\-]*:)?//[^/?\#]*@#i', $url) === 1) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s : $%s refusée : identifiants (user:pass@) interdits dans l\'URL ; authentification HTTP par PRESTAFLOW_BASIC_USER / PRESTAFLOW_BASIC_PASS',
+                static::class,
+                $property
+            ));
+        }
+        $absolute = preg_match('#^https?://#i', $url) === 1;
+        if ($absolute) {
+            if ((string) parse_url($url, PHP_URL_HOST) === '') {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : URL http(s) avec un hôte attendue', static::class, $property));
+            }
+            if (!$relativeAllowed && preg_match('/[?#]/', $url) === 1) {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : requête (?) et fragment (#) interdits', static::class, $property));
+            }
+
+            return;
+        }
+        if ($relativeAllowed && str_starts_with($url, '//')) {
+            if ((string) parse_url($url, PHP_URL_HOST) === '') {
+                throw new \InvalidArgumentException(sprintf('%s : $%s refusée : URL http(s) avec un hôte attendue', static::class, $property));
+            }
+
+            return;
+        }
+        $otherScheme = preg_match('#^[a-z][a-z0-9+.\-]*:#i', $url) === 1;
+        if ($otherScheme || !$relativeAllowed) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s : $%s refusée : URL http:// ou https:// attendue%s',
+                static::class,
+                $property,
+                $relativeAllowed ? ' (ou chemin relatif à la boutique, ex. admin123/)' : ''
+            ));
+        }
+        if (!self::isSafeRelativePath($url)) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s : $%s refusée : chemin relatif invalide (ex. admin123/ : sans espace, ni ? ou #, ni segment commençant par un point, ni point dans le premier segment sans « / » initial)',
+                static::class,
+                $property
+            ));
+        }
+    }
+
+    /** Chemin relatif sûr : même règle que App\Support\BackOfficeUrl::isValid() hors URL absolue. */
+    private static function isSafeRelativePath(string $url): bool
+    {
+        if (preg_match('#^/?[A-Za-z0-9_~%-][A-Za-z0-9._~%-]*(/[A-Za-z0-9_~%-][A-Za-z0-9._~%-]*)*/?\z#', $url) !== 1) {
+            return false;
+        }
+        foreach (explode('/', trim($url, '/')) as $segment) {
+            if (str_starts_with(rawurldecode($segment), '.')) {
+                return false;
+            }
+        }
+
+        return str_starts_with($url, '/') || !str_contains(explode('/', $url)[0], '.');
     }
 
     /**
@@ -539,7 +687,9 @@ abstract class VisualTestsSuite extends TestsSuite
             throw new \InvalidArgumentException(sprintf('%s : checkpoint « %s » : auth => false capture la page de connexion, menu interdit', static::class, (string) ($cp['name'] ?? '')));
         }
 
-        // init() n'est pas appelé (il enregistrerait les étapes du run) : pages importées ici.
+        // init() n'est pas appelé (il enregistrerait les étapes du run) : URL du fichier
+        // appliquées, puis pages importées ici.
+        $this->applySuiteUrls();
         if (!isset($this->pages['backOfficePage'])) {
             $this->importVisualPage();
         }

@@ -81,6 +81,22 @@ The back-office area also uses `PRESTAFLOW_BO_URL` (admin URL), `PRESTAFLOW_BO_E
 
 CSS transitions are frozen during back-office captures (`protected ?bool $freezeTransitions`; `null` = on for `bo`, off for `fo`). See `src/Tests/Suites/Visual/BackOffice.php`.
 
+### Shop and back-office URLs in the suite file
+
+A visual suite may pin its own URLs (the PrestaFlow app writes them from its editor). A non-empty value replaces `PRESTAFLOW_FO_URL` / `PRESTAFLOW_BO_URL` (or the URLs sent by the app) before the first checkpoint:
+
+```php
+protected ?string $shopUrl = 'http://localhost:8093/';
+protected ?string $backOfficeUrl = 'admin123/'; // relative: appended to the effective shop URL
+```
+
+`null` or empty: the environment URL. Rules:
+
+- Only `http(s)` URLs with a host; no whitespace; `$shopUrl` takes no query (`?`) or fragment (`#`).
+- A relative back-office URL is appended to the effective shop URL: the shop path is kept, its query and fragment are dropped (`http://x.test/shop/` + `admin123/` gives `http://x.test/shop/admin123/`). `//host/admin` takes the shop URL scheme. A relative path must be safe: no `?`/`#`, no segment starting with a dot, no dot in the first segment unless it starts with `/` (`shop.test/admin` is refused, not guessed). It needs an `http(s)` shop URL, else it is refused.
+- When only `$shopUrl` is set, a back-office URL that the library completed from the environment shop URL (relative `PRESTAFLOW_BO_URL`, or the default `admin-dev/`) follows the new shop URL; an absolute `PRESTAFLOW_BO_URL`, or one sent by the app, is kept.
+- Credentials (`user:pass@`) are refused at launch, without echoing the URL: use `PRESTAFLOW_BASIC_USER` / `PRESTAFLOW_BASIC_PASS`. The same goes for every other refusal: the message names the property, never the value.
+
 ### Visual picker API
 
 The visual picker of the PrestaFlow app captures a page and lists its elements, so that a user can pick a checkpoint selector. It uses the run's own code, under short ceilings.
