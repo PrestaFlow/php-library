@@ -66,8 +66,16 @@ abstract class VisualTestsSuite extends TestsSuite
     private const LOCATION_JS = '(function(){var c=new URLSearchParams(location.search).get("controller");return location.pathname+(c?"?controller="+c:"");})()';
 
     /**
-     * Rechargement attendu par Login\Page::login() avant l'issue de la connexion
-     * (CommonPage::waitForPageReload(), 10 s fixes) : déduit du plafond de connexion.
+     * Plafond fixe du rechargement attendu par Login\Page::login() avant l'issue
+     * de la connexion (CommonPage::waitForPageReload(), 10 s au plus). N'entre
+     * plus dans le calcul du budget : l'issue attend jusqu'à son échéance
+     * (Login\Page::$loginOutcomeDeadline), si bien qu'un rechargement court lui
+     * laisse le reste. Il borne le dépassement du pire cas de
+     * openBackOfficeCheckpoint().
+     *
+     * Sur PS 1.7 et 8, la connexion passe par AJAX (`<form action="#">`) : un
+     * refus ne recharge pas la page et consomme ces 10 s entières. Le gain du
+     * rechargement court vaut donc surtout pour PS 9 et pour les succès.
      */
     private const PAGE_RELOAD_MS = 10000;
 
@@ -83,15 +91,15 @@ abstract class VisualTestsSuite extends TestsSuite
 
     /**
      * Appelé par ensureBackOfficeLogin() juste avant l'envoi du formulaire :
-     * openBackOfficeCheckpoint() y pose le plafond de l'issue selon le reste du
-     * budget (null pendant un run).
+     * openBackOfficeCheckpoint() y pose l'échéance de l'issue
+     * (Login\Page::$loginOutcomeDeadline) selon le budget (null pendant un run).
      */
     private ?\Closure $boBeforeLoginSubmit = null;
 
-    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
     public const DEFAULT_MAX_DIFF_PIXELS = \PrestaFlow\Library\Pages\CommonPage::DEFAULT_MAX_DIFF_PIXELS;
 
+    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     public const UNSTABLE_WARNING = 'Page non stabilisée après 5 s (images/polices encore en chargement) : capture prise quand même.';
 
     /**
@@ -494,15 +502,19 @@ abstract class VisualTestsSuite extends TestsSuite
      * (BackOfficeTimeoutException) :
      * - navigation de la page de connexion, du tableau de bord, du menu :
      *   min($menuTimeoutMs, reste) (CommonPage::$navigationTimeout) ;
-     * - envoi du formulaire : seulement s'il reste au moins 16 s
-     *   (PAGE_RELOAD_MS + LOGIN_CHECK_MS + 1 s), car Login\Page::login() attend
-     *   d'abord un rechargement de 10 s fixes (CommonPage::waitForPageReload()),
-     *   et Login\Page::isLoggedIn() jusqu'à 5 s après l'issue ; l'issue de la
-     *   connexion (Login\Page::$loginOutcomeTimeout) reçoit
-     *   max(1 s, min($loginTimeoutMs, reste) - 10 s - 5 s). Si $loginTimeoutMs +
-     *   $menuTimeoutMs < 17 s, le formulaire n'est donc jamais envoyé.
-     * Pire cas : échéance + lectures JS et remplissage du formulaire (≤ 5 s
-     * chacun), non plafonnés par ce budget.
+     * - envoi du formulaire : seulement s'il reste au moins 6 s
+     *   (LOGIN_CHECK_MS + 1 s). Login\Page::login() attend alors le rechargement
+     *   (CommonPage::waitForPageReload(), 10 s au plus), puis l'issue de la
+     *   connexion jusqu'à l'échéance Login\Page::$loginOutcomeDeadline =
+     *   min(début + $loginTimeoutMs, échéance globale) - 5 s (1 s au moins après
+     *   le rechargement), et Login\Page::isLoggedIn() jusqu'à 5 s après l'issue.
+     *   Un rechargement court laisse donc le reste du plafond de connexion à
+     *   l'issue. Si $loginTimeoutMs + $menuTimeoutMs < 6 s, le formulaire n'est
+     *   jamais envoyé.
+     * Pire cas : échéance + 10 s (formulaire envoyé à 6 s de l'échéance,
+     * rechargement au plafond PAGE_RELOAD_MS, issue 1 s, constat 5 s), plus les
+     * lectures JS et le remplissage du formulaire (≤ 5 s chacun), non plafonnés
+     * par ce budget.
      * La capture (PageSnapshot::captureCurrent()) et la déconnexion
      * (closeBackOfficeSession()) sont hors de ce budget. Les plafonds d'avant
      * l'appel (ceux du run) sont rétablis avant de rendre la main, même en cas
@@ -544,7 +556,8 @@ abstract class VisualTestsSuite extends TestsSuite
         $this->lastVisualUrl = null;
 
         $budgetMs = $loginTimeoutMs + $menuTimeoutMs;
-        $deadline = $this->nowMs() + $budgetMs;
+        $start = $this->nowMs();
+        $deadline = $start + $budgetMs;
         // Reste avant l'échéance, plafonné à $stepMs ; délai si moins de $neededMs.
         $left = function (int $stepMs, int $neededMs = self::MIN_STEP_MS) use ($deadline, $budgetMs): int {
             $left = $deadline - $this->nowMs();
@@ -560,9 +573,12 @@ abstract class VisualTestsSuite extends TestsSuite
             if ($cp['auth']) {
                 if ($login !== null) {
                     $login->navigationTimeout = $left($menuTimeoutMs);
-                    $this->boBeforeLoginSubmit = static function (object $login) use ($left, $loginTimeoutMs): void {
-                        $rest = $left(PHP_INT_MAX, self::PAGE_RELOAD_MS + self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
-                        $login->loginOutcomeTimeout = max(self::MIN_STEP_MS, min($loginTimeoutMs, $rest) - self::PAGE_RELOAD_MS - self::LOGIN_CHECK_MS);
+                    $this->boBeforeLoginSubmit = static function (object $login) use ($left, $start, $deadline, $loginTimeoutMs): void {
+                        // Délai s'il ne reste pas de quoi attendre l'issue (1 s) puis la constater (5 s).
+                        $left(PHP_INT_MAX, self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
+                        if (property_exists($login, 'loginOutcomeDeadline')) {
+                            $login->loginOutcomeDeadline = min($start + $loginTimeoutMs, $deadline) - self::LOGIN_CHECK_MS;
+                        }
                     };
                 }
                 try {
@@ -647,44 +663,52 @@ abstract class VisualTestsSuite extends TestsSuite
         }
     }
 
-    /** Horloge monotone en millisecondes (surchargée en test unitaire). */
+    /**
+     * Horloge monotone en millisecondes (surchargée en test unitaire). Doit rester
+     * l'horloge de Login\Page::nowMs() : l'échéance Login\Page::$loginOutcomeDeadline
+     * est calculée ici et lue là-bas.
+     */
     protected function nowMs(): int
     {
         return intdiv(hrtime(true), 1_000_000);
     }
 
     /**
-     * Note les plafonds d'avant openBackOfficeCheckpoint() (ceux du run) et
-     * renvoie de quoi les rétablir. Les plafonds sont posés étape par étape.
+     * Note les plafonds d'avant openBackOfficeCheckpoint() (ceux du run :
+     * navigations, échéance de l'issue de connexion) et renvoie de quoi les
+     * rétablir. Les plafonds sont posés étape par étape.
      */
     private function capBackOfficeWaits(object $page, ?object $login): \Closure
     {
         $pageBefore = $page->navigationTimeout ?? null;
         $loginBefore = $login?->navigationTimeout ?? null;
-        $outcomeBefore = $login?->loginOutcomeTimeout ?? null;
-        if ($login !== null) {
+        $deadlineBefore = $login?->loginOutcomeDeadline ?? null;
+        // Page de connexion cliente sans ces propriétés (n'hérite pas de Login\Page) :
+        // ne pas les écrire, sinon propriété dynamique (dépréciée en PHP 8.2+).
+        if ($login !== null && property_exists($login, 'loginOutcomeSeen')) {
             $login->loginOutcomeSeen = null;
         }
 
-        return static function () use ($page, $login, $pageBefore, $loginBefore, $outcomeBefore): void {
+        return static function () use ($page, $login, $pageBefore, $loginBefore, $deadlineBefore): void {
             $page->navigationTimeout = $pageBefore;
             if ($login !== null) {
                 $login->navigationTimeout = $loginBefore;
-                if ($outcomeBefore !== null) {
-                    $login->loginOutcomeTimeout = $outcomeBefore;
+                if (property_exists($login, 'loginOutcomeDeadline')) {
+                    $login->loginOutcomeDeadline = $deadlineBefore;
                 }
             }
         };
     }
 
     /**
-     * Masque jetons (`token=`, `_token=`, encodés ou en entité HTML) et identifiants d'URL
-     * (`scheme://user:pass@`) d'un message relayé à l'utilisateur.
+     * Masque jetons (`token=`, `_token=`, encodés une ou deux fois, ou en entité HTML) et
+     * identifiants d'URL (`scheme://user:pass@`) d'un message relayé à l'utilisateur.
      */
     private static function redactUrls(string $message): string
     {
-        // Jeton en clair, encodé (%26token%3D, %3F_token%3D) ou en entité HTML (&amp;token=).
-        $message = preg_replace('~((?:[?&;]|%26|%3F)_?token(?:=|%3D))[^&"\'\s%<>]+~i', '$1…', $message) ?? $message;
+        // Jeton en clair, encodé (%26token%3D, %3F_token%3D), doublement encodé
+        // (%2526token%253D, %253F_token%253D) ou en entité HTML (&amp;token=).
+        $message = preg_replace('~((?:[?&;]|%26|%3F|%2526|%253F)_?token(?:=|%3D|%253D))[^&"\'\s%<>]+~i', '$1…', $message) ?? $message;
 
         // Identifiants avant l'hôte seulement : un « @ » de requête (?email=a@b.com) reste.
         return preg_replace('~\b([a-z][a-z0-9+.\-]*://)[^\s/?#"\'@]+@~i', '$1…@', $message) ?? $message;

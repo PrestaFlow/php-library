@@ -48,6 +48,15 @@ final class FakeLoginOutcomePage extends LoginPage
     /** Plafond reçu par chaque waitForLoginOutcome(). */
     public array $outcomeTimeouts = [];
 
+    /** Horloge factice (ms) lue par nowMs() ; le rechargement l'avance de $reloadMs. */
+    public int $now = 0;
+    public int $reloadMs = 0;
+
+    protected function nowMs(): int
+    {
+        return $this->now;
+    }
+
     public function waitForLoginOutcome(int $timeout = 60000, int $interval = 200): bool
     {
         $this->outcomeTimeouts[] = $timeout;
@@ -78,6 +87,7 @@ final class FakeLoginOutcomePage extends LoginPage
     public function waitForPageReload()
     {
         $this->log[] = 'reload';
+        $this->now += $this->reloadMs;
     }
 }
 
@@ -174,6 +184,65 @@ final class BackOfficeLoginOutcomeTest extends TestCase
         $page->login();
 
         $this->assertSame([150], $page->outcomeTimeouts);
+    }
+
+    public function testLoginWaitsForTheOutcomeUntilTheDeadline(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->now = 100000;
+        $page->reloadMs = 3000;
+        // Échéance à 20 s du début ; rechargement de 3 s : 17 s restent à l'issue.
+        $page->loginOutcomeDeadline = 120000;
+
+        $page->login();
+
+        $this->assertSame([17000], $page->outcomeTimeouts);
+        $this->assertSame(['set #email', 'set #passwd', 'click #submit_login', 'reload'], $page->log);
+    }
+
+    public function testLoginKeepsOneSecondForTheOutcomeOnceTheDeadlineIsPassed(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->now = 100000;
+        $page->reloadMs = 10000;
+        $page->loginOutcomeDeadline = 105000;
+
+        $page->login();
+
+        $this->assertSame([1000], $page->outcomeTimeouts);
+    }
+
+    public function testANearerDeadlineWinsOverTheCeiling(): void
+    {
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->loginOutcomeTimeout = 8000;
+        $page->loginOutcomeDeadline = 4000;
+
+        $page->login();
+
+        $this->assertSame([4000], $page->outcomeTimeouts);
+    }
+
+    public function testTheRunCeilingBoundsAFarDeadline(): void
+    {
+        // Horloges divergentes (échéance posée sur une autre horloge que nowMs()) :
+        // le temps restant serait énorme ; le plafond du run le borne.
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->now = 1000;
+        $page->loginOutcomeDeadline = PHP_INT_MAX;
+
+        $page->login();
+
+        $this->assertSame([60000], $page->outcomeTimeouts);
+    }
+
+    public function testNoDeadlineByDefault(): void
+    {
+        $this->assertNull($this->page()->loginOutcomeDeadline);
     }
 
     public function testAnOutcomeNotSeenWithinTheCeilingIsRecorded(): void
