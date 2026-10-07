@@ -11,9 +11,18 @@ class Page extends BasePage
     /**
      * Plafond (ms) de l'attente de l'issue de la connexion dans login().
      * 60 s pour un run (premier tableau de bord lent en CI, voir
-     * waitForLoginOutcome()) ; le sélecteur visuel de l'app le baisse.
+     * waitForLoginOutcome()). Ignoré quand $loginOutcomeDeadline est posée.
      */
     public int $loginOutcomeTimeout = 60000;
+
+    /**
+     * Échéance (ms monotones, l'horloge de nowMs()) de l'attente de l'issue dans
+     * login() : le plafond vaut alors le temps restant après le rechargement,
+     * 1 s au moins. null (défaut, et toujours pendant un run) : $loginOutcomeTimeout.
+     * Posée par VisualTestsSuite::openBackOfficeCheckpoint() : un rechargement
+     * court laisse le reste du budget à l'issue.
+     */
+    public ?int $loginOutcomeDeadline = null;
 
     /**
      * Issue de la dernière connexion de login() : true = vue (session ouverte
@@ -70,10 +79,19 @@ class Page extends BasePage
         if ($waitForNavigation) {
             $this->click($this->getSelector('submitLoginButton'));
             $this->waitForPageReload();
-            $this->loginOutcomeSeen = $this->waitForLoginOutcome($this->loginOutcomeTimeout);
+            $timeout = $this->loginOutcomeDeadline === null
+                ? $this->loginOutcomeTimeout
+                : max(1000, $this->loginOutcomeDeadline - $this->nowMs());
+            $this->loginOutcomeSeen = $this->waitForLoginOutcome($timeout);
         } else {
             $this->click($this->getSelector('submitLoginButton'));
         }
+    }
+
+    /** Horloge monotone en millisecondes, celle de $loginOutcomeDeadline (surchargée en test unitaire). */
+    protected function nowMs(): int
+    {
+        return intdiv(hrtime(true), 1_000_000);
     }
 
     /**
