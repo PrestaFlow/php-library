@@ -749,6 +749,10 @@ class TestsSuite implements OutputStates
      * l'appelle pas ; l'app l'appelle en libérant le navigateur du sélecteur
      * visuel, pour qu'un worker persistant ne garde pas les en-têtes d'un job
      * pour le suivant.
+     *
+     * N'oublie QUE le tableau statique : les en-têtes déjà posés sur la connexion
+     * d'un navigateur (setConnectionHttpHeaders, hérités par chaque nouvelle page)
+     * y restent. Fermer ou réinitialiser ce navigateur après usage (resetBrowser()).
      */
     public static function clearEnvironment(): void
     {
@@ -855,7 +859,9 @@ class TestsSuite implements OutputStates
 
         $decoded = json_decode((string) $raw, true);
         if (!is_array($decoded)) {
-            fwrite(STDERR, "[PrestaFlow] PRESTAFLOW_EXTRA_HEADERS: JSON invalide, ignoré.\n");
+            // STDERR n'existe qu'en CLI : applyEnvironment() tourne aussi dans une requête web (php-fpm).
+            $msg = "[PrestaFlow] PRESTAFLOW_EXTRA_HEADERS: JSON invalide, ignoré.\n";
+            defined('STDERR') ? fwrite(STDERR, $msg) : error_log(trim($msg));
             return;
         }
 

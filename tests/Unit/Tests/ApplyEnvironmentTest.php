@@ -89,9 +89,14 @@ final class ApplyEnvironmentTest extends TestCase
                 };
             }
         };
-        $browser = new class ($connection, $page) {
-            public function __construct(private object $connection, private object $page) {}
-            public function getConnection(): object { return $this->connection; }
+        $browser = new class ($journal, $connection, $page) {
+            public function __construct(private \ArrayObject $journal, private object $connection, private object $page) {}
+            public function getConnection(): object
+            {
+                $this->journal[] = 'browser getConnection';
+
+                return $this->connection;
+            }
             public function getPages(): array { return [$this->page]; }
             public function createPage(): object { return $this->page; }
             public function close(): void {}
@@ -118,9 +123,11 @@ final class ApplyEnvironmentTest extends TestCase
         $basic = ['Authorization' => 'Basic YWRtaW46czNjcmV0'];
         $all = $basic + ['X-CI-Bypass' => 'k'];
         $this->assertSame([
+            'browser getConnection',
             'connection '.json_encode($basic),
             'session Network.enable',
             'page '.json_encode($basic),
+            'browser getConnection',
             'connection '.json_encode($all),
             'session Network.enable',
             'page '.json_encode($all),
@@ -148,6 +155,62 @@ final class ApplyEnvironmentTest extends TestCase
 
         $this->assertSame([], $journal->getArrayCopy());
         $this->assertSame([], TestsSuite::$extraHttpHeaders);
+    }
+
+    public function test_applying_twice_does_not_accumulate_headers(): void
+    {
+        $this->setFullEnvironment();
+        [$browser, $page, $journal] = $this->doubles();
+        TestsSuite::applyEnvironment($browser, $page);
+        $firstHeaders = TestsSuite::$extraHttpHeaders;
+        $firstConnection = $this->lastConnection($journal);
+
+        TestsSuite::applyEnvironment($browser, $page);
+
+        $this->assertSame($firstHeaders, TestsSuite::$extraHttpHeaders);
+        $this->assertSame($firstConnection, $this->lastConnection($journal));
+    }
+
+    private function lastConnection(\ArrayObject $journal): ?string
+    {
+        $connections = array_values(array_filter($journal->getArrayCopy(), static fn (string $line) => str_starts_with($line, 'connection ')));
+
+        return $connections === [] ? null : $connections[count($connections) - 1];
+    }
+
+    /**
+     * Hors CLI (php-fpm : file `sync` de l'app), la constante STDERR n'existe pas.
+     * Un PRESTAFLOW_EXTRA_HEADERS invalide ne doit pas lever « Undefined constant ».
+     * Le SAPI CGI n'a pas STDERR non plus : on y exécute l'étape dans un sous-processus.
+     */
+    public function test_invalid_extra_headers_do_not_fail_outside_cli(): void
+    {
+        $cgi = dirname(PHP_BINARY).'/php-cgi';
+        if (!is_executable($cgi)) {
+            $this->markTestSkipped('php-cgi absent à côté de '.PHP_BINARY);
+        }
+
+        $autoload = dirname(__DIR__, 3).'/vendor/autoload.php';
+        $base = tempnam(sys_get_temp_dir(), 'pf-env-cgi-');
+        $script = $base.'.php';
+        file_put_contents($script, '<?php
+require '.var_export($autoload, true).';
+$_ENV["PRESTAFLOW_BASIC_USER"] = "";
+$_ENV["PRESTAFLOW_COOKIES"] = "";
+$_ENV["PRESTAFLOW_EXTRA_HEADERS"] = "{pas du json";
+echo defined("STDERR") ? "stderr-defini|" : "sans-stderr|";
+\\PrestaFlow\\Library\\Tests\\TestsSuite::applyEnvironment(new stdClass(), new stdClass());
+echo "ok";
+');
+
+        try {
+            $output = (string) shell_exec(escapeshellarg($cgi).' -q -d display_errors=1 -d error_log=/dev/null '.escapeshellarg($script).' 2>&1');
+        } finally {
+            @unlink($script);
+            @unlink($base);
+        }
+
+        $this->assertSame('sans-stderr|ok', trim($output));
     }
 
     public function test_clear_environment_forgets_the_headers(): void
@@ -179,9 +242,12 @@ final class ApplyEnvironmentTest extends TestCase
         (new InjectedBrowserSuite(loadGlobals: false, getBrowser: false))->before(headless: true);
 
         // before() vide d'abord les cookies de la suite précédente, puis applique l'environnement.
+        // getBrowser() valide son cache par getConnection()->isConnected() à chaque appel :
+        // ces lectures du navigateur partagé ne sont pas comparées, seuls les effets le sont.
+        $effects = static fn (\ArrayObject $j) => array_values(array_filter($j->getArrayCopy(), static fn (string $line) => $line !== 'browser getConnection'));
         $this->assertSame(
-            array_merge(['session Network.clearBrowserCookies'], $expected->getArrayCopy()),
-            $journal->getArrayCopy()
+            array_merge(['session Network.clearBrowserCookies'], $effects($expected)),
+            $effects($journal)
         );
     }
 }
