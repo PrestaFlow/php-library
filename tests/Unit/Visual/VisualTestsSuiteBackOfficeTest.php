@@ -210,12 +210,13 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
                 $this->log[] = 'login:submit';
                 $this->outcomeDeadlines[] = $this->loginOutcomeDeadline;
                 // Fidèle à Login\Page::login() : rechargement (10 s au plus), puis issue
-                // plafonnée par le temps restant avant l'échéance (1 s au moins), ou par
-                // $loginOutcomeTimeout sans échéance ; au-delà du plafond, l'issue n'est pas vue.
+                // plafonnée par le temps restant avant l'échéance borné par $loginOutcomeTimeout
+                // (1 s au moins), ou par $loginOutcomeTimeout sans échéance ; au-delà du plafond,
+                // l'issue n'est pas vue.
                 $this->chrome->now += min($this->reloadCostMs, 10000);
                 $ceiling = $this->loginOutcomeDeadline === null
                     ? $this->loginOutcomeTimeout
-                    : max(1000, $this->loginOutcomeDeadline - $this->chrome->now);
+                    : max(1000, min($this->loginOutcomeTimeout, $this->loginOutcomeDeadline - $this->chrome->now));
                 $this->outcomeTimeouts[] = $ceiling;
                 $this->loginOutcomeSeen = $this->outcome && $this->outcomeCostMs <= $ceiling;
                 $this->chrome->now += min($this->outcomeCostMs, $ceiling);
@@ -988,6 +989,10 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
             'jeton encodé %26' => ['http://shop.test/r?back=x%26token%3Dabc123', 'http://shop.test/r?back=x%26token%3D…'],
             'jeton encodé %3F' => ['http://shop.test/r?back=y%3F_token%3Dxyz789', 'http://shop.test/r?back=y%3F_token%3D…'],
             'jeton en entité HTML' => ['http://shop.test/a?controller=X&amp;token=html123', 'http://shop.test/a?controller=X&amp;token=…'],
+            'jeton doublement encodé %2526' => ['http://shop.test/r?back=x%2526token%253Dabc123', 'http://shop.test/r?back=x%2526token%253D…'],
+            'jeton doublement encodé %253F' => ['http://shop.test/r?back=y%253Ftoken%253Dxyz789', 'http://shop.test/r?back=y%253Ftoken%253D…'],
+            '_token doublement encodé, suite gardée' => ['http://shop.test/r?back=z%2526_token%253Dqrs456%2526id%253D7', 'http://shop.test/r?back=z%2526_token%253D…%2526id%253D7'],
+            '_token doublement encodé en tête' => ['http://shop.test/r?back=%252Fadmin%253F_token%253Dmno321', 'http://shop.test/r?back=%252Fadmin%253F_token%253D…'],
             "guillemet simple conservé" => ["'http://shop.test/a?token=abc123'", "'http://shop.test/a?token=…'"],
             'identifiants' => ['https://admin:s3cret@shop.test/admin-dev/', 'https://…@shop.test/admin-dev/'],
             'arobase de requête, hôte gardé' => ['https://shop.test?email=a@b.com', 'https://shop.test?email=a@b.com'],

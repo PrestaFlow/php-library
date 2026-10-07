@@ -214,16 +214,30 @@ final class BackOfficeLoginOutcomeTest extends TestCase
         $this->assertSame([1000], $page->outcomeTimeouts);
     }
 
-    public function testTheDeadlineWinsOverTheCeiling(): void
+    public function testANearerDeadlineWinsOverTheCeiling(): void
     {
         $page = $this->page();
         $page->settlesOnPoll = 1;
-        $page->loginOutcomeTimeout = 150;
+        $page->loginOutcomeTimeout = 8000;
         $page->loginOutcomeDeadline = 4000;
 
         $page->login();
 
         $this->assertSame([4000], $page->outcomeTimeouts);
+    }
+
+    public function testTheRunCeilingBoundsAFarDeadline(): void
+    {
+        // Horloges divergentes (échéance posée sur une autre horloge que nowMs()) :
+        // le temps restant serait énorme ; le plafond du run le borne.
+        $page = $this->page();
+        $page->settlesOnPoll = 1;
+        $page->now = 1000;
+        $page->loginOutcomeDeadline = PHP_INT_MAX;
+
+        $page->login();
+
+        $this->assertSame([60000], $page->outcomeTimeouts);
     }
 
     public function testNoDeadlineByDefault(): void

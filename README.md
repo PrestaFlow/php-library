@@ -81,6 +81,56 @@ The back-office area also uses `PRESTAFLOW_BO_URL` (admin URL), `PRESTAFLOW_BO_E
 
 CSS transitions are frozen during back-office captures (`protected ?bool $freezeTransitions`; `null` = on for `bo`, off for `fo`). See `src/Tests/Suites/Visual/BackOffice.php`.
 
+### Visual picker API
+
+The visual picker of the PrestaFlow app captures a page and lists its elements, so that a user can pick a checkpoint selector. It uses the run's own code, under short ceilings.
+
+**Back-office page.** Open the checkpoint's page in the shared browser, capture it, log out, then close the browser:
+
+```php
+use PrestaFlow\Library\Exceptions\BackOfficeTimeoutException;
+use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Visual\PageSnapshot;
+
+TestsSuite::scopeBrowserFilesTo('picker-'.$jobId);
+$browser = TestsSuite::getBrowser(force: true);
+TestsSuite::applyEnvironment($browser, TestsSuite::getPage(), $boUrl); // Basic Auth, headers, cookies
+
+$suite = new MyBackOfficeVisualSuite(loadGlobals: true, getBrowser: false);
+try {
+    $where = $suite->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts']);
+    $result = (new PageSnapshot())->captureCurrent(TestsSuite::getPage());
+} catch (BackOfficeTimeoutException $e) {
+    // the back office did not answer in time: readable message
+} catch (\RuntimeException $e) {
+    // run error, readable message: credentials refused, unexpected page, menu entry not found
+} finally {
+    $suite->closeBackOfficeSession();
+    TestsSuite::resetBrowser();
+    TestsSuite::clearEnvironment();
+}
+```
+
+- `openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): string` logs in (unless `auth => false`), opens the back-office root, then the `menu` entry. It returns the path and controller of the opened page, never its token. The login outcome is awaited until a deadline (`Login\Page::$loginOutcomeDeadline`, still bounded by `$loginOutcomeTimeout`), so a fast reload leaves the rest of the login budget to the outcome. The run's ceilings are restored before it returns, even on error.
+- `PageSnapshot::captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult` captures the open tab without navigating or closing anything.
+- `closeBackOfficeSession(int $timeoutMs = 5000): void` follows the logout link of an open session. It never throws.
+- `TestsSuite::resetBrowser()` closes the browser.
+
+**Front-office page.** `(new PageSnapshot())->take($url, $device)` starts a dedicated browser, applies the run's environment (`TestsSuite::applyEnvironment()`, with `$url` as the cookies' default domain), opens the URL, captures the page and closes the browser. It starts from empty headers and restores `TestsSuite::$extraHttpHeaders` on return, so a run in the same process neither leaks into it nor is altered by it. It throws `SnapshotException` when Chrome cannot start or the page does not load in time.
+
+**Exceptions of `openBackOfficeCheckpoint()`.**
+
+| Exception | When |
+|---|---|
+| `BackOfficeTimeoutException` | The back office did not answer within the budget. It extends `\RuntimeException`: catch it first. |
+| `\RuntimeException` | Run error with a readable message (credentials refused, unexpected page, menu entry not found, session already open for an `auth => false` checkpoint). |
+| `\LogicException` | The suite's `$area` is not `bo`. |
+| `\InvalidArgumentException` | An `auth => false` checkpoint with a `menu`. |
+
+Messages never carry a token (`token`, `_token`, plain, encoded or double-encoded) nor URL credentials. `getPrevious()` keeps the original cause, which may hold the raw URL: never show or log it.
+
+**Environment.** `TestsSuite::applyEnvironment($browser, $page, ?string $defaultUrl = null)` applies what `before()` applies to a run, in the same order: Basic Auth (`PRESTAFLOW_BASIC_USER` / `PRESTAFLOW_BASIC_PASS`), then the `PRESTAFLOW_EXTRA_HEADERS` headers on the connection and the page, then the `PRESTAFLOW_COOKIES` cookies. A cookie without `domain` takes the host of its own `url`, otherwise the host of `$defaultUrl` (the page is still on `about:blank`). Values are read from the environment only. Without these variables, nothing is set. The headers stay in `TestsSuite::$extraHttpHeaders` for the pages created afterwards: call `TestsSuite::clearEnvironment()` when releasing the browser, so that a persistent worker does not keep them for the next job. It only empties that array: headers already set on a browser's connection stay there, so close or reset that browser too (`TestsSuite::resetBrowser()`).
+
 ## Run a suite against a throwaway shop
 
 `docker-compose.yml` boots a disposable PrestaShop from the official

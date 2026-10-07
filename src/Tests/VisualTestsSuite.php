@@ -72,6 +72,10 @@ abstract class VisualTestsSuite extends TestsSuite
      * (Login\Page::$loginOutcomeDeadline), si bien qu'un rechargement court lui
      * laisse le reste. Il borne le dépassement du pire cas de
      * openBackOfficeCheckpoint().
+     *
+     * Sur PS 1.7 et 8, la connexion passe par AJAX (`<form action="#">`) : un
+     * refus ne recharge pas la page et consomme ces 10 s entières. Le gain du
+     * rechargement court vaut donc surtout pour PS 9 et pour les succès.
      */
     private const PAGE_RELOAD_MS = 10000;
 
@@ -92,10 +96,10 @@ abstract class VisualTestsSuite extends TestsSuite
      */
     private ?\Closure $boBeforeLoginSubmit = null;
 
-    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     /** Budget par défaut de pixels changés (cf. CommonPage::visualCheckpoint). */
     public const DEFAULT_MAX_DIFF_PIXELS = \PrestaFlow\Library\Pages\CommonPage::DEFAULT_MAX_DIFF_PIXELS;
 
+    /** Avertissement posé sur le test quand waitForStable() expire (la capture est prise quand même). */
     public const UNSTABLE_WARNING = 'Page non stabilisée après 5 s (images/polices encore en chargement) : capture prise quand même.';
 
     /**
@@ -657,7 +661,11 @@ abstract class VisualTestsSuite extends TestsSuite
         }
     }
 
-    /** Horloge monotone en millisecondes (surchargée en test unitaire). */
+    /**
+     * Horloge monotone en millisecondes (surchargée en test unitaire). Doit rester
+     * l'horloge de Login\Page::nowMs() : l'échéance Login\Page::$loginOutcomeDeadline
+     * est calculée ici et lue là-bas.
+     */
     protected function nowMs(): int
     {
         return intdiv(hrtime(true), 1_000_000);
@@ -687,13 +695,14 @@ abstract class VisualTestsSuite extends TestsSuite
     }
 
     /**
-     * Masque jetons (`token=`, `_token=`, encodés ou en entité HTML) et identifiants d'URL
-     * (`scheme://user:pass@`) d'un message relayé à l'utilisateur.
+     * Masque jetons (`token=`, `_token=`, encodés une ou deux fois, ou en entité HTML) et
+     * identifiants d'URL (`scheme://user:pass@`) d'un message relayé à l'utilisateur.
      */
     private static function redactUrls(string $message): string
     {
-        // Jeton en clair, encodé (%26token%3D, %3F_token%3D) ou en entité HTML (&amp;token=).
-        $message = preg_replace('~((?:[?&;]|%26|%3F)_?token(?:=|%3D))[^&"\'\s%<>]+~i', '$1…', $message) ?? $message;
+        // Jeton en clair, encodé (%26token%3D, %3F_token%3D), doublement encodé
+        // (%2526token%253D, %253F_token%253D) ou en entité HTML (&amp;token=).
+        $message = preg_replace('~((?:[?&;]|%26|%3F|%2526|%253F)_?token(?:=|%3D|%253D))[^&"\'\s%<>]+~i', '$1…', $message) ?? $message;
 
         // Identifiants avant l'hôte seulement : un « @ » de requête (?email=a@b.com) reste.
         return preg_replace('~\b([a-z][a-z0-9+.\-]*://)[^\s/?#"\'@]+@~i', '$1…@', $message) ?? $message;
