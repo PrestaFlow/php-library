@@ -150,7 +150,8 @@ class TestsSuite implements OutputStates
 
     /**
      * En-têtes HTTP à (ré)appliquer sur CHAQUE page, y compris celles recréées par
-     * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth().
+     * goToPage (qui ferme puis recrée la page). Alimenté par presetBasicAuth(),
+     * presetExtraHeadersFromEnv() et applyEnvironment() ; vidé par clearEnvironment().
      */
     public static array $extraHttpHeaders = [];
 
@@ -715,6 +716,46 @@ class TestsSuite implements OutputStates
     }
 
     /**
+     * Environnement du run (Basic Auth, en-têtes PRESTAFLOW_EXTRA_HEADERS, cookies
+     * PRESTAFLOW_COOKIES) appliqué à un navigateur et à une page donnés, pour ceux
+     * qui ne passent pas par before() : PageSnapshot::take() et le sélecteur
+     * visuel de l'app. Mêmes étapes, dans le même ordre, que before() :
+     *  1. Basic Auth → TestsSuite::$extraHttpHeaders['Authorization'] ;
+     *  2. PRESTAFLOW_EXTRA_HEADERS fusionnés par-dessus ;
+     *  3. en-têtes posés sur la connexion (setConnectionHttpHeaders) et sur la page
+     *     (Network.enable puis setExtraHTTPHeaders), à chacune des deux étapes ;
+     *  4. cookies PRESTAFLOW_COOKIES posés sur la page.
+     *
+     * Valeurs lues dans l'environnement (Env::get), jamais écrites dans un message
+     * ni un journal. Sans variable, rien n'est posé. Best-effort comme before().
+     * Les en-têtes restent dans TestsSuite::$extraHttpHeaders : clearEnvironment()
+     * les oublie.
+     *
+     * @param object $browser \HeadlessChromium\Browser ; typé object pour les doubles de test
+     * @param object $page    \HeadlessChromium\Page ; typé object pour les doubles de test
+     */
+    public static function applyEnvironment(object $browser, object $page): void
+    {
+        $browserOf = static fn () => $browser;
+        $pageOf = static fn () => $page;
+
+        self::presetBasicAuthOn($browserOf, $pageOf);
+        self::presetExtraHeadersOn($browserOf, $pageOf);
+        self::presetCookiesOn($pageOf);
+    }
+
+    /**
+     * Oublie les en-têtes persistants (TestsSuite::$extraHttpHeaders). Le run ne
+     * l'appelle pas ; l'app l'appelle en libérant le navigateur du sélecteur
+     * visuel, pour qu'un worker persistant ne garde pas les en-têtes d'un job
+     * pour le suivant.
+     */
+    public static function clearEnvironment(): void
+    {
+        TestsSuite::$extraHttpHeaders = [];
+    }
+
+    /**
      * Authentification HTTP Basic via l'environnement, posée en en-tête sur toutes
      * les requêtes (utile pour un environnement protégé : preprod/staging).
      *
@@ -725,32 +766,16 @@ class TestsSuite implements OutputStates
      * FrontOfficePage::goToPage() ferme la page courante et en crée une neuve —
      * un en-tête posé uniquement sur la page initiale serait perdu. On l'applique
      * aussi à la page courante pour couvrir la toute première navigation.
+     *
+     * Gardée pour les suites qui la surchargent : même code qu'applyEnvironment(),
+     * sur le navigateur partagé et sa page courante.
      */
     protected function presetBasicAuth(): void
     {
-        $user = Env::get('PRESTAFLOW_BASIC_USER');
-        $pass = Env::get('PRESTAFLOW_BASIC_PASS');
-        if ($user === null || $user === '') {
-            return;
-        }
-
-        $authHeader = 'Basic '.\base64_encode($user.':'.($pass ?? ''));
-
-        // Mémorisé pour réapplication après chaque (re)création de page (goToPage).
-        TestsSuite::$extraHttpHeaders['Authorization'] = $authHeader;
-
-        $browser = TestsSuite::getBrowser();
-        if ($browser) {
-            try {
-                // Hérité par chaque page créée ensuite (dont le createPage de goToPage).
-                $browser->getConnection()->setConnectionHttpHeaders(['Authorization' => $authHeader]);
-            } catch (Throwable $e) {
-                // best-effort
-            }
-        }
-
-        // Applique sur la page courante (première navigation).
-        TestsSuite::applyExtraHttpHeaders();
+        self::presetBasicAuthOn(
+            static fn () => TestsSuite::getBrowser(),
+            static fn () => TestsSuite::getPage(),
+        );
     }
 
     /**
@@ -768,8 +793,60 @@ class TestsSuite implements OutputStates
      *
      * Best-effort : JSON invalide → warning stderr, on n'interrompt pas le
      * bootstrap. Les clés non-string ou valeurs non-string sont ignorées.
+     *
+     * Gardée pour les suites qui la surchargent : même code qu'applyEnvironment(),
+     * sur le navigateur partagé (sans en lancer un) et sa page courante.
      */
     protected function presetExtraHeadersFromEnv(): void
+    {
+        self::presetExtraHeadersOn(
+            static fn () => TestsSuite::getBrowser(force: false),
+            static fn () => TestsSuite::getPage(),
+        );
+    }
+
+    /**
+     * Étape Basic Auth de before() et d'applyEnvironment(). Navigateur et page
+     * sont résolus seulement quand une variable est posée : sans variable, le run
+     * n'ouvre rien de plus qu'avant.
+     *
+     * @param \Closure(): ?object $browserOf
+     * @param \Closure(): ?object $pageOf
+     */
+    private static function presetBasicAuthOn(\Closure $browserOf, \Closure $pageOf): void
+    {
+        $user = Env::get('PRESTAFLOW_BASIC_USER');
+        $pass = Env::get('PRESTAFLOW_BASIC_PASS');
+        if ($user === null || $user === '') {
+            return;
+        }
+
+        $authHeader = 'Basic '.\base64_encode($user.':'.($pass ?? ''));
+
+        // Mémorisé pour réapplication après chaque (re)création de page (goToPage).
+        TestsSuite::$extraHttpHeaders['Authorization'] = $authHeader;
+
+        $browser = $browserOf();
+        if ($browser) {
+            try {
+                // Hérité par chaque page créée ensuite (dont le createPage de goToPage).
+                $browser->getConnection()->setConnectionHttpHeaders(['Authorization' => $authHeader]);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
+
+        // Applique sur la page courante (première navigation).
+        self::pushExtraHttpHeaders($pageOf());
+    }
+
+    /**
+     * Étape PRESTAFLOW_EXTRA_HEADERS de before() et d'applyEnvironment().
+     *
+     * @param \Closure(): ?object $browserOf
+     * @param \Closure(): ?object $pageOf
+     */
+    private static function presetExtraHeadersOn(\Closure $browserOf, \Closure $pageOf): void
     {
         $raw = Env::get('PRESTAFLOW_EXTRA_HEADERS');
         if ($raw === null || $raw === '') {
@@ -801,7 +878,7 @@ class TestsSuite implements OutputStates
 
         // Même chemin d'application que Basic Auth : au niveau de la connexion
         // pour héritage par chaque nouvelle page, puis sur la page courante.
-        $browser = TestsSuite::getBrowser(force: false);
+        $browser = $browserOf();
         if ($browser) {
             try {
                 $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
@@ -809,7 +886,7 @@ class TestsSuite implements OutputStates
                 // best-effort
             }
 
-            TestsSuite::applyExtraHttpHeaders();
+            self::pushExtraHttpHeaders($pageOf());
         }
     }
 
@@ -855,8 +932,13 @@ class TestsSuite implements OutputStates
             return;
         }
 
-        $page = TestsSuite::getPage();
-        if (!$page) {
+        self::pushExtraHttpHeaders(TestsSuite::getPage());
+    }
+
+    /** Pose self::$extraHttpHeaders sur $page (rien sans en-tête ni page). Best-effort. */
+    private static function pushExtraHttpHeaders(?object $page): void
+    {
+        if (empty(TestsSuite::$extraHttpHeaders) || !$page) {
             return;
         }
 
@@ -877,8 +959,21 @@ class TestsSuite implements OutputStates
      *   PRESTAFLOW_COOKIES=[{"name":"___kbgdcc","value":"eyIx...","domain":"preprod.example.com"}]
      *
      * Best-effort : n'interrompt jamais l'exécution si l'API cookies échoue.
+     *
+     * Gardée pour les suites qui la surchargent : même code qu'applyEnvironment(),
+     * sur la page courante du navigateur partagé.
      */
     protected function presetEnvCookies(): void
+    {
+        self::presetCookiesOn(static fn () => TestsSuite::getPage());
+    }
+
+    /**
+     * Étape PRESTAFLOW_COOKIES de before() et d'applyEnvironment().
+     *
+     * @param \Closure(): ?object $pageOf
+     */
+    private static function presetCookiesOn(\Closure $pageOf): void
     {
         $raw = Env::get('PRESTAFLOW_COOKIES');
         if (!$raw) {
@@ -890,7 +985,7 @@ class TestsSuite implements OutputStates
             return;
         }
 
-        $page = TestsSuite::getPage();
+        $page = $pageOf();
         if (!$page) {
             return;
         }
