@@ -260,6 +260,40 @@ echo "ok";
         $this->assertSame(['cookie consent=1 domain= path=/'], $journal->getArrayCopy());
     }
 
+    public function test_an_unusable_cookie_url_falls_back_on_the_default_url(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"a","value":"1","url":"preprod.shop.test/fr/"},{"name":"b","value":"2","url":"http://:80"}]';
+        [$browser, $page, $journal] = $this->doubles();
+
+        TestsSuite::applyEnvironment($browser, $page, 'https://shop.test/');
+
+        $this->assertSame([
+            'cookie a=1 domain=shop.test path=/',
+            'cookie b=2 domain=shop.test path=/',
+        ], $journal->getArrayCopy());
+    }
+
+    public function test_a_non_string_cookie_url_raises_no_warning(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"a","value":"1","url":["https://autre.test/"]}]';
+        [$browser, $page, $journal] = $this->doubles();
+        $warnings = [];
+        set_error_handler(static function (int $no, string $msg) use (&$warnings) {
+            $warnings[] = $msg;
+
+            return true;
+        });
+
+        try {
+            TestsSuite::applyEnvironment($browser, $page, 'https://shop.test/');
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+        $this->assertSame(['cookie a=1 domain=shop.test path=/'], $journal->getArrayCopy());
+    }
+
     public function test_clear_environment_forgets_the_headers(): void
     {
         $this->setFullEnvironment();
@@ -296,6 +330,21 @@ echo "ok";
             array_merge(['session Network.clearBrowserCookies'], $effects($expected)),
             $effects($journal)
         );
+    }
+
+    public function test_before_gives_a_cookie_without_domain_the_host_of_its_url(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1","url":"https://preprod.shop.test/fr/"}]';
+        [$shared, , $journal] = $this->doubles();
+        TestsSuite::scopeBrowserFilesTo('apply-env-'.getmypid());
+        $this->socketFile = TestsSuite::getFilePath('.browser');
+        file_put_contents($this->socketFile, 'ws://127.0.0.1:1/devtools/browser/double');
+        InjectedBrowserSuite::useBrowser($shared, 'ws://127.0.0.1:1/devtools/browser/double');
+
+        (new InjectedBrowserSuite(loadGlobals: false, getBrowser: false))->before(headless: true);
+
+        // Effet voulu côté run aussi : le domaine vient de l'url du cookie.
+        $this->assertContains('cookie consent=1 domain=preprod.shop.test path=/', $journal->getArrayCopy());
     }
 
     public function test_before_gives_no_default_domain_to_a_cookie_without_domain_nor_url(): void

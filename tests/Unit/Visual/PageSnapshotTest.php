@@ -366,4 +366,35 @@ final class PageSnapshotTest extends TestCase
             array_slice($this->rec['log'], 0, 2)
         );
     }
+
+    public function test_take_neither_inherits_nor_leaves_run_headers(): void
+    {
+        TestsSuite::$extraHttpHeaders = ['X-Run' => '1'];
+        $_ENV['PRESTAFLOW_BASIC_USER'] = 'admin';
+        $_ENV['PRESTAFLOW_BASIC_PASS'] = 's3cret';
+
+        $this->snapshot()->take('https://shop.test/', 'desktop');
+
+        $this->assertSame([], array_values(array_filter($this->rec['log'], static fn (string $l) => str_contains($l, 'X-Run'))));
+        $this->assertContains('headers '.json_encode(['Authorization' => 'Basic YWRtaW46czNjcmV0']), $this->rec['log']);
+        $this->assertSame(['X-Run' => '1'], TestsSuite::$extraHttpHeaders);
+    }
+
+    public function test_take_restores_run_headers_when_navigation_fails(): void
+    {
+        TestsSuite::$extraHttpHeaders = ['X-Run' => '1'];
+        $_ENV['PRESTAFLOW_BASIC_USER'] = 'admin';
+        $_ENV['PRESTAFLOW_BASIC_PASS'] = 's3cret';
+        $snapshot = $this->snapshot([], new \HeadlessChromium\Exception\OperationTimedOut('timeout'));
+
+        try {
+            $snapshot->take('https://shop.test/', 'desktop');
+            $this->fail('SnapshotException attendue');
+        } catch (SnapshotException $e) {
+        }
+
+        $this->assertSame([], array_values(array_filter($this->rec['log'], static fn (string $l) => str_contains($l, 'X-Run'))));
+        $this->assertSame(['X-Run' => '1'], TestsSuite::$extraHttpHeaders);
+        $this->assertTrue($this->rec['closed']);
+    }
 }

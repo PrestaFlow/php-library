@@ -15,7 +15,9 @@ use PrestaFlow\Library\Tests\TestsSuite;
  * take() : navigateur DÉDIÉ (jamais l'instance statique de TestsSuite) : une
  * capture ne doit pas perturber un run en cours, et inversement. L'environnement
  * du run (Basic Auth, en-têtes, cookies : TestsSuite::applyEnvironment()) y est
- * appliqué avant la navigation.
+ * appliqué avant la navigation, en partant d'en-têtes vides : take() n'hérite
+ * pas de TestsSuite::$extraHttpHeaders d'un run en cours et n'y laisse rien
+ * (tableau rétabli à la sortie, même en exception).
  * captureCurrent() : page déjà ouverte par l'appelant (sélecteur visuel BO de
  * l'app, navigateur à portée « picker-… »).
  */
@@ -59,6 +61,10 @@ class PageSnapshot
             throw new SnapshotException('Navigateur Chrome introuvable ou impossible à lancer : '.$e->getMessage(), 0, $e);
         }
 
+        // En-têtes du run (même worker) : ni hérités ni écrasés, rétablis dans le finally.
+        $runHeaders = TestsSuite::$extraHttpHeaders;
+        TestsSuite::$extraHttpHeaders = [];
+
         try {
             $page = $browser->createPage();
             // Boutique protégée (préproduction) : environnement du run avant la navigation,
@@ -75,6 +81,7 @@ class PageSnapshot
 
             return $this->captureCurrent($page, $timeoutMs);
         } finally {
+            TestsSuite::$extraHttpHeaders = $runHeaders;
             try {
                 $browser->close();
             } catch (\Throwable $e) {

@@ -733,11 +733,11 @@ class TestsSuite implements OutputStates
      * Valeurs lues dans l'environnement (Env::get), jamais écrites dans un message
      * ni un journal. Sans variable, rien n'est posé. Best-effort comme before().
      * Les en-têtes restent dans TestsSuite::$extraHttpHeaders : clearEnvironment()
-     * les oublie.
+     * les oublie (PageSnapshot::take() sauvegarde et rétablit le tableau lui-même).
      *
-     * @param object $browser \HeadlessChromium\Browser ; typé object pour les doubles de test
+     * @param object      $browser    \HeadlessChromium\Browser ; typé object pour les doubles de test
      * @param object      $page       \HeadlessChromium\Page ; typé object pour les doubles de test
-     * @param string|null $defaultUrl URL qui sera visitée : son host sert de domaine aux cookies sans domain ni url
+     * @param string|null $defaultUrl URL qui sera visitée : son host sert de domaine aux cookies sans domain ni url exploitable
      */
     public static function applyEnvironment(object $browser, object $page, ?string $defaultUrl = null): void
     {
@@ -984,8 +984,13 @@ class TestsSuite implements OutputStates
      *
      * Sans `domain`, le domaine vient du host de `url`, sinon de $defaultUrl
      * (before() n'en donne pas : chrome-php le tire alors de la page courante).
+     * Une `url` inexploitable (sans schéma, malformée, non chaîne) passe à
+     * $defaultUrl. Poser `domain` explicitement fait un cookie de domaine
+     * (sous-domaines compris) et non host-only : chrome-php l'impose de toute
+     * façon (domain = host de la page courante quand il manque).
      *
      * @param \Closure(): ?object $pageOf
+     * @param string|null         $defaultUrl repli pour un cookie sans domain ni url exploitable
      */
     private static function presetCookiesOn(\Closure $pageOf, ?string $defaultUrl = null): void
     {
@@ -1019,9 +1024,14 @@ class TestsSuite implements OutputStates
                 $params['path'] = '/';
             }
             if (empty($params['domain'])) {
-                $host = \parse_url((string) ($params['url'] ?? $defaultUrl ?? ''), PHP_URL_HOST);
-                if (is_string($host) && $host !== '') {
-                    $params['domain'] = $host;
+                // url du cookie d'abord, puis $defaultUrl : une url sans schéma (host null),
+                // malformée (false) ou non chaîne passe au candidat suivant.
+                foreach ([$params['url'] ?? null, $defaultUrl] as $candidate) {
+                    $host = is_string($candidate) ? \parse_url($candidate, PHP_URL_HOST) : null;
+                    if (is_string($host) && $host !== '') {
+                        $params['domain'] = $host;
+                        break;
+                    }
                 }
             }
 
