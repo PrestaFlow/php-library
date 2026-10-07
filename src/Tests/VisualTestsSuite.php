@@ -576,7 +576,9 @@ abstract class VisualTestsSuite extends TestsSuite
                     $this->boBeforeLoginSubmit = static function (object $login) use ($left, $start, $deadline, $loginTimeoutMs): void {
                         // Délai s'il ne reste pas de quoi attendre l'issue (1 s) puis la constater (5 s).
                         $left(PHP_INT_MAX, self::LOGIN_CHECK_MS + self::MIN_STEP_MS);
-                        $login->loginOutcomeDeadline = min($start + $loginTimeoutMs, $deadline) - self::LOGIN_CHECK_MS;
+                        if (property_exists($login, 'loginOutcomeDeadline')) {
+                            $login->loginOutcomeDeadline = min($start + $loginTimeoutMs, $deadline) - self::LOGIN_CHECK_MS;
+                        }
                     };
                 }
                 try {
@@ -681,7 +683,9 @@ abstract class VisualTestsSuite extends TestsSuite
         $pageBefore = $page->navigationTimeout ?? null;
         $loginBefore = $login?->navigationTimeout ?? null;
         $deadlineBefore = $login?->loginOutcomeDeadline ?? null;
-        if ($login !== null) {
+        // Page de connexion cliente sans ces propriétés (n'hérite pas de Login\Page) :
+        // ne pas les écrire, sinon propriété dynamique (dépréciée en PHP 8.2+).
+        if ($login !== null && property_exists($login, 'loginOutcomeSeen')) {
             $login->loginOutcomeSeen = null;
         }
 
@@ -689,7 +693,9 @@ abstract class VisualTestsSuite extends TestsSuite
             $page->navigationTimeout = $pageBefore;
             if ($login !== null) {
                 $login->navigationTimeout = $loginBefore;
-                $login->loginOutcomeDeadline = $deadlineBefore;
+                if (property_exists($login, 'loginOutcomeDeadline')) {
+                    $login->loginOutcomeDeadline = $deadlineBefore;
+                }
             }
         };
     }

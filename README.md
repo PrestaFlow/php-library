@@ -104,6 +104,8 @@ try {
     // the back office did not answer in time: readable message
 } catch (\RuntimeException $e) {
     // run error, readable message: credentials refused, unexpected page, menu entry not found
+} catch (\Exception $e) {
+    // raw chrome-php error from captureCurrent() (OperationTimedOut, EvaluationFailed, ScreenshotFailed…)
 } finally {
     $suite->closeBackOfficeSession();
     TestsSuite::resetBrowser();
@@ -112,11 +114,11 @@ try {
 ```
 
 - `openBackOfficeCheckpoint(array $checkpoint, int $loginTimeoutMs = 25000, int $menuTimeoutMs = 15000): string` logs in (unless `auth => false`), opens the back-office root, then the `menu` entry. It returns the path and controller of the opened page, never its token. The login outcome is awaited until a deadline (`Login\Page::$loginOutcomeDeadline`, still bounded by `$loginOutcomeTimeout`), so a fast reload leaves the rest of the login budget to the outcome. The run's ceilings are restored before it returns, even on error.
-- `PageSnapshot::captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult` captures the open tab without navigating or closing anything.
+- `PageSnapshot::captureCurrent(object $page, int $timeoutMs = 15000): SnapshotResult` captures the open tab without navigating or closing anything. It lets chrome-php exceptions through as they are (`OperationTimedOut`, `EvaluationFailed`, `ScreenshotFailed`…): they extend `\Exception`, not `\RuntimeException`, hence the last `catch` above. Their messages are not redacted.
 - `closeBackOfficeSession(int $timeoutMs = 5000): void` follows the logout link of an open session. It never throws.
 - `TestsSuite::resetBrowser()` closes the browser.
 
-**Front-office page.** `(new PageSnapshot())->take($url, $device)` starts a dedicated browser, applies the run's environment (`TestsSuite::applyEnvironment()`, with `$url` as the cookies' default domain), opens the URL, captures the page and closes the browser. It starts from empty headers and restores `TestsSuite::$extraHttpHeaders` on return, so a run in the same process neither leaks into it nor is altered by it. It throws `SnapshotException` when Chrome cannot start or the page does not load in time.
+**Front-office page.** `(new PageSnapshot())->take($url, $device)` starts a dedicated browser, applies the run's environment (`TestsSuite::applyEnvironment()`, with `$url` as the cookies' default domain), opens the URL, captures the page and closes the browser. It starts from empty headers and restores `TestsSuite::$extraHttpHeaders` on return, so a run in the same process neither leaks into it nor is altered by it. It throws `SnapshotException` when Chrome cannot start or the page does not load in time. That list is not exhaustive: once the page is loaded, the capture (`captureCurrent()`) lets chrome-php exceptions through as they are.
 
 **Exceptions of `openBackOfficeCheckpoint()`.**
 

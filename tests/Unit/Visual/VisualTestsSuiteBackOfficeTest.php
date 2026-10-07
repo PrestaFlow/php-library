@@ -885,6 +885,45 @@ final class VisualTestsSuiteBackOfficeTest extends TestCase
         $this->assertSame(123, $login->loginOutcomeDeadline);
     }
 
+    public function test_open_checkpoint_creates_no_dynamic_property_on_a_login_page_without_deadline(): void
+    {
+        // Page de connexion cliente qui n'hérite pas de Login\Page : ni
+        // $loginOutcomeDeadline ni $loginOutcomeSeen. PHP 8.2+ : écrire l'une
+        // d'elles créerait une propriété dynamique dépréciée.
+        $log = new \ArrayObject();
+        $login = new class ($log, $this->chrome) {
+            public ?int $navigationTimeout = null;
+            public function __construct(public \ArrayObject $log, public object $chrome) {}
+            public function getPage(): object { return $this->chrome; }
+            public function getSelector($selector, $replacements = []): string
+            {
+                return ['emailInput' => '#email', 'alertDangerDiv' => '.alert-danger'][$selector];
+            }
+            public function goToPage($page = null, $params = null): void { $this->log[] = 'login:page '.$page; }
+            public function login($email = null, $password = null, $waitForNavigation = true): void { $this->log[] = 'login:submit'; }
+            public function isLoggedIn(): bool { $this->log[] = 'login:check'; return true; }
+            public function logout(): void { $this->log[] = 'login:logout'; }
+        };
+        $s = $this->suite(page: $this->page($log), login: $login);
+        $propsBefore = array_keys(get_object_vars($login));
+        $deprecations = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$deprecations): bool {
+            $deprecations[] = $errstr;
+
+            return true;
+        }, E_DEPRECATED | E_USER_DEPRECATED);
+
+        try {
+            $s->openBackOfficeCheckpoint(['name' => 'picker', 'menu' => '#subtab-AdminProducts'], 25000, 15000);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertContains('login:submit', $log->getArrayCopy());
+        $this->assertSame($propsBefore, array_keys(get_object_vars($login)));
+        $this->assertSame([], $deprecations);
+    }
+
     public function test_open_checkpoint_masks_the_token_of_a_failed_page_load(): void
     {
         $log = new \ArrayObject();
