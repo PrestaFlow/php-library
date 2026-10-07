@@ -726,22 +726,27 @@ class TestsSuite implements OutputStates
      *     (Network.enable puis setExtraHTTPHeaders), à chacune des deux étapes ;
      *  4. cookies PRESTAFLOW_COOKIES posés sur la page.
      *
+     * Cookie sans `domain` : posé avant toute navigation, la page est sur
+     * about:blank, dont chrome-php tirerait un domaine nul (cookie refusé par
+     * CDP). Le domaine vient alors du host de son `url`, sinon de $defaultUrl.
+     *
      * Valeurs lues dans l'environnement (Env::get), jamais écrites dans un message
      * ni un journal. Sans variable, rien n'est posé. Best-effort comme before().
      * Les en-têtes restent dans TestsSuite::$extraHttpHeaders : clearEnvironment()
      * les oublie.
      *
      * @param object $browser \HeadlessChromium\Browser ; typé object pour les doubles de test
-     * @param object $page    \HeadlessChromium\Page ; typé object pour les doubles de test
+     * @param object      $page       \HeadlessChromium\Page ; typé object pour les doubles de test
+     * @param string|null $defaultUrl URL qui sera visitée : son host sert de domaine aux cookies sans domain ni url
      */
-    public static function applyEnvironment(object $browser, object $page): void
+    public static function applyEnvironment(object $browser, object $page, ?string $defaultUrl = null): void
     {
         $browserOf = static fn () => $browser;
         $pageOf = static fn () => $page;
 
         self::presetBasicAuthOn($browserOf, $pageOf);
         self::presetExtraHeadersOn($browserOf, $pageOf);
-        self::presetCookiesOn($pageOf);
+        self::presetCookiesOn($pageOf, $defaultUrl);
     }
 
     /**
@@ -977,9 +982,12 @@ class TestsSuite implements OutputStates
     /**
      * Étape PRESTAFLOW_COOKIES de before() et d'applyEnvironment().
      *
+     * Sans `domain`, le domaine vient du host de `url`, sinon de $defaultUrl
+     * (before() n'en donne pas : chrome-php le tire alors de la page courante).
+     *
      * @param \Closure(): ?object $pageOf
      */
-    private static function presetCookiesOn(\Closure $pageOf): void
+    private static function presetCookiesOn(\Closure $pageOf, ?string $defaultUrl = null): void
     {
         $raw = Env::get('PRESTAFLOW_COOKIES');
         if (!$raw) {
@@ -1009,6 +1017,12 @@ class TestsSuite implements OutputStates
             }
             if (!isset($params['path'])) {
                 $params['path'] = '/';
+            }
+            if (empty($params['domain'])) {
+                $host = \parse_url((string) ($params['url'] ?? $defaultUrl ?? ''), PHP_URL_HOST);
+                if (is_string($host) && $host !== '') {
+                    $params['domain'] = $host;
+                }
             }
 
             try {

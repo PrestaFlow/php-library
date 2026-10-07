@@ -4,6 +4,7 @@ namespace PrestaFlow\Tests\Unit\Visual;
 
 use HeadlessChromium\Clip;
 use PHPUnit\Framework\TestCase;
+use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Visual\PageScripts;
 use PrestaFlow\Library\Visual\PageSnapshot;
 use PrestaFlow\Library\Visual\SnapshotException;
@@ -15,6 +16,34 @@ final class PageSnapshotTest extends TestCase
 
     /** @var \Closure(array): object fabrique de navigateur du dernier snapshot() (pour obtenir une page factice) */
     private \Closure $factory;
+
+    private const ENV_KEYS = ['PRESTAFLOW_BASIC_USER', 'PRESTAFLOW_BASIC_PASS', 'PRESTAFLOW_EXTRA_HEADERS', 'PRESTAFLOW_COOKIES'];
+
+    private array $envBackup = [];
+    private array $headersBackup = [];
+
+    protected function setUp(): void
+    {
+        // take() applique l'environnement du run : absent par défaut, même si le shell le définit.
+        foreach (self::ENV_KEYS as $key) {
+            $this->envBackup[$key] = array_key_exists($key, $_ENV) ? $_ENV[$key] : null;
+            $_ENV[$key] = '';
+        }
+        $this->headersBackup = TestsSuite::$extraHttpHeaders;
+        TestsSuite::$extraHttpHeaders = [];
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->envBackup as $key => $value) {
+            if ($value === null) {
+                unset($_ENV[$key]);
+            } else {
+                $_ENV[$key] = $value;
+            }
+        }
+        TestsSuite::$extraHttpHeaders = $this->headersBackup;
+    }
 
     private function snapshot(array $values = [], ?\Throwable $navigateThrows = null, bool $factoryThrows = false): PageSnapshot
     {
@@ -39,6 +68,22 @@ final class PageSnapshotTest extends TestCase
                 {
                 }
 
+                public function getConnection()
+                {
+                    $rec = &$this->rec;
+
+                    return new class ($rec) {
+                        public function __construct(private array &$rec)
+                        {
+                        }
+
+                        public function setConnectionHttpHeaders(array $headers): void
+                        {
+                            $this->rec['log'][] = 'connection '.json_encode($headers);
+                        }
+                    };
+                }
+
                 public function createPage()
                 {
                     $rec = &$this->rec;
@@ -48,6 +93,43 @@ final class PageSnapshotTest extends TestCase
                     return new class ($rec, $values, $throws) {
                         public function __construct(private array &$rec, private array $values, private ?\Throwable $throws)
                         {
+                        }
+
+                        public function getSession()
+                        {
+                            $rec = &$this->rec;
+
+                            return new class ($rec) {
+                                public function __construct(private array &$rec)
+                                {
+                                }
+
+                                public function sendMessageSync(\HeadlessChromium\Communication\Message $message, ?int $timeout = null): object
+                                {
+                                    $this->rec['log'][] = 'session '.$message->getMethod();
+
+                                    return new \stdClass();
+                                }
+                            };
+                        }
+
+                        public function setExtraHTTPHeaders(array $headers = []): void
+                        {
+                            $this->rec['log'][] = 'headers '.json_encode($headers);
+                        }
+
+                        public function setCookies($cookies)
+                        {
+                            foreach ($cookies as $cookie) {
+                                $this->rec['log'][] = 'cookie '.$cookie->getName().'='.$cookie->getValue().' domain='.(string) $cookie->offsetGet('domain');
+                            }
+
+                            return new class {
+                                public function await(?int $time = null): self
+                                {
+                                    return $this;
+                                }
+                            };
                         }
 
                         public function navigate(string $url)
@@ -253,5 +335,35 @@ final class PageSnapshotTest extends TestCase
         $snapshot->captureCurrent(($this->factory)([])->createPage());
 
         $this->assertSame(['value 15000', 'base64 15000'], $this->rec['timeouts']);
+    }
+
+    public function test_take_applies_the_run_environment_before_navigating(): void
+    {
+        $_ENV['PRESTAFLOW_BASIC_USER'] = 'admin';
+        $_ENV['PRESTAFLOW_BASIC_PASS'] = 's3cret';
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1","domain":"shop.test"}]';
+
+        $result = $this->snapshot()->take('https://preprod.shop.test/', 'desktop');
+
+        $auth = json_encode(['Authorization' => 'Basic YWRtaW46czNjcmV0']);
+        $this->assertSame(
+            ['connection '.$auth, 'session Network.enable', 'headers '.$auth, 'cookie consent=1 domain=shop.test', 'navigate https://preprod.shop.test/'],
+            array_slice($this->rec['log'], 0, 5)
+        );
+        $this->assertSame('JPEGDATA', $result->image);
+        $this->assertTrue($this->rec['closed']);
+    }
+
+    public function test_take_gives_a_cookie_without_domain_the_host_of_the_captured_url(): void
+    {
+        // Avant navigation la page est sur about:blank : chrome-php n'en tirerait aucun domaine.
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1"}]';
+
+        $this->snapshot()->take('https://preprod.shop.test:8443/fr/', 'desktop');
+
+        $this->assertSame(
+            ['cookie consent=1 domain=preprod.shop.test', 'navigate https://preprod.shop.test:8443/fr/'],
+            array_slice($this->rec['log'], 0, 2)
+        );
     }
 }

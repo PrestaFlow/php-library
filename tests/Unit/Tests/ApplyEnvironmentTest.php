@@ -213,6 +213,53 @@ echo "ok";
         $this->assertSame('sans-stderr|ok', trim($output));
     }
 
+    /**
+     * Avant navigation la page est sur about:blank : chrome-php y impose
+     * domain = host de l'URL courante, soit null, et CDP refuse le cookie.
+     */
+    public function test_a_cookie_without_domain_takes_the_host_of_its_url(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1","url":"https://preprod.shop.test:8443/fr/"}]';
+        [$browser, $page, $journal] = $this->doubles();
+
+        TestsSuite::applyEnvironment($browser, $page);
+
+        $this->assertSame(['cookie consent=1 domain=preprod.shop.test path=/'], $journal->getArrayCopy());
+    }
+
+    public function test_a_cookie_without_domain_nor_url_takes_the_host_of_the_default_url(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1"},{"name":"vu","value":"2","url":"https://autre.test/"}]';
+        [$browser, $page, $journal] = $this->doubles();
+
+        TestsSuite::applyEnvironment($browser, $page, 'https://shop.test/fr/');
+
+        $this->assertSame([
+            'cookie consent=1 domain=shop.test path=/',
+            'cookie vu=2 domain=autre.test path=/',
+        ], $journal->getArrayCopy());
+    }
+
+    public function test_an_explicit_cookie_domain_is_kept(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1","domain":".shop.test","url":"https://preprod.shop.test/"}]';
+        [$browser, $page, $journal] = $this->doubles();
+
+        TestsSuite::applyEnvironment($browser, $page, 'https://autre.test/');
+
+        $this->assertSame(['cookie consent=1 domain=.shop.test path=/'], $journal->getArrayCopy());
+    }
+
+    public function test_without_default_url_a_cookie_without_domain_nor_url_is_left_to_chrome_php(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1"}]';
+        [$browser, $page, $journal] = $this->doubles();
+
+        TestsSuite::applyEnvironment($browser, $page);
+
+        $this->assertSame(['cookie consent=1 domain= path=/'], $journal->getArrayCopy());
+    }
+
     public function test_clear_environment_forgets_the_headers(): void
     {
         $this->setFullEnvironment();
@@ -249,6 +296,21 @@ echo "ok";
             array_merge(['session Network.clearBrowserCookies'], $effects($expected)),
             $effects($journal)
         );
+    }
+
+    public function test_before_gives_no_default_domain_to_a_cookie_without_domain_nor_url(): void
+    {
+        $_ENV['PRESTAFLOW_COOKIES'] = '[{"name":"consent","value":"1"}]';
+        [$shared, , $journal] = $this->doubles();
+        TestsSuite::scopeBrowserFilesTo('apply-env-'.getmypid());
+        $this->socketFile = TestsSuite::getFilePath('.browser');
+        file_put_contents($this->socketFile, 'ws://127.0.0.1:1/devtools/browser/double');
+        InjectedBrowserSuite::useBrowser($shared, 'ws://127.0.0.1:1/devtools/browser/double');
+
+        (new InjectedBrowserSuite(loadGlobals: false, getBrowser: false))->before(headless: true);
+
+        // Comportement du run inchangé : chrome-php reste seul à déduire le domaine.
+        $this->assertContains('cookie consent=1 domain= path=/', $journal->getArrayCopy());
     }
 }
 

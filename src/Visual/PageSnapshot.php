@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Visual;
 use HeadlessChromium\BrowserFactory;
 use HeadlessChromium\Clip;
 use HeadlessChromium\Page;
+use PrestaFlow\Library\Tests\TestsSuite;
 
 /**
  * Capture d'une page pour le sélecteur visuel : pleine page en JPEG qualité 80
@@ -12,7 +13,9 @@ use HeadlessChromium\Page;
  * + carte des éléments visibles avec un sélecteur CSS proposé.
  *
  * take() : navigateur DÉDIÉ (jamais l'instance statique de TestsSuite) : une
- * capture ne doit pas perturber un run en cours, et inversement.
+ * capture ne doit pas perturber un run en cours, et inversement. L'environnement
+ * du run (Basic Auth, en-têtes, cookies : TestsSuite::applyEnvironment()) y est
+ * appliqué avant la navigation.
  * captureCurrent() : page déjà ouverte par l'appelant (sélecteur visuel BO de
  * l'app, navigateur à portée « picker-… »).
  */
@@ -58,6 +61,9 @@ class PageSnapshot
 
         try {
             $page = $browser->createPage();
+            // Boutique protégée (préproduction) : environnement du run avant la navigation,
+            // sur about:blank : un cookie sans domaine prend celui de l'URL capturée.
+            TestsSuite::applyEnvironment($browser, $page, $url);
             try {
                 // DOMContentLoaded plutôt que `load` (souvent plusieurs secondes de plus sur
                 // une boutique) : la stabilité (readyState complete, polices, images
