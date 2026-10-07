@@ -29,7 +29,8 @@ dans `app/docs/superpowers/specs/2026-10-07-visual-picker-async-design.md`.
 ## 1. `TestsSuite::applyEnvironment()` et `clearEnvironment()`
 
 - Nouvelle méthode publique statique
-  `applyEnvironment(\HeadlessChromium\Browser $browser, \HeadlessChromium\Page $page): void`.
+  `applyEnvironment(object $browser, object $page, ?string $defaultUrl = null): void`
+  (typée `object` pour les doubles de test ; l'app passe un vrai `Browser` et une vraie `Page`).
   Elle regroupe, dans le même ordre et avec le même effet, ce que font aujourd'hui
   `presetBasicAuth()`, `presetExtraHeadersFromEnv()` et `presetEnvCookies()` :
   1. Basic Auth → `TestsSuite::$extraHttpHeaders['Authorization']` ;
@@ -37,6 +38,14 @@ dans `app/docs/superpowers/specs/2026-10-07-visual-picker-async-design.md`.
   3. en-têtes posés sur la connexion (`setConnectionHttpHeaders`) et sur la page
      (`Network.enable` puis `setExtraHTTPHeaders`) ;
   4. cookies `PRESTAFLOW_COOKIES` posés sur la page.
+- Cookie sans `domain` : posé avant toute navigation, la page est sur `about:blank`, dont
+  chrome-php tirerait un domaine nul (CDP refuse le cookie, perdu sans bruit). Le domaine
+  vient alors du host de son `url`, sinon de `$defaultUrl` ; une `url` inexploitable (sans
+  schéma, malformée, non chaîne) passe à `$defaultUrl`. Un `domain` explicite est gardé.
+  Poser `domain` fait un cookie de domaine (sous-domaines compris), non host-only : chrome-php
+  l'impose de toute façon.
+- Côté run, `before()` ne passe pas de `$defaultUrl` ; seule la déduction depuis l'`url` du
+  cookie s'y ajoute (effet voulu : un cookie `{name, value, url}` n'est plus perdu).
 - Les trois méthodes protégées restent, en délégant, pour ne casser aucune suite qui les
   surcharge. `before()` garde exactement le même comportement : les tests existants du run
   le prouvent.
@@ -48,8 +57,12 @@ dans `app/docs/superpowers/specs/2026-10-07-visual-picker-async-design.md`.
 
 ## 2. `PageSnapshot::take()` applique l'environnement
 
-- `take()` appelle `TestsSuite::applyEnvironment($browser, $page)` entre `createPage()` et
-  `navigate()`.
+- `take()` appelle `TestsSuite::applyEnvironment($browser, $page, $url)` entre `createPage()`
+  et `navigate()` : un cookie sans domaine prend le host de l'URL capturée.
+- `take()` part d'en-têtes vides : il sauvegarde `TestsSuite::$extraHttpHeaders`, le vide
+  avant `createPage()` et le rétablit dans son `finally`, même en exception. Une capture
+  n'hérite donc pas des en-têtes d'un run en cours dans le même worker, et n'y laisse ni
+  `Authorization` ni en-têtes extra.
 - Sans variable d'environnement, rien n'est posé : le résultat est identique à aujourd'hui.
 - `captureCurrent()` ne change pas : la page appartient à l'appelant.
 

@@ -37,7 +37,7 @@
 - **Lecture :** outil Read ou `sed -n 'A,Bp' fichier`. `cat`, `grep` et `git` sont filtrés par rtk : `rtk proxy grep -n …`, `rtk proxy git show …`, `rtk proxy git diff …`.
 - **Numéros de ligne :** ceux de `da93bc1`. Une tâche qui insère du code décale les lignes suivantes du même fichier : repère-toi au texte cité dans chaque remplacement.
 - **Noms partagés avec l'app** (ne pas les changer) :
-  - `TestsSuite::applyEnvironment(object $browser, object $page): void` ;
+  - `TestsSuite::applyEnvironment(object $browser, object $page, ?string $defaultUrl = null): void` (troisième paramètre ajouté en tâche 2, optionnel) ;
   - `TestsSuite::clearEnvironment(): void` ;
   - `v9\BackOffice\Login\Page::$loginOutcomeDeadline` (`?int`, ms monotones) et `Login\Page::nowMs(): int` (protégée).
 
@@ -53,6 +53,8 @@
    « `before()` passe par elle » est prouvé par un test d'équivalence : sur les mêmes doubles, `before()` produit le journal d'`applyEnvironment()`, précédé du vidage des cookies.
 3. **`capBackOfficeWaits()` ne sauvegarde plus `loginOutcomeTimeout`** : `openBackOfficeCheckpoint()` ne l'écrit plus. Elle sauvegarde et rétablit `loginOutcomeDeadline` à la place. Les assertions existantes « `loginOutcomeTimeout` reste à sa valeur » restent vraies et sont gardées.
 4. **Double de connexion de `VisualTestsSuiteBackOfficeTest`** : `submitCostMs` (rechargement + issue + constat d'un bloc) est remplacé par `reloadCostMs`, `outcomeCostMs` et `checkCostMs`, pour reproduire `Login\Page::login()` (rechargement 10 s au plus, puis issue plafonnée par l'échéance, 1 s au moins) et `isLoggedIn()` (5 s au plus). Les tests de budget qui reposaient sur l'ancien calcul changent de chiffres (tâche 4, liste exacte).
+5. **Domaine des cookies sans `domain`** (ajouté en tâche 2) : sur `about:blank`, chrome-php imposerait un domaine nul et CDP refuserait le cookie. `applyEnvironment()` prend un `?string $defaultUrl = null` ; `presetCookiesOn()` déduit `domain` du host de l'`url` du cookie, sinon de `$defaultUrl` (url inexploitable → `$defaultUrl`). `take()` passe l'URL capturée ; `before()` n'en passe pas, mais profite de la déduction depuis l'`url` du cookie.
+6. **`take()` isole `TestsSuite::$extraHttpHeaders`** (ajouté en tâche 2) : sauvegardé, vidé avant `createPage()`, rétabli dans le `finally` même en exception. Ni héritage des en-têtes d'un run en cours, ni fuite d'`Authorization` vers la suite du worker.
 
 ---
 
