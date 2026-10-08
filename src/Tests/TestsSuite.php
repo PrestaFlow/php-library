@@ -17,6 +17,7 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
+use PrestaFlow\Library\Utils\BackOfficeUrl;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
 use PrestaFlow\Library\Utils\OutputStates;
@@ -267,8 +268,8 @@ class TestsSuite implements OutputStates
 
     /**
      * Valeur brute de l'URL BO quand loadGlobals() l'a complétée à partir de
-     * l'URL FO de l'environnement (PRESTAFLOW_BO_URL relative, ou défaut
-     * `admin-dev/`) ; null sinon (BO absolue, globals fournies). Permet à
+     * l'URL FO de l'environnement (PRESTAFLOW_BO_URL relative : chemin, ni
+     * absolue ni `//hôte`, ou défaut `admin-dev/`) ; null sinon (BO absolue, globals fournies). Permet à
      * VisualTestsSuite::applySuiteUrls() de suivre une $shopUrl du fichier.
      */
     protected ?string $backOfficeRelative = null;
@@ -1185,15 +1186,12 @@ class TestsSuite implements OutputStates
             $frontOfficeUrl .= '/';
         }
 
-        $backOfficeUrl = Env::get('PRESTAFLOW_BO_URL', $frontOfficeUrl . 'admin-dev/');
-        $this->backOfficeRelative = Env::has('PRESTAFLOW_BO_URL') ? null : 'admin-dev/';
-        if (!str_starts_with($backOfficeUrl, 'https://') && !str_starts_with($backOfficeUrl, 'http://')) {
-            $this->backOfficeRelative = (string) $backOfficeUrl;
-            $backOfficeUrl = $frontOfficeUrl . $backOfficeUrl;
-        }
-        if (!str_ends_with($backOfficeUrl, '/')) {
-            $backOfficeUrl .= '/';
-        }
+        // Règle unique (BackOfficeUrl, la même que l'app et que $backOfficeUrl) :
+        // chemin relatif complété par l'URL FO sans requête ni fragment,
+        // `//hôte` au schéma de la FO, absolue gardée. Aucun refus ici.
+        $rawBackOffice = (string) Env::get('PRESTAFLOW_BO_URL', 'admin-dev/');
+        $this->backOfficeRelative = BackOfficeUrl::isRelative($rawBackOffice) ? trim($rawBackOffice) : null;
+        $backOfficeUrl = BackOfficeUrl::resolve($rawBackOffice, $frontOfficeUrl);
 
         $this->globals = [
             'PS_VERSION' => Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'),

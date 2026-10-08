@@ -77,7 +77,7 @@ A visual suite with `protected string $area = 'bo';` captures the back office. E
 | `auth` | `true` | `false`: captured logged out (the login page). Logged-out checkpoints run first; the suite then logs in once with `PRESTAFLOW_BO_EMAIL` / `PRESTAFLOW_BO_PASSWD`. |
 | `hide` | `[]` | Selectors set to `display: none` during the capture (popups, modal backdrops). Works in both areas. |
 
-The back-office area also uses `PRESTAFLOW_BO_URL` (admin URL), `PRESTAFLOW_BO_EMAIL` and `PRESTAFLOW_BO_PASSWD` (login).
+The back-office area also uses `PRESTAFLOW_BO_URL` (admin URL, default `admin-dev/`), `PRESTAFLOW_BO_EMAIL` and `PRESTAFLOW_BO_PASSWD` (login). A relative `PRESTAFLOW_BO_URL` is completed from `PRESTAFLOW_FO_URL` with the same rule as `$backOfficeUrl` below (shop path kept, query and fragment dropped, `//host` takes the shop scheme); nothing is refused for environment variables.
 
 CSS transitions are frozen during back-office captures (`protected ?bool $freezeTransitions`; `null` = on for `bo`, off for `fo`). See `src/Tests/Suites/Visual/BackOffice.php`.
 
