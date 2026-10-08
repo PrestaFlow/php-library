@@ -1,0 +1,30 @@
+{
+  "planPath": "docs/superpowers/plans/2026-10-08-bo-url-resolve.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: utilitaire BackOfficeUrl et délégation de VisualTestsSuite",
+      "status": "completed",
+      "description": "**Goal:** BackOfficeUrl::resolve()/isRelative() testés ; VisualTestsSuite::resolveBackOfficeUrl() délègue.\n\n```json:metadata\n{\"files\": [\"src/Utils/BackOfficeUrl.php\", \"tests/Unit/Utils/BackOfficeUrlTest.php\", \"src/Tests/VisualTestsSuite.php\", \"tests/Unit/Visual/VisualTestsSuiteUrlsTest.php\"], \"verifyCommand\": \"php vendor/bin/phpunit --filter 'BackOfficeUrlTest|VisualTestsSuiteUrlsTest'\", \"acceptanceCriteria\": [\"13 cas resolve\", \"isRelative\", \"délégation\", \"678 tests 8.4/8.1\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: loadGlobals() utilise BackOfficeUrl, et README",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** PRESTAFLOW_BO_URL résolue par BackOfficeUrl::resolve(), backOfficeRelative par isRelative(), README.\n\n```json:metadata\n{\"files\": [\"src/Tests/TestsSuite.php\", \"tests/Unit/Tests/LoadGlobalsBackOfficeUrlTest.php\", \"README.md\"], \"verifyCommand\": \"php vendor/bin/phpunit --filter 'LoadGlobalsBackOfficeUrlTest|VisualTestsSuiteUrlsTest'\", \"acceptanceCriteria\": [\"tableau Problème\", \"défaut admin-dev\", \"vide\", \"688 tests 8.4/8.1\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: livraison (coordinateur)",
+      "status": "pending",
+      "blockedBy": [
+        2
+      ],
+      "description": "**Goal:** revue finale, PR vers dev ; release et bump app sur accord.\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"gh pr view --repo PrestaFlow/php-library\", \"acceptanceCriteria\": [\"PR dev ouverte\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-10-08T09:22:09.024342+02:00"
+}

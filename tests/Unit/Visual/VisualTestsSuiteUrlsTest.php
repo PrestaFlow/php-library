@@ -283,39 +283,14 @@ final class VisualTestsSuiteUrlsTest extends TestCase
         $this->assertSame('http://fo.test/fr/admin123/', $suite->getGlobals()['BO']['URL']);
     }
 
-    /** @return array<string, array{string, string, string}> */
-    public static function backOfficeUrlCases(): array
-    {
-        return [
-            'absolue gardée' => ['http://shop.test/admin-dev/', 'http://other.test/', 'http://shop.test/admin-dev/'],
-            'absolue rognée' => [' https://shop.test/admin123 ', '', 'https://shop.test/admin123/'],
-            'absolue majuscules' => ['HTTP://shop.test/a', '', 'HTTP://shop.test/a/'],
-            'relative sans slash' => ['admin-dev', 'http://shop.test', 'http://shop.test/admin-dev/'],
-            'relative' => ['admin-dev/', 'http://shop.test/', 'http://shop.test/admin-dev/'],
-            'relative à slash initial' => ['/admin-dev/', 'http://shop.test/', 'http://shop.test/admin-dev/'],
-            'relative sous chemin' => ['admin/sub', ' http://shop.test/fr/ ', 'http://shop.test/fr/admin/sub/'],
-            'protocole https' => ['//h.test/admin', 'https://fo.test', 'https://h.test/admin/'],
-            'protocole majuscules' => ['//h.test/admin', 'HTTP://fo.test/fr', 'http://h.test/admin/'],
-            'requête et fragment FO ignorés' => ['admin', 'http://fo.test/fr?x=1#a', 'http://fo.test/fr/admin/'],
-            'fragment FO seul' => ['/admin', 'http://fo.test/#frag', 'http://fo.test/admin/'],
-            'point dans un segment non initial' => ['/admin.v2/', 'http://fo.test', 'http://fo.test/admin.v2/'],
-            'segment à point' => ['admin/v2.1/', 'http://fo.test', 'http://fo.test/admin/v2.1/'],
-        ];
-    }
-
-    /** @dataProvider backOfficeUrlCases */
-    public function test_resolve_back_office_url(string $backOffice, string $frontOffice, string $expected): void
-    {
-        $this->assertSame($expected, VisualTestsSuite::resolveBackOfficeUrl($backOffice, $frontOffice));
-    }
-
     private function cliSuite(array $env, ?string $shopUrl): VisualTestsSuite
     {
         $keys = ['PRESTAFLOW_FO_URL', 'PRESTAFLOW_BO_URL'];
         $saved = [];
         foreach ($keys as $key) {
-            $saved[$key] = array_key_exists($key, $_ENV) ? $_ENV[$key] : null;
+            $saved[$key] = [array_key_exists($key, $_ENV) ? $_ENV[$key] : null, getenv($key)];
             unset($_ENV[$key]);
+            putenv($key);
         }
         foreach ($env as $key => $value) {
             $_ENV[$key] = $value;
@@ -336,11 +311,16 @@ final class VisualTestsSuiteUrlsTest extends TestCase
                 }
             };
         } finally {
-            foreach ($saved as $key => $value) {
-                if ($value === null) {
+            foreach ($saved as $key => [$envValue, $processValue]) {
+                if ($envValue === null) {
                     unset($_ENV[$key]);
                 } else {
-                    $_ENV[$key] = $value;
+                    $_ENV[$key] = $envValue;
+                }
+                if ($processValue === false) {
+                    putenv($key);
+                } else {
+                    putenv($key . '=' . $processValue);
                 }
             }
         }
@@ -371,6 +351,23 @@ final class VisualTestsSuiteUrlsTest extends TestCase
     public function test_cli_absolute_back_office_url_is_kept_with_the_suite_shop_url(): void
     {
         $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => 'https://bo.env.test/admin/'], 'http://localhost:8093');
+        $suite->applySuiteUrls();
+
+        $this->assertSame('https://bo.env.test/admin/', $suite->getGlobals()['BO']['URL']);
+    }
+
+    public function test_cli_empty_back_office_url_follows_the_suite_shop_url(): void
+    {
+        $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => ''], 'http://localhost:8093');
+        $this->assertSame('https://env.test/', $suite->getGlobals()['BO']['URL']);
+        $suite->applySuiteUrls();
+
+        $this->assertSame('http://localhost:8093/', $suite->getGlobals()['BO']['URL']);
+    }
+
+    public function test_cli_protocol_relative_back_office_url_is_kept_with_the_suite_shop_url(): void
+    {
+        $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => '//bo.env.test/admin'], 'http://localhost:8093');
         $suite->applySuiteUrls();
 
         $this->assertSame('https://bo.env.test/admin/', $suite->getGlobals()['BO']['URL']);
