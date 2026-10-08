@@ -28,6 +28,7 @@ final class BackOfficeUrlTest extends TestCase
             'requête et fragment FO ignorés' => ['admin', 'http://fo.test/fr?x=1#a', 'http://fo.test/fr/admin/'],
             'fragment FO seul' => ['/admin', 'http://fo.test/#frag', 'http://fo.test/admin/'],
             'point dans un segment non initial' => ['/admin.v2/', 'http://fo.test', 'http://fo.test/admin.v2/'],
+            'vide = FO' => ['', 'http://fo.test/fr?x=1', 'http://fo.test/fr/'],
             'segment à point' => ['admin/v2.1/', 'http://fo.test', 'http://fo.test/admin/v2.1/'],
         ];
     }
@@ -51,6 +52,9 @@ final class BackOfficeUrlTest extends TestCase
             'protocole' => ['//x/a', false],
             'vide' => ['', false],
             'blanc' => ['   ', false],
+            'autre schéma' => ['ftp://x', true],
+            'un seul slash' => ['http:/x', true],
+            'protocole entouré de blancs' => ["\t//x\n", false],
         ];
     }
 

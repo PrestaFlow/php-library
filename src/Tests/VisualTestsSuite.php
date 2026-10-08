@@ -478,8 +478,9 @@ abstract class VisualTestsSuite extends TestsSuite
     }
 
     /**
-     * URL BO effective : voir BackOfficeUrl::resolve() (règle unique, la même que
-     * loadGlobals() et que l'app). Gardée publique pour compatibilité.
+     * URL BO effective : voir BackOfficeUrl::resolve() (règle unique ; même règle que
+     * App\Support\BackOfficeUrl::resolve() pour les valeurs valides, rien n'est refusé ici).
+     * Gardée publique pour compatibilité.
      */
     public static function resolveBackOfficeUrl(string $backOffice, string $frontOffice): string
     {

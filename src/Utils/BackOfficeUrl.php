@@ -3,8 +3,9 @@
 namespace PrestaFlow\Library\Utils;
 
 /**
- * Règle unique de l'URL du back-office, la même que App\Support\BackOfficeUrl::resolve()
- * dans l'app PrestaFlow. Sert à loadGlobals() (PRESTAFLOW_BO_URL) et aux suites
+ * Règle unique de l'URL du back-office : même règle que App\Support\BackOfficeUrl::resolve()
+ * (app PrestaFlow) pour les valeurs valides (absolue, `//hôte`, chemin sûr) ; ici rien n'est refusé.
+ * Sert à loadGlobals() (PRESTAFLOW_BO_URL) et aux suites
  * visuelles ($backOfficeUrl). Ne refuse rien : la validation reste à l'appelant.
  */
 final class BackOfficeUrl
@@ -33,7 +34,10 @@ final class BackOfficeUrl
         return str_ends_with($backOffice, '/') ? $backOffice : $backOffice.'/';
     }
 
-    /** Vrai si l'URL BO dépend de l'URL FO : ni absolue http(s), ni `//hôte`, ni vide. */
+    /**
+     * Vrai si la valeur est un chemin à coller à l'URL FO : ni absolue http(s), ni `//hôte`.
+     * Une valeur vide n'est pas relative par convention : resolve() rend alors l'URL FO elle-même.
+     */
     public static function isRelative(string $backOffice): bool
     {
         $backOffice = trim($backOffice);
