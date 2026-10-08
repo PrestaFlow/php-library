@@ -17,7 +17,10 @@ final class LoadGlobalsBackOfficeUrlTest extends TestCase
     {
         $saved = [];
         foreach ($env as $key => $value) {
-            $saved[$key] = array_key_exists($key, $_ENV) ? $_ENV[$key] : null;
+            $saved[$key] = [
+                array_key_exists($key, $_ENV) ? $_ENV[$key] : null,
+                getenv($key),
+            ];
             if ($value === null) {
                 unset($_ENV[$key]);
                 putenv($key);
@@ -33,11 +36,16 @@ final class LoadGlobalsBackOfficeUrlTest extends TestCase
                 }
             };
         } finally {
-            foreach ($saved as $key => $value) {
-                if ($value === null) {
+            foreach ($saved as $key => [$envValue, $processValue]) {
+                if ($envValue === null) {
                     unset($_ENV[$key]);
                 } else {
-                    $_ENV[$key] = $value;
+                    $_ENV[$key] = $envValue;
+                }
+                if ($processValue === false) {
+                    putenv($key);
+                } else {
+                    putenv($key . '=' . $processValue);
                 }
             }
         }
@@ -54,7 +62,7 @@ final class LoadGlobalsBackOfficeUrlTest extends TestCase
             'absolue majuscules' => ['https://x/', 'HTTPS://bo.test/admin', 'HTTPS://bo.test/admin/', null],
             'absolue' => ['https://x/', 'https://bo.test/admin/', 'https://bo.test/admin/', null],
             'relatif rogné' => ['https://x/', '  admin  ', 'https://x/admin/', 'admin'],
-            'vide' => ['https://x/', '', 'https://x/', null],
+            'vide' => ['https://x/', '', 'https://x/', ''],
         ];
     }
 
@@ -77,6 +85,10 @@ final class LoadGlobalsBackOfficeUrlTest extends TestCase
     public function test_missing_back_office_url_defaults_to_admin_dev(): void
     {
         $suite = $this->suite(['PRESTAFLOW_FO_URL' => 'https://x/fr?y=1', 'PRESTAFLOW_BO_URL' => null]);
+
+        if (getenv('PRESTAFLOW_BO_URL') !== false || isset($_ENV['PRESTAFLOW_BO_URL'])) {
+            $this->markTestSkipped('Un .env* définit PRESTAFLOW_BO_URL : le cas « absente » est faussé.');
+        }
 
         $this->assertSame('https://x/fr/admin-dev/', $suite->getGlobals()['BO']['URL']);
         $this->assertSame('admin-dev/', $suite->relative());

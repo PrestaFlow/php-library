@@ -55,7 +55,7 @@ final class BackOfficeUrl
 - `PRESTAFLOW_FO_URL` ne change pas : il reçoit seulement un `/` final.
 - L'URL BO vaut `PRESTAFLOW_BO_URL`, ou `admin-dev/` si la variable est absente. Elle passe par `BackOfficeUrl::resolve($bo, $frontOfficeUrl)`.
 - `$backOfficeRelative` vaut la valeur brute nettoyée quand `BackOfficeUrl::isRelative()` est vrai, sinon `null`. Avec `$shopUrl` seule, un `//hôte` ou une URL absolue ne suit donc plus l'URL FO du fichier. C'est cohérent : leur hôte ne dépend pas de la FO.
-- `PRESTAFLOW_BO_URL` défini mais vide : l'URL FO elle-même, comme aujourd'hui, avec un `/` final. Ce cas n'est pas relatif.
+- `PRESTAFLOW_BO_URL` défini mais vide : l'URL FO elle-même, comme aujourd'hui ; `$backOfficeRelative` vaut `''`, pour que la BO suive une `$shopUrl` du fichier (comportement de `dev` conservé).
 
 ### `VisualTestsSuite`
 

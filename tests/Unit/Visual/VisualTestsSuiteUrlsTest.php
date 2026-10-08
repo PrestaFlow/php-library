@@ -288,8 +288,9 @@ final class VisualTestsSuiteUrlsTest extends TestCase
         $keys = ['PRESTAFLOW_FO_URL', 'PRESTAFLOW_BO_URL'];
         $saved = [];
         foreach ($keys as $key) {
-            $saved[$key] = array_key_exists($key, $_ENV) ? $_ENV[$key] : null;
+            $saved[$key] = [array_key_exists($key, $_ENV) ? $_ENV[$key] : null, getenv($key)];
             unset($_ENV[$key]);
+            putenv($key);
         }
         foreach ($env as $key => $value) {
             $_ENV[$key] = $value;
@@ -310,11 +311,16 @@ final class VisualTestsSuiteUrlsTest extends TestCase
                 }
             };
         } finally {
-            foreach ($saved as $key => $value) {
-                if ($value === null) {
+            foreach ($saved as $key => [$envValue, $processValue]) {
+                if ($envValue === null) {
                     unset($_ENV[$key]);
                 } else {
-                    $_ENV[$key] = $value;
+                    $_ENV[$key] = $envValue;
+                }
+                if ($processValue === false) {
+                    putenv($key);
+                } else {
+                    putenv($key . '=' . $processValue);
                 }
             }
         }
@@ -345,6 +351,23 @@ final class VisualTestsSuiteUrlsTest extends TestCase
     public function test_cli_absolute_back_office_url_is_kept_with_the_suite_shop_url(): void
     {
         $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => 'https://bo.env.test/admin/'], 'http://localhost:8093');
+        $suite->applySuiteUrls();
+
+        $this->assertSame('https://bo.env.test/admin/', $suite->getGlobals()['BO']['URL']);
+    }
+
+    public function test_cli_empty_back_office_url_follows_the_suite_shop_url(): void
+    {
+        $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => ''], 'http://localhost:8093');
+        $this->assertSame('https://env.test/', $suite->getGlobals()['BO']['URL']);
+        $suite->applySuiteUrls();
+
+        $this->assertSame('http://localhost:8093/', $suite->getGlobals()['BO']['URL']);
+    }
+
+    public function test_cli_protocol_relative_back_office_url_is_kept_with_the_suite_shop_url(): void
+    {
+        $suite = $this->cliSuite(['PRESTAFLOW_FO_URL' => 'https://env.test/', 'PRESTAFLOW_BO_URL' => '//bo.env.test/admin'], 'http://localhost:8093');
         $suite->applySuiteUrls();
 
         $this->assertSame('https://bo.env.test/admin/', $suite->getGlobals()['BO']['URL']);

@@ -269,8 +269,9 @@ class TestsSuite implements OutputStates
     /**
      * Valeur brute de l'URL BO quand loadGlobals() l'a complétée à partir de
      * l'URL FO de l'environnement (PRESTAFLOW_BO_URL relative : chemin, ni
-     * absolue ni `//hôte`, ou défaut `admin-dev/`) ; null sinon (BO absolue, globals fournies). Permet à
-     * VisualTestsSuite::applySuiteUrls() de suivre une $shopUrl du fichier.
+     * absolue ni `//hôte`, vide, ou défaut `admin-dev/`) ; null sinon (BO
+     * absolue, globals fournies). Permet à VisualTestsSuite::applySuiteUrls()
+     * de suivre une $shopUrl du fichier.
      */
     protected ?string $backOfficeRelative = null;
 
@@ -1190,7 +1191,9 @@ class TestsSuite implements OutputStates
         // chemin relatif complété par l'URL FO sans requête ni fragment,
         // `//hôte` au schéma de la FO, absolue gardée. Aucun refus ici.
         $rawBackOffice = (string) Env::get('PRESTAFLOW_BO_URL', 'admin-dev/');
-        $this->backOfficeRelative = BackOfficeUrl::isRelative($rawBackOffice) ? trim($rawBackOffice) : null;
+        $trimmedBackOffice = trim($rawBackOffice);
+        // Une valeur vide reste « relative » ('') : la BO suit alors une $shopUrl du fichier.
+        $this->backOfficeRelative = ($trimmedBackOffice === '' || BackOfficeUrl::isRelative($trimmedBackOffice)) ? $trimmedBackOffice : null;
         $backOfficeUrl = BackOfficeUrl::resolve($rawBackOffice, $frontOfficeUrl);
 
         $this->globals = [
