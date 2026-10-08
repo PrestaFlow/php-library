@@ -283,32 +283,6 @@ final class VisualTestsSuiteUrlsTest extends TestCase
         $this->assertSame('http://fo.test/fr/admin123/', $suite->getGlobals()['BO']['URL']);
     }
 
-    /** @return array<string, array{string, string, string}> */
-    public static function backOfficeUrlCases(): array
-    {
-        return [
-            'absolue gardée' => ['http://shop.test/admin-dev/', 'http://other.test/', 'http://shop.test/admin-dev/'],
-            'absolue rognée' => [' https://shop.test/admin123 ', '', 'https://shop.test/admin123/'],
-            'absolue majuscules' => ['HTTP://shop.test/a', '', 'HTTP://shop.test/a/'],
-            'relative sans slash' => ['admin-dev', 'http://shop.test', 'http://shop.test/admin-dev/'],
-            'relative' => ['admin-dev/', 'http://shop.test/', 'http://shop.test/admin-dev/'],
-            'relative à slash initial' => ['/admin-dev/', 'http://shop.test/', 'http://shop.test/admin-dev/'],
-            'relative sous chemin' => ['admin/sub', ' http://shop.test/fr/ ', 'http://shop.test/fr/admin/sub/'],
-            'protocole https' => ['//h.test/admin', 'https://fo.test', 'https://h.test/admin/'],
-            'protocole majuscules' => ['//h.test/admin', 'HTTP://fo.test/fr', 'http://h.test/admin/'],
-            'requête et fragment FO ignorés' => ['admin', 'http://fo.test/fr?x=1#a', 'http://fo.test/fr/admin/'],
-            'fragment FO seul' => ['/admin', 'http://fo.test/#frag', 'http://fo.test/admin/'],
-            'point dans un segment non initial' => ['/admin.v2/', 'http://fo.test', 'http://fo.test/admin.v2/'],
-            'segment à point' => ['admin/v2.1/', 'http://fo.test', 'http://fo.test/admin/v2.1/'],
-        ];
-    }
-
-    /** @dataProvider backOfficeUrlCases */
-    public function test_resolve_back_office_url(string $backOffice, string $frontOffice, string $expected): void
-    {
-        $this->assertSame($expected, VisualTestsSuite::resolveBackOfficeUrl($backOffice, $frontOffice));
-    }
-
     private function cliSuite(array $env, ?string $shopUrl): VisualTestsSuite
     {
         $keys = ['PRESTAFLOW_FO_URL', 'PRESTAFLOW_BO_URL'];

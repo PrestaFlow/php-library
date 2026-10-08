@@ -7,6 +7,7 @@ use HeadlessChromium\Exception\OperationTimedOut;
 use PrestaFlow\Library\Exceptions\BackOfficeTimeoutException;
 use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Utils\BackOfficeUrl;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Visual\VisualDevices;
 
@@ -477,25 +478,12 @@ abstract class VisualTestsSuite extends TestsSuite
     }
 
     /**
-     * URL BO effective, règle de l'app (App\Support\BackOfficeUrl::resolve) :
-     * absolue http(s) gardée ; relative au protocole (`//hôte/admin`) : schéma
-     * de l'URL FO ; relative (`admin123/`, `/admin123`) : URL FO sans requête
-     * ni fragment, puis le chemin. Toujours terminée par « / ».
+     * URL BO effective : voir BackOfficeUrl::resolve() (règle unique, la même que
+     * loadGlobals() et que l'app). Gardée publique pour compatibilité.
      */
     public static function resolveBackOfficeUrl(string $backOffice, string $frontOffice): string
     {
-        $backOffice = trim($backOffice);
-        $frontOffice = trim($frontOffice);
-        if (str_starts_with($backOffice, '//')) {
-            if (preg_match('#^(https?)://#i', $frontOffice, $m) === 1) {
-                $backOffice = strtolower($m[1]).':'.$backOffice;
-            }
-        } elseif (preg_match('#^https?://#i', $backOffice) !== 1) {
-            $frontOffice = (string) preg_replace('/[?#].*\z/s', '', $frontOffice);
-            $backOffice = rtrim($frontOffice, '/').'/'.ltrim($backOffice, '/');
-        }
-
-        return str_ends_with($backOffice, '/') ? $backOffice : $backOffice.'/';
+        return BackOfficeUrl::resolve($backOffice, $frontOffice);
     }
 
     /** Refuse blancs, identifiants, schéma non http(s) et chemin relatif non sûr, sans citer l'URL (elle peut porter un mot de passe). */
