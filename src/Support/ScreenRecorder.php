@@ -27,7 +27,7 @@ class ScreenRecorder
     public const MAX_FRAMES_PER_TEST = 1500;
 
     /** Attente maximale de la capture de départ d'un test. */
-    private const SEED_TIMEOUT_MS = 3000;
+    private const CAPTURE_TIMEOUT_MS = 3000;
 
     private static ?self $instance = null;
 
@@ -93,27 +93,29 @@ class ScreenRecorder
         $this->truncated = false;
         $this->follow($session);
         $this->mark('start', ['title' => $title]);
-        $this->seedFrame($session);
+        $this->captureFrame($session);
     }
 
     /**
-     * Première image du test, prise tout de suite : Chrome n'envoie une image que quand la page
-     * se redessine, et un test qui ne fait que lire la page n'en aurait aucune. Un échec de la
-     * capture (page en pleine navigation) laisse simplement le test sans cette image.
+     * Image prise à la demande : au début du test et au moment de l'échec. Chrome n'envoie une
+     * image que quand la page se redessine ; sans elle, un test qui ne fait que lire la page n'en
+     * aurait aucune, et l'erreur s'afficherait sur la dernière image reçue, parfois une page
+     * quittée depuis plusieurs secondes. Un échec de la capture (page en pleine navigation, page
+     * figée) laisse simplement le test sans cette image.
      */
-    private function seedFrame(?object $session): void
+    private function captureFrame(?object $session): void
     {
-        if ($this->broken || $session === null || ! method_exists($session, 'sendMessageSync')) {
+        if ($this->broken || $this->test === null || $session === null || ! method_exists($session, 'sendMessageSync')) {
             return;
         }
         try {
-            $response = $session->sendMessageSync(new Message('Page.captureScreenshot', ['format' => 'jpeg', 'quality' => self::SCREENCAST['quality'], 'optimizeForSpeed' => true]), self::SEED_TIMEOUT_MS);
+            $response = $session->sendMessageSync(new Message('Page.captureScreenshot', ['format' => 'jpeg', 'quality' => self::SCREENCAST['quality'], 'optimizeForSpeed' => true]), self::CAPTURE_TIMEOUT_MS);
             $jpeg = base64_decode((string) $response->getResultData('data'), true);
             if ($jpeg !== false && $jpeg !== '') {
                 $this->writeFrame($jpeg, microtime(true));
             }
         } catch (Throwable) {
-            // Pas d'image de départ : le flux prendra le relais.
+            // Pas d'image : le flux (ou l'image précédente) prend le relais.
         }
     }
 
@@ -128,8 +130,16 @@ class ScreenRecorder
         $this->test = null;
     }
 
-    public function fail(string $message): void
+    /**
+     * Échec du test : les images en attente sont lues, puis l'écran est capturé, pour que l'erreur
+     * s'affiche sur la page où elle s'est produite.
+     *
+     * @param  object|null  $session  session de la page courante (défaut : la session suivie)
+     */
+    public function fail(string $message, ?object $session = null): void
     {
+        $this->pump();
+        $this->captureFrame($session ?? $this->session);
         $this->mark('fail', ['message' => mb_substr($message, 0, 500)]);
     }
 

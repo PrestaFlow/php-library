@@ -186,6 +186,23 @@ final class ScreenRecorderTest extends TestCase
         $this->assertSame(['Page.startScreencast', 'Page.captureScreenshot', 'Page.captureScreenshot'], $session->sent);
     }
 
+    public function test_a_failure_is_shown_on_a_capture_of_the_current_page(): void
+    {
+        $session = new FakeSyncSession;
+        $recorder = new ScreenRecorder($this->dir);
+
+        // La dernière image du flux date d'une page quittée depuis : l'erreur doit s'afficher
+        // sur une capture prise au moment de l'échec, pas sur cette image.
+        $recorder->beginTest(0, 'ajoute au panier', $session);
+        $session->frame(microtime(true) + 1);
+        $recorder->fail('countItems introuvable', $session);
+        $recorder->endTest('fail');
+
+        $this->assertSame(['start', '1.jpg', '2.jpg', '3.jpg', 'fail', 'end'], array_map(fn ($l) => $l['m'] ?? $l['f'], $this->lines(0)));
+        $this->assertSame("\xFF\xD8\xFFseed", file_get_contents($this->dir.'/0/3.jpg'));
+        $this->assertSame(['Page.startScreencast', 'Page.captureScreenshot', 'Page.screencastFrameAck', 'Page.captureScreenshot'], $session->sent);
+    }
+
     public function test_a_failed_capture_leaves_the_stream_running(): void
     {
         $session = new FakeSyncSession(fails: true);

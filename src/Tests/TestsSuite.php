@@ -1384,7 +1384,7 @@ class TestsSuite implements OutputStates
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';
-                    $recorder?->fail($e->getMessage());
+                    $recorder?->fail($e->getMessage(), self::currentSession());
                     Expect::$expectMessage['fail'] = [$e->getMessage()];
                     $this->attachWarning($test);
                     $this->attachScreen($test);
