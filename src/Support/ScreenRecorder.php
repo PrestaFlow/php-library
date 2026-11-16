@@ -26,6 +26,9 @@ class ScreenRecorder
 
     public const MAX_FRAMES_PER_TEST = 1500;
 
+    /** Attente maximale de la capture de départ d'un test. */
+    private const SEED_TIMEOUT_MS = 3000;
+
     private static ?self $instance = null;
 
     private ?object $session = null;
@@ -90,6 +93,28 @@ class ScreenRecorder
         $this->truncated = false;
         $this->follow($session);
         $this->mark('start', ['title' => $title]);
+        $this->seedFrame($session);
+    }
+
+    /**
+     * Première image du test, prise tout de suite : Chrome n'envoie une image que quand la page
+     * se redessine, et un test qui ne fait que lire la page n'en aurait aucune. Un échec de la
+     * capture (page en pleine navigation) laisse simplement le test sans cette image.
+     */
+    private function seedFrame(?object $session): void
+    {
+        if ($this->broken || $session === null || ! method_exists($session, 'sendMessageSync')) {
+            return;
+        }
+        try {
+            $response = $session->sendMessageSync(new Message('Page.captureScreenshot', ['format' => 'jpeg', 'quality' => self::SCREENCAST['quality'], 'optimizeForSpeed' => true]), self::SEED_TIMEOUT_MS);
+            $jpeg = base64_decode((string) $response->getResultData('data'), true);
+            if ($jpeg !== false && $jpeg !== '') {
+                $this->writeFrame($jpeg, microtime(true));
+            }
+        } catch (Throwable) {
+            // Pas d'image de départ : le flux prendra le relais.
+        }
     }
 
     /** Fin du test : état final (pass, fail, skip…). */
@@ -187,14 +212,19 @@ class ScreenRecorder
             if ($jpeg === false) {
                 return;
             }
-            $this->frames++;
-            $this->lastFrameAt = $t;
-            $name = $this->frames.'.jpg';
-            file_put_contents($this->testDir().'/'.$name, $jpeg);
-            $this->append(['f' => $name, 't' => $t]);
+            $this->writeFrame($jpeg, $t);
         } catch (Throwable) {
             $this->broken = true;
         }
+    }
+
+    private function writeFrame(string $jpeg, float $t): void
+    {
+        $this->frames++;
+        $this->lastFrameAt = $t;
+        $name = $this->frames.'.jpg';
+        file_put_contents($this->testDir().'/'.$name, $jpeg);
+        $this->append(['f' => $name, 't' => $t]);
     }
 
     /** @param array<string, mixed> $data */
