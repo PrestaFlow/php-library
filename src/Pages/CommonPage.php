@@ -11,6 +11,7 @@ use PrestaFlow\Library\Exceptions\InvalidVersionException;
 use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
+use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
 
@@ -443,6 +444,21 @@ class CommonPage
     public function getPage()
     {
         return TestsSuite::getPage();
+    }
+
+    /**
+     * Erreurs JavaScript relevées sur la page depuis le début du test (exceptions non
+     * rattrapées, console.error), une par message distinct. Pour un test strict :
+     * Expect::that($page->jsErrors())->isEmpty().
+     *
+     * @return list<string>
+     */
+    public function jsErrors(): array
+    {
+        return array_map(
+            fn (array $e) => $e['message'].($e['url'] !== null ? ' ('.$e['url'].($e['line'] !== null ? ':'.$e['line'] : '').')' : ''),
+            ConsoleErrors::instance()->errors()
+        );
     }
 
     /**
