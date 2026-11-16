@@ -4,6 +4,7 @@ namespace PrestaFlow\Tests\Unit\Support;
 
 use Evenement\EventEmitter;
 use HeadlessChromium\Communication\Message;
+use HeadlessChromium\Communication\Response;
 use PHPUnit\Framework\TestCase;
 use PrestaFlow\Library\Support\ScreenRecorder;
 
@@ -34,6 +35,39 @@ final class FakeSession extends EventEmitter
     public function frame(float $t, int $ack = 1): void
     {
         $this->emit('method:Page.screencastFrame', [['data' => base64_encode("\xFF\xD8\xFFjpeg"), 'sessionId' => $ack, 'metadata' => ['timestamp' => $t]]]);
+    }
+}
+
+/** Session qui répond aux appels synchrones (Page.captureScreenshot), ou échoue sur demande. */
+final class FakeSyncSession extends EventEmitter
+{
+    public array $sent = [];
+
+    public function __construct(private bool $fails = false) {}
+
+    public function getSessionId(): string
+    {
+        return 'SYNC';
+    }
+
+    public function sendMessage(Message $message): void
+    {
+        $this->sent[] = $message->getMethod();
+    }
+
+    public function sendMessageSync(Message $message, ?int $timeout = null): Response
+    {
+        $this->sent[] = $message->getMethod();
+        if ($this->fails) {
+            throw new \RuntimeException('navigation en cours');
+        }
+
+        return new Response(['id' => $message->getId(), 'result' => ['data' => base64_encode("\xFF\xD8\xFFseed")]], $message);
+    }
+
+    public function frame(float $t): void
+    {
+        $this->emit('method:Page.screencastFrame', [['data' => base64_encode("\xFF\xD8\xFFjpeg"), 'sessionId' => 1, 'metadata' => ['timestamp' => $t]]]);
     }
 }
 
@@ -131,6 +165,38 @@ final class ScreenRecorderTest extends TestCase
         $this->assertSame(['Page.startScreencast', 'Page.stopScreencast', 'Page.screencastFrameAck'], $first->methods());
         $this->assertSame(['Page.startScreencast', 'Page.screencastFrameAck'], $second->methods());
         $this->assertEquals([['f' => '1.jpg', 't' => 2.0]], array_values(array_filter($this->lines(0), fn ($l) => isset($l['f']))));
+    }
+
+    public function test_each_test_starts_with_a_captured_frame(): void
+    {
+        $session = new FakeSyncSession;
+        $recorder = new ScreenRecorder($this->dir);
+
+        // Même session pour les deux tests : sans capture, le second (lecture seule) n'aurait aucune image.
+        $recorder->beginTest(0, 'ouvre la home', $session);
+        $recorder->endTest('pass');
+        $recorder->beginTest(1, 'lit les produits', $session);
+        $recorder->endTest('pass');
+
+        foreach ([0, 1] as $test) {
+            $lines = $this->lines($test);
+            $this->assertSame(['start', '1.jpg', 'end'], array_map(fn ($l) => $l['m'] ?? $l['f'], $lines));
+            $this->assertSame("\xFF\xD8\xFFseed", file_get_contents($this->dir.'/'.$test.'/1.jpg'));
+        }
+        $this->assertSame(['Page.startScreencast', 'Page.captureScreenshot', 'Page.captureScreenshot'], $session->sent);
+    }
+
+    public function test_a_failed_capture_leaves_the_stream_running(): void
+    {
+        $session = new FakeSyncSession(fails: true);
+        $recorder = new ScreenRecorder($this->dir);
+
+        $recorder->beginTest(0, 'ouvre la home', $session);
+        $session->frame(microtime(true) + 1);
+        $recorder->endTest('pass');
+
+        $this->assertSame(['start', '1.jpg', 'end'], array_map(fn ($l) => $l['m'] ?? $l['f'], $this->lines(0)));
+        $this->assertSame("\xFF\xD8\xFFjpeg", file_get_contents($this->dir.'/0/1.jpg'));
     }
 
     public function test_a_broken_session_never_breaks_the_run(): void
