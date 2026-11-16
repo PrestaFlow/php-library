@@ -34,7 +34,14 @@ final class ScreenRecorderBrowserTest extends TestCase
                 $recorder->pump(50);
             }
             $recorder->endTest('pass');
+
+            // Test suivant, sur la même page, sans rien changer : la capture de départ suffit à lui donner une image.
+            $recorder->beginTest(1, 'lecture seule', $page->getSession());
+            $page->evaluate("document.getElementById('b').textContent")->getReturnValue();
+            $recorder->endTest('pass');
             $recorder->stop();
+            $this->assertNotSame([], glob($dir.'/1/*.jpg'), 'un test sans changement a son image de départ');
+            $this->assertStringStartsWith("\xFF\xD8\xFF", (string) file_get_contents($dir.'/1/1.jpg'));
 
             $frames = glob($dir.'/0/*.jpg');
             $this->assertGreaterThanOrEqual(3, count($frames), 'au moins quelques images');
