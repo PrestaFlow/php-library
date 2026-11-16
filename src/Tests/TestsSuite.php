@@ -14,6 +14,7 @@ use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Support\ScreenRecorder;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
@@ -923,6 +924,48 @@ class TestsSuite implements OutputStates
         TestsSuite::getPage()?->close();
         TestsSuite::getBrowser()?->createPage();
         TestsSuite::applyExtraHttpHeaders();
+        // Vidéo de débogage : le flux suit la nouvelle page.
+        ScreenRecorder::current()?->follow(self::currentSession());
+    }
+
+    /** Session CDP de la page courante, ou null si elle est inaccessible. */
+    private static function currentSession(): ?object
+    {
+        try {
+            return TestsSuite::getPage()?->getSession();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * PRESTAFLOW_ONLY_TEST="<titre>" : ne garde que ce test (rejeu d'un test en échec). Un titre
+     * introuvable donne un test en échec, jamais une suite vide qui passerait pour verte.
+     *
+     * @param  list<array<string, mixed>>  $tests
+     * @return list<array<string, mixed>>
+     */
+    public static function onlyTest(array $tests): array
+    {
+        $only = trim((string) Env::get('PRESTAFLOW_ONLY_TEST', ''));
+        if ($only === '') {
+            return $tests;
+        }
+        $kept = array_values(array_filter($tests, fn (array $t) => trim((string) ($t['title'] ?? '')) === $only));
+        if ($kept !== []) {
+            return $kept;
+        }
+
+        return [[
+            'title' => $only,
+            'steps' => static function () use ($only): void {
+                throw new \RuntimeException(sprintf('Test introuvable dans la suite : « %s ».', $only));
+            },
+            'datasets' => [],
+            'dataset' => 1,
+            'file' => __FILE__,
+            'line' => __LINE__,
+        ]];
     }
 
     /**
@@ -1298,9 +1341,10 @@ class TestsSuite implements OutputStates
                     $tests[] = $test;
                 }
             }
-            $this->tests = $tests;
+            $this->tests = self::onlyTest($tests);
+            $recorder = ScreenRecorder::current();
 
-            foreach ($this->tests as &$test) {
+            foreach ($this->tests as $testIndex => &$test) {
                 $visualStartIndex = count(self::$visualResults);
 
                 try {
@@ -1325,6 +1369,11 @@ class TestsSuite implements OutputStates
                         $reflection = new \ReflectionFunction($test['steps']);
                         $this->scenarioName = $reflection->getClosureCalledClass()->name;
 
+                        if ($recorder !== null) {
+                            $recorder->beginTest($testIndex, (string) $test['title'], self::currentSession());
+                            $test['video'] = $testIndex;
+                        }
+
                         $test['steps']->call($this);
                         $this->stats['assertions'] += Expect::getNbAssertions();
 
@@ -1335,6 +1384,7 @@ class TestsSuite implements OutputStates
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';
+                    $recorder?->fail($e->getMessage());
                     Expect::$expectMessage['fail'] = [$e->getMessage()];
                     $this->attachWarning($test);
                     $this->attachScreen($test);
@@ -1351,6 +1401,7 @@ class TestsSuite implements OutputStates
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
                     $test['visual'] = self::buildVisualBlock($visualStartIndex);
+                    $recorder?->endTest((string) $test['state']);
 
                     match ($test['state']) {
                         'skip' => $this->skipped(test: $test, section: $sectionId, newLine: true),
@@ -1373,6 +1424,9 @@ class TestsSuite implements OutputStates
                     }
                 }
             }
+
+            unset($test);
+            $recorder?->stop();
 
             $endTime = hrtime(true);
             $this->stats['time'] = round(($endTime - $this->start_time) / 1e+6);
