@@ -177,19 +177,8 @@ class ConsoleErrors
     /** Lit les événements en attente sur le socket (au plus 100 ms). */
     private function drain(): void
     {
-        if ($this->session === null || $this->broken || ! method_exists($this->session, 'getConnection')) {
-            return;
-        }
-        try {
-            $connection = $this->session->getConnection();
-            $deadline = microtime(true) + 0.1;
-            while (microtime(true) < $deadline && $connection->waitForData(0.02)) {
-                for ($i = 0; $i < 50; $i++) {
-                    $connection->readLine();
-                }
-            }
-        } catch (Throwable) {
-            // Socket fermé (page détruite) : rien à lire.
+        if (! $this->broken) {
+            SessionEvents::drain($this->session);
         }
     }
 }

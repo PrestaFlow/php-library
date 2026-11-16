@@ -12,6 +12,7 @@ use PrestaFlow\Library\Exceptions\TimeoutException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Support\ConsoleErrors;
+use PrestaFlow\Library\Support\FailedRequests;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
 
@@ -458,6 +459,21 @@ class CommonPage
         return array_map(
             fn (array $e) => $e['message'].($e['url'] !== null ? ' ('.$e['url'].($e['line'] !== null ? ':'.$e['line'] : '').')' : ''),
             ConsoleErrors::instance()->errors()
+        );
+    }
+
+    /**
+     * Requêtes réseau en échec depuis le début du test (réponse HTTP ≥ 400, chargement qui
+     * n'aboutit pas), une par requête distincte : « POST https://… → 500 ». Pour un test
+     * strict : Expect::that($page->failedRequests())->isEmpty().
+     *
+     * @return list<string>
+     */
+    public function failedRequests(): array
+    {
+        return array_map(
+            fn (array $r) => $r['method'].' '.$r['url'].' → '.($r['status'] ?? $r['error']),
+            FailedRequests::instance()->requests()
         );
     }
 
