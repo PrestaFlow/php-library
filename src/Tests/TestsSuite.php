@@ -14,6 +14,7 @@ use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\ScreenRecorder;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
@@ -926,6 +927,7 @@ class TestsSuite implements OutputStates
         TestsSuite::applyExtraHttpHeaders();
         // Vidéo de débogage : le flux suit la nouvelle page.
         ScreenRecorder::current()?->follow(self::currentSession());
+        ConsoleErrors::instance()->follow(self::currentSession());
     }
 
     /** Session CDP de la page courante, ou null si elle est inaccessible. */
@@ -1369,6 +1371,7 @@ class TestsSuite implements OutputStates
                         $reflection = new \ReflectionFunction($test['steps']);
                         $this->scenarioName = $reflection->getClosureCalledClass()->name;
 
+                        ConsoleErrors::instance()->beginTest(self::currentSession());
                         if ($recorder !== null) {
                             $recorder->beginTest($testIndex, (string) $test['title'], self::currentSession());
                             $test['video'] = $testIndex;
@@ -1401,6 +1404,8 @@ class TestsSuite implements OutputStates
                     $endTime = hrtime(true);
                     $test['time'] = round(($endTime - $startTime) / 1e+6);
                     $test['visual'] = self::buildVisualBlock($visualStartIndex);
+                    // Erreurs JS de la page pendant le test : jointes, sans changer son état.
+                    $test['js_errors'] = ConsoleErrors::instance()->endTest();
                     $recorder?->endTest((string) $test['state']);
 
                     match ($test['state']) {
