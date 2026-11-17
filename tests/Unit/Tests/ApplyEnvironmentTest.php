@@ -322,12 +322,13 @@ echo "ok";
 
         (new InjectedBrowserSuite(loadGlobals: false, getBrowser: false))->before(headless: true);
 
-        // before() vide d'abord les cookies de la suite précédente, puis applique l'environnement.
+        // before() met la page au premier plan, vide les cookies de la suite précédente, puis applique l'environnement.
         // getBrowser() valide son cache par getConnection()->isConnected() à chaque appel :
         // ces lectures du navigateur partagé ne sont pas comparées, seuls les effets le sont.
         $effects = static fn (\ArrayObject $j) => array_values(array_filter($j->getArrayCopy(), static fn (string $line) => $line !== 'browser getConnection'));
         $this->assertSame(
-            array_merge(['session Network.clearBrowserCookies'], $effects($expected)),
+            // La page est d'abord mise au premier plan (bringPageToFront) : un état de la page, pas de l'environnement.
+            array_merge(['session Page.bringToFront', 'session Network.clearBrowserCookies'], $effects($expected)),
             $effects($journal)
         );
     }
