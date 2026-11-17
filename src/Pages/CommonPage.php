@@ -458,6 +458,8 @@ class CommonPage
      */
     public function frame(string $urlContains, int $timeout = 10000): Frame
     {
+        // Une page masquée répond aux événements souris en ~5 s : voir TestsSuite::bringPageToFront().
+        TestsSuite::bringPageToFront();
         $frame = Frame::find($this->getPage(), $urlContains, $timeout);
         if ($frame === null) {
             throw new TimeoutException(sprintf(
