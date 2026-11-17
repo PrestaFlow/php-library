@@ -692,6 +692,7 @@ class TestsSuite implements OutputStates
         }
 
         TestsSuite::getBrowser(headless: $headless, force: true);
+        TestsSuite::bringPageToFront();
 
         // 1) Nettoyer les cookies héritées de la suite précédente. Cet appel doit
         //    précéder presetEnvCookies() : sinon il EFFACE les cookies qu'on vient
@@ -925,11 +926,33 @@ class TestsSuite implements OutputStates
     {
         TestsSuite::getPage()?->close();
         TestsSuite::getBrowser()?->createPage();
+        TestsSuite::bringPageToFront();
         TestsSuite::applyExtraHttpHeaders();
         // Vidéo de débogage : le flux suit la nouvelle page.
         ScreenRecorder::current()?->follow(self::currentSession());
         ConsoleErrors::instance()->follow(self::currentSession());
         FailedRequests::instance()->follow(self::currentSession());
+    }
+
+    /**
+     * Met la page courante au premier plan (document.visibilityState = visible).
+     *
+     * Le navigateur est gardé entre les runs (keepAlive) et une page recréée ou retrouvée n'est
+     * pas forcément l'onglet actif. Une page masquée est ralentie par Chrome : chaque événement
+     * souris attend une image (~5 s, au-delà du délai CDP par défaut, d'où « Operation timed
+     * out after 5s » sur Stripe Checkout), les animations et le screencast de la vidéo sont
+     * gelés. Sans effet sur le reste si l'appel échoue.
+     */
+    public static function bringPageToFront(): void
+    {
+        try {
+            TestsSuite::getPage()?->getSession()->sendMessageSync(
+                new \HeadlessChromium\Communication\Message('Page.bringToFront'),
+                3000
+            );
+        } catch (\Throwable) {
+            // Page en cours de fermeture : la suivante sera mise au premier plan à sa création.
+        }
     }
 
     /** Session CDP de la page courante, ou null si elle est inaccessible. */
