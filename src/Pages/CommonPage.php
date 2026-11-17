@@ -13,6 +13,7 @@ use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\FailedRequests;
+use PrestaFlow\Library\Support\Frame;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
 
@@ -445,6 +446,38 @@ class CommonPage
     public function getPage()
     {
         return TestsSuite::getPage();
+    }
+
+    /**
+     * Iframe d'un autre domaine (paiement Stripe, PayPal…) dont l'URL contient $urlContains,
+     * pour y cliquer et taper par sélecteur. Lève une TimeoutException si elle n'apparaît pas.
+     * frameUrls() liste les iframes ouvertes pour trouver le motif.
+     *
+     *   $card = $page->frame('js.stripe.com');
+     *   $card->type('#cardNumber', '4242424242424242');
+     */
+    public function frame(string $urlContains, int $timeout = 10000): Frame
+    {
+        $frame = Frame::find($this->getPage(), $urlContains, $timeout);
+        if ($frame === null) {
+            throw new TimeoutException(sprintf(
+                'Aucune iframe dont l\'URL contient « %s » (iframes ouvertes : %s)',
+                $urlContains,
+                implode(', ', Frame::urls($this->getPage())) ?: 'aucune'
+            ));
+        }
+
+        return $frame;
+    }
+
+    /**
+     * URL des iframes d'un autre domaine ouvertes dans le navigateur.
+     *
+     * @return list<string>
+     */
+    public function frameUrls(): array
+    {
+        return Frame::urls($this->getPage());
     }
 
     /**
