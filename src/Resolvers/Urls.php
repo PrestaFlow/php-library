@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Resolvers;
 
 use PrestaFlow\Library\Traits\Locale;
+use PrestaFlow\Library\Utils\TestsPath;
 
 trait Urls
 {
@@ -34,28 +35,13 @@ trait Urls
             $this->initLocale($this->getGlobal('LOCALE'));
         }
 
-        $customPath = __DIR__ . '/../../../../../Tests/Urls/';
         $basePath = __DIR__ . '/../Urls/';
         $fileName = $this->getLocale() . '.json';
-        $defaultCatalog = [];
-        $customCatalog = [];
-        $mergedCatalog = [];
 
-        $pathToCatalog = $basePath . $fileName;
-        if (file_exists($pathToCatalog)) {
-            $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
-            if (!is_array($defaultCatalog)) {
-                $defaultCatalog = [];
-            }
-        }
-
-        $pathToCatalog = $customPath . $fileName;
-        if (file_exists($pathToCatalog)) {
-            $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
-            if (!is_array($defaultCatalog)) {
-                $defaultCatalog = [];
-            }
-        }
+        $defaultCatalog = TestsPath::readJson($basePath . $fileName);
+        // Un fichier du projet invalide vaut [] : l'ancien code testait $defaultCatalog au lieu de
+        // $customCatalog, et le null restait dans la fusion (TypeError au déballage).
+        $customCatalog = TestsPath::readJson(TestsPath::dir('Urls', $this->globals ?? []) . $fileName);
 
         $specificUrls = [];
         if (is_array($this->customs['urls'])) {

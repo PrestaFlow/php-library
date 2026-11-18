@@ -16,6 +16,7 @@ use PrestaFlow\Library\Support\FailedRequests;
 use PrestaFlow\Library\Support\Frame;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
+use PrestaFlow\Library\Utils\TestsPath;
 
 
 class CommonPage
@@ -159,7 +160,13 @@ class CommonPage
             return $selector;
         }
 
-        throw new Exception('Selector "' . $selector . '" is not defined');
+        throw new Exception(sprintf('Selector "%s" is not defined on page "%s"', $selector, $this->getPagePath()));
+    }
+
+    /** Chemin de la page tel que rangé dans les JSON (FrontOffice\Registration), sans « \Page ». */
+    public function getPagePath(): string
+    {
+        return (string) preg_replace('#\\\\Page$#', '', $this->getPageName());
     }
 
     public function __call($name, $arguments)
@@ -264,7 +271,7 @@ class CommonPage
 
         return [
             __DIR__ . '/../Themes',
-            __DIR__ . '/../../../../../Tests/Themes',
+            TestsPath::dir('Themes', $this->globals),
         ];
     }
 
@@ -1388,24 +1395,11 @@ class CommonPage
 
         $baseSelectors = [...$selectors, ...$pageSelectors];
 
-        $customPath = __DIR__ . '/../../../../../Tests/Selectors/';
-
-        $fileName = $this->getLocale() . '.json';
-
-        $customSelectors = [];
-        $pathToCatalog = $customPath . $fileName;
-        if (file_exists($pathToCatalog)) {
-            $customSelectors = json_decode(file_get_contents($pathToCatalog), true);
-
-            if (count($customSelectors)) {
-                foreach ($pageNames as $pageName) {
-                    if ($pageName !== 'Page') {
-                        if (isset($customSelectors[$pageName])) {
-                            $customSelectors = $customSelectors[$pageName];
-                        } else {
-                            $customSelectors = [];
-                        }
-                    }
+        $customSelectors = TestsPath::readJson(TestsPath::dir('Selectors', $this->globals) . $this->getLocale() . '.json');
+        if (count($customSelectors)) {
+            foreach ($pageNames as $pageName) {
+                if ($pageName !== 'Page') {
+                    $customSelectors = is_array($customSelectors[$pageName] ?? null) ? $customSelectors[$pageName] : [];
                 }
             }
         }
@@ -1447,25 +1441,11 @@ class CommonPage
 
         $baseMessages = [...$messages, ...$pageMessages];
 
-        $customPath = __DIR__ . '/../../../../../Tests/Messages/';
-        $fileName = $this->getLocale() . '.json';
-        $customMessages = [];
-        $pathToCatalog = $customPath . $fileName;
-        if (file_exists($pathToCatalog)) {
-            $customMessages = json_decode(file_get_contents($pathToCatalog), true);
-
-            if (count($customMessages)) {
-                $pageName = str_replace('PrestaFlow\\Library\\Pages\\v' . $this->getMajorVersion(namespace: true) . '\\', '', get_class($this));
-                $pageNames = explode('\\', $pageName);
-
-                foreach ($pageNames as $pageName) {
-                    if ($pageName !== 'Page') {
-                        if (isset($customMessages[$pageName])) {
-                            $customMessages = $customMessages[$pageName];
-                        } else {
-                            $customMessages = [];
-                        }
-                    }
+        $customMessages = TestsPath::readJson(TestsPath::dir('Messages', $this->globals) . $this->getLocale() . '.json');
+        if (count($customMessages)) {
+            foreach ($pageNames as $pageName) {
+                if ($pageName !== 'Page') {
+                    $customMessages = is_array($customMessages[$pageName] ?? null) ? $customMessages[$pageName] : [];
                 }
             }
         }
