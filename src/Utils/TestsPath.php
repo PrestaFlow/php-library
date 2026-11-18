@@ -16,9 +16,10 @@ final class TestsPath
 
     public const GLOBAL_KEY = 'TESTS_PATH';
 
-    public static function root(array $globals = []): string
+    /** $globals : les globals de la page ; null ou une valeur non tableau valent []. */
+    public static function root(mixed $globals = []): string
     {
-        $configured = $globals[self::GLOBAL_KEY] ?? null;
+        $configured = is_array($globals) ? ($globals[self::GLOBAL_KEY] ?? null) : null;
         if (!is_string($configured) || $configured === '') {
             $configured = Env::get(self::ENV_VAR);
         }
@@ -36,7 +37,7 @@ final class TestsPath
     }
 
     /** Dossier d'un type de fichier, avec « / » final. */
-    public static function dir(string $kind, array $globals = []): string
+    public static function dir(string $kind, mixed $globals = []): string
     {
         return self::root($globals) . '/' . $kind . '/';
     }

@@ -8,10 +8,33 @@ use PrestaFlow\Library\Utils\TestsPath;
 /** Dossier Tests/ du projet : global, puis environnement, puis le chemin historique relatif à vendor/. */
 final class TestsPathTest extends TestCase
 {
+    /** Valeurs d'avant le test : la variable peut être posée sur la machine ou en CI. */
+    private array $saved = [];
+
+    protected function setUp(): void
+    {
+        $this->saved = [
+            'env' => $_ENV[TestsPath::ENV_VAR] ?? null,
+            'server' => $_SERVER[TestsPath::ENV_VAR] ?? null,
+            'process' => getenv(TestsPath::ENV_VAR),
+        ];
+        putenv(TestsPath::ENV_VAR);
+        unset($_ENV[TestsPath::ENV_VAR], $_SERVER[TestsPath::ENV_VAR]);
+    }
+
     protected function tearDown(): void
     {
-        unset($_ENV[TestsPath::ENV_VAR]);
         putenv(TestsPath::ENV_VAR);
+        unset($_ENV[TestsPath::ENV_VAR], $_SERVER[TestsPath::ENV_VAR]);
+        if ($this->saved['process'] !== false) {
+            putenv(TestsPath::ENV_VAR.'='.$this->saved['process']);
+        }
+        if ($this->saved['env'] !== null) {
+            $_ENV[TestsPath::ENV_VAR] = $this->saved['env'];
+        }
+        if ($this->saved['server'] !== null) {
+            $_SERVER[TestsPath::ENV_VAR] = $this->saved['server'];
+        }
     }
 
     /** `a/b/../c` → `a/c`, sans toucher au disque (le dossier par défaut n'existe pas ici). */
@@ -52,6 +75,12 @@ final class TestsPathTest extends TestCase
         foreach (['Selectors', 'Messages', 'Translations', 'Urls', 'Themes'] as $kind) {
             $this->assertSame(self::normalize($historical.'/'.$kind), self::normalize(TestsPath::dir($kind, [])));
         }
+    }
+
+    public function testNonArrayGlobalsFallBackToTheDefault(): void
+    {
+        $this->assertSame(TestsPath::defaultRoot(), TestsPath::root(null));
+        $this->assertSame(TestsPath::defaultRoot().'/Urls/', TestsPath::dir('Urls', 'oops'));
     }
 
     public function testReadJsonToleratesMissingAndInvalidFiles(): void

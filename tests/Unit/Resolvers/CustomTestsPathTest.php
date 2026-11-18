@@ -11,7 +11,7 @@ use PrestaFlow\Library\Utils\TestsPath;
 /** Double de page sans navigateur : sélecteurs et messages fusionnés comme une page de la librairie. */
 final class FakeCustomPage extends CommonPage
 {
-    public function __construct(array $globals = [])
+    public function __construct(mixed $globals = [])
     {
         $this->globals = $globals;
         $this->customs = ['selectors' => [], 'messages' => [], 'urls' => []];
@@ -44,14 +44,57 @@ final class CustomTestsPathTest extends TestCase
 {
     private string $root = '';
 
+    private ?string $previousEnv = null;
+
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir().'/pf-tests-'.bin2hex(random_bytes(4));
+        // Le dossier par défaut ne doit pas dépendre d'une variable posée sur la machine.
+        $previous = getenv(TestsPath::ENV_VAR);
+        $this->previousEnv = $previous === false ? null : $previous;
+        putenv(TestsPath::ENV_VAR);
+        unset($_ENV[TestsPath::ENV_VAR], $_SERVER[TestsPath::ENV_VAR]);
     }
 
     protected function tearDown(): void
     {
-        exec('rm -rf '.escapeshellarg($this->root));
+        self::deleteTree($this->root);
+        if ($this->previousEnv !== null) {
+            putenv(TestsPath::ENV_VAR.'='.$this->previousEnv);
+        }
+    }
+
+    private static function deleteTree(string $path): void
+    {
+        if (!file_exists($path)) {
+            return;
+        }
+        if (is_dir($path) && !is_link($path)) {
+            foreach (scandir($path) as $entry) {
+                if ($entry !== '.' && $entry !== '..') {
+                    self::deleteTree($path.'/'.$entry);
+                }
+            }
+            rmdir($path);
+
+            return;
+        }
+        unlink($path);
+    }
+
+    /** `a/b/../c` → `a/c`, sans toucher au disque (le dossier par défaut n'existe pas ici). */
+    private static function normalize(string $path): string
+    {
+        $out = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '..') {
+                array_pop($out);
+            } elseif ($segment !== '.' && $segment !== '') {
+                $out[] = $segment;
+            }
+        }
+
+        return '/'.implode('/', $out);
     }
 
     private function put(string $relative, string $content): void
@@ -72,6 +115,14 @@ final class CustomTestsPathTest extends TestCase
         $selectors = (new FakeCustomPage($this->globals()))->getSelectors();
 
         $this->assertSame('#mine', $selectors['submitButton']);
+        $this->assertSame('h1', $selectors['title']);
+    }
+
+    public function testAPageWithNullGlobalsStillBuildsItsSelectors(): void
+    {
+        $selectors = (new FakeCustomPage(null))->getSelectors();
+
+        $this->assertSame('.lib-submit', $selectors['submitButton']);
         $this->assertSame('h1', $selectors['title']);
     }
 
@@ -100,7 +151,9 @@ final class CustomTestsPathTest extends TestCase
 
     public function testTheDefaultThemeFolderIsUnchanged(): void
     {
-        $this->assertSame(TestsPath::dir('Themes', []), (new FakeCustomPage([]))->themeDirs()[1]);
+        $historical = dirname(__DIR__, 3).'/src/Pages/../../../../../Tests/Themes/';
+
+        $this->assertSame(self::normalize($historical), self::normalize((new FakeCustomPage([]))->themeDirs()[1]));
     }
 
     public function testUrlsComeFromTheConfiguredFolderAndAnInvalidFileIsIgnored(): void
