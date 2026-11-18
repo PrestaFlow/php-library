@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Resolvers;
 
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
+use PrestaFlow\Library\Utils\TestsPath;
 
 trait Translations
 {
@@ -54,7 +55,6 @@ trait Translations
         var_dump($customDomain);
         */
 
-        $customPath = __DIR__.'/../../../../../Tests/Translations/';
         $basePath = __DIR__.'/../Translations/';
         $fileName = $this->getLocale().'.json';
         $defaultCatalog = [];
@@ -69,13 +69,7 @@ trait Translations
             $defaultCatalog = json_decode(file_get_contents($pathToCatalog), true);
         }
 
-        $pathToCatalog = $customPath.$fileName;
-        if (file_exists($pathToCatalog)) {
-            $customCatalog = json_decode(file_get_contents($pathToCatalog), true);
-            if (!is_array($customCatalog)) {
-                $customCatalog = [];
-            }
-        }
+        $customCatalog = TestsPath::readJson(TestsPath::dir('Translations', $this->globals ?? []).$fileName);
 
         $pathToCatalog = $basePath.$this->getMajorVersion().'/'.$fileName;
         if (file_exists($pathToCatalog)) {
