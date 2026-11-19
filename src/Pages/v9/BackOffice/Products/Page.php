@@ -31,7 +31,11 @@ class Page extends BasePage
             'listRowLink' => '#product_grid_table tbody tr:nth-child(${row}) a[href*="/products/"][href*="/edit"]',
             'resultCount' => '.pagination-total, #product_grid_panel .card-header .badge',
             'rowActionsToggle' => '#product_grid_table tbody tr:nth-child(${row}) .dropdown-toggle',
-            'rowDeleteLink' => '#product_grid_table tbody tr:nth-child(${row}) a.grid-delete-row-link',
+            // 9.2 builds the class from the action id, which now carries spaces
+            // ("grid-delete from all stores-row-link"): grid-delete-row-link no
+            // longer exists. The action's data-url (…/delete, …/delete-from-all-shops)
+            // is the stable part; the old class stays for the versions that have it.
+            'rowDeleteLink' => '#product_grid_table tbody tr:nth-child(${row}) a.grid-delete-row-link, #product_grid_table tbody tr:nth-child(${row}) a.js-submit-row-action[data-url*="/delete"]',
             'deleteConfirmButton' => '.modal.show .btn-confirm-submit',
             'formNameInput' => '#product_header_name_1',
             'formPriceInput' => '#product_pricing_retail_price_price_tax_excluded',

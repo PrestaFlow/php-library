@@ -19,6 +19,13 @@ class FrontOfficePage extends CommonPage
     use Urls;
     use Locale;
 
+    // Redeclared here, not only through the trait: before PHP 8.3 a trait's
+    // static property used again in a child class stays shared with the
+    // parent (CommonPage), so the back office and the front office would
+    // overwrite each other's language (BO_LOCALE).
+    protected static $localeInit = null;
+    protected static string $locale = 'en';
+
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
         $this->initVersion(patchVersion: $patchVersion, globals: $globals);
