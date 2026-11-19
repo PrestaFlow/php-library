@@ -55,7 +55,7 @@ name: Visual
 # to the working directory, see Utils\Screenshots::referencesBaseDir). That
 # directory is cached per PrestaShop version × theme:
 #   - restored on every run (push, pull_request, workflow_dispatch) from the
-#     most recent `visual-refs-v3-<ps>-<theme>-*` entry;
+#     most recent `visual-refs-v4-<ps>-<theme>-*` entry;
 #   - saved ONLY on push to main, under a key unique to the run, so a pull
 #     request can never move the baseline; it only compares against it.
 # A checkpoint with no reference yet becomes the reference and passes, so the
@@ -63,6 +63,8 @@ name: Visual
 # baselines on purpose, bump the version in both keys. v3: the key gained the
 # PrestaShop version (three rows are Classic now) and the cart checkpoint
 # moved to cart?action=show, so the v2 references no longer apply.
+# v4: the 9.2.0 Classic shop's module list changed (PrestaShop Marketplace 5.3.1), so the
+# back-office modules capture no longer matched its v3 reference.
 #
 # The run's captures and diffs (prestaflow/screens/actual and /diff) are
 # uploaded on every run, one artifact per row, together with the references
@@ -141,8 +143,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: visual-baseline
-          key: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}
-          restore-keys: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-
+          key: visual-refs-v4-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}
+          restore-keys: visual-refs-v4-${{ matrix.ps }}-${{ matrix.theme }}-
 
       - name: Report the references in use
         run: |
@@ -262,4 +264,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: visual-baseline
-          key: visual-refs-v3-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: visual-refs-v4-${{ matrix.ps }}-${{ matrix.theme }}-${{ github.run_id }}-${{ github.run_attempt }}
