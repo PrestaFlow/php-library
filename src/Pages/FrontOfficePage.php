@@ -11,7 +11,6 @@ use PrestaFlow\Library\Resolvers\Translations;
 use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
-use SapientPro\ImageComparator\ImageComparator;
 
 class FrontOfficePage extends CommonPage
 {
@@ -172,52 +171,5 @@ class FrontOfficePage extends CommonPage
     public function getPageTitle()
     {
         return $this->getTitle();
-    }
-
-    public function compare()
-    {
-        ini_set('memory_limit', '-1');
-
-        $score = 0;
-
-        if (false) {
-            sleep(3);
-            $fileName = 'reference_' . $this->getPage()->getSession()->getTargetId() . '.jpeg';
-            $screenshot = $this->getPage()->screenshot([
-                'captureBeyondViewport' => true,
-                'clip' => $this->getPage()->getFullPageClip(),
-                'format' => 'jpeg',
-            ]);
-            $screenshot->saveToFile($this->getStoragePath(__DIR__) . '/screens/references/' . $fileName);
-        }
-        $reference = 'reference_1EF3347A43C8621081BB3865E78241F3.jpeg';
-        $actual = 'reference_DE67A27A300C825129F2D5B4BE813202.jpeg';
-
-        if (!file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $reference) || !file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)) {
-            return 0;
-        }
-
-        $imageComparator = new ImageComparator();
-        $score = $imageComparator->compare($this->getStoragePath(__DIR__) . '/screens/references/' . $reference, $this->getStoragePath(__DIR__) . '/screens/references/' . $actual);
-
-        return $score;
-    }
-
-    public function compareWithMaskedImage()
-    {
-        ini_set('memory_limit', '-1');
-
-        $reference = 'reference_1EF3347A43C8621081BB3865E78241F3.jpeg';
-        $actual = 'reference_DE67A27A300C825129F2D5B4BE813202.jpeg';
-
-        if (!file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $reference) || !file_exists($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)) {
-            return 0;
-        }
-
-        $mask = \Image::fromFile($this->getStoragePath(__DIR__) . '/screens/references/' . $reference);
-
-        \Image::fromFile($this->getStoragePath(__DIR__) . '/screens/references/' . $actual)->subtract($mask, 75)->save(time(), $this->getStoragePath(__DIR__) . '/screens/masked/');
-
-        return $this->compare();
     }
 }
