@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Traits;
 
 use PrestaFlow\Library\Exceptions\InvalidVersionException;
+use PrestaFlow\Library\Pages\BackOfficePage;
 
 trait ImportPage
 {
@@ -38,6 +39,15 @@ trait ImportPage
             throw new InvalidVersionException(
                 'Page ' . $pageName . ' introuvable pour PrestaShop ' . $patchVersion . ' (' . $pageClass . ') : version non prise en charge ou nom de page erroné.'
             );
+        }
+
+        // Le back-office parle la langue de l'employé, pas celle de la boutique :
+        // BO_LOCALE (vide = LOCALE) la donne aux seules pages BO. FrontOfficePage
+        // et BackOfficePage redéclarent le trait Locale, d'où deux langues
+        // statiques distinctes qui cohabitent dans un même run.
+        $backOfficeLocale = $globals['BO_LOCALE'] ?? null;
+        if (is_string($backOfficeLocale) && $backOfficeLocale !== '' && is_a($pageClass, BackOfficePage::class, true)) {
+            $locale = $backOfficeLocale;
         }
 
         $customs = [];

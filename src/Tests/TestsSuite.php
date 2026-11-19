@@ -1269,6 +1269,8 @@ class TestsSuite implements OutputStates
         $this->globals = [
             'PS_VERSION' => Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'),
             'LOCALE' => Env::get('PRESTAFLOW_LOCALE', 'en'),
+            // Langue du back-office (celle de l'employé) ; vide = LOCALE.
+            'BO_LOCALE' => (string) Env::get('PRESTAFLOW_BO_LOCALE', ''),
             // Selector variants are merged per theme. Classic is the default
             // because it is the library's historical baseline — see
             // CommonPage::getSelectors().
