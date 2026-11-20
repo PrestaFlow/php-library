@@ -48,14 +48,26 @@ class WishlistTest extends TestsSuite
         ->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->login();
 
-            var_dump($frontOfficeLoginPage->selector('logoutLink'));
-
             Expect::that()->customerIsLogged($frontOfficeLoginPage->selector('logoutLink'), 1000);
         })
         ->it('should go to all products page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
             $frontOfficeHomePage->goToAllProducts();
 
-            Expect::that($frontOfficeListingPage->getListingTitle())->contains('Accueil');
+            // Locale-agnostic, as in FrontOfficeSmoke: a heading, and the same
+            // one in the document title.
+            $title = $frontOfficeListingPage->getListingTitle();
+
+            Expect::that($title)->isNotEmpty();
+            Expect::that($frontOfficeListingPage->getMetaTitle())->contains($title);
+        })
+        ->it('the wishlist module is on the product listing', function () use ($frontOfficeListingPage) {
+            $present = $frontOfficeListingPage->getPage()->evaluate(
+                '!!document.querySelector(".wishlist-button-add, .wishlist-button, [class*=\\"wishlist\\"]")'
+            )->getReturnValue();
+
+            if ($present !== true) {
+                $this->skipTest('The wishlist module (blockwishlist) is not installed, or not shown on product listings.');
+            }
         });
 
         for ($i = 1; $i <= 3; $i++) {

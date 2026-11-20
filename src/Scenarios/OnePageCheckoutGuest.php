@@ -15,7 +15,6 @@ use PrestaFlow\Library\Expects\Expect;
 class OnePageCheckoutGuest extends Scenario
 {
     public $params = [
-        // The reference shop (ps92rc1 container) runs in English.
         // null => the suite's locale (the project's language in the app). Friendly
         // URLs and their per-language overrides are read in that language.
         'locale' => null,

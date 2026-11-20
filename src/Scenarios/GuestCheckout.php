@@ -44,8 +44,8 @@ class GuestCheckout extends Scenario
     public function steps($testSuite)
     {
         // importPage() resolves friendly URLs from the SUITE's locale, so
-        // propagate this scenario's locale (fr on the demo shop) before importing
-        // pages — otherwise cart/checkout URLs fall back to English and 404.
+        // propagate an explicit locale before importing pages. Without one,
+        // the suite's own locale applies.
         if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
             $testSuite->params['locale'] = $this->params['locale'];
         }
