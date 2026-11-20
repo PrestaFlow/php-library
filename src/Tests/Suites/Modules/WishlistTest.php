@@ -43,7 +43,9 @@ class WishlistTest extends TestsSuite
         ->it('should go to login page', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->goToPage('login');
 
-            Expect::that($frontOfficeLoginPage->getPageTitle())->contains($frontOfficeLoginPage->pageTitle());
+            // The form, not the page title: the title is the shop's wording,
+            // in the shop's language ("Login", "Sign in", "Connexion"...).
+            Expect::that($frontOfficeLoginPage->elementIsVisible($frontOfficeLoginPage->getSelector('emailInput'), 5000))->equals(true);
         })
         ->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->login();
