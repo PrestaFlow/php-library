@@ -10,7 +10,7 @@ use PrestaFlow\Library\Tests\TestsSuite;
  * skipWithReason() turns a missing shop capability (no offline payment method, no
  * wishlist module) into a skip with its reason, not a failure.
  */
-final class SkipTestTest extends TestCase
+final class SkipWithReasonTest extends TestCase
 {
     private function suite(): TestsSuite
     {
@@ -38,17 +38,8 @@ final class SkipTestTest extends TestCase
         }
     }
 
-    public function test_the_run_loop_catches_it_before_the_generic_failure(): void
-    {
-        $source = (string) file_get_contents((new \ReflectionClass(TestsSuite::class))->getFileName());
-
-        $skip = strpos($source, 'catch (SkipTestException $e)');
-        $generic = strpos($source, 'catch (OperationTimedOut | UnexpectedValueException');
-
-        $this->assertNotFalse($skip);
-        $this->assertNotFalse($generic);
-        $this->assertLessThan($generic, $skip);
-    }
+    // The run-loop behaviour (states, counters, skipRemaining) is covered by
+    // tests/Browser/SkipWithReasonBrowserTest: run() needs a browser.
 
     /** No silent fallback on PrestaShop's demo accounts. */
     public function test_globals_carry_no_demo_account(): void
