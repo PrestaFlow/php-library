@@ -114,6 +114,10 @@ class FrontOfficePage extends CommonPage
             $page = $this;
         }
 
+        // The only place that may navigate to read the shop's own URLs:
+        // getPageURL() just answers an URL, from what is already known.
+        $this->pfPrimeShopUrls($page);
+
         $url = $this->getPageURL($page, $params);
 
         // close()+createPage() peut floter au démarrage à froid : l'énumération des
@@ -155,9 +159,13 @@ class FrontOfficePage extends CommonPage
     /**
      * URL of a page, by priority:
      *  1. an override of the project (Tests/Urls/<locale>.json, customs['urls']);
-     *  2. what the shop publishes (prestashop.urls.pages), for standard pages;
-     *  3. the library's tables (src/Urls/<locale>.json), then the page's own value;
-     *  4. index.php?controller=<x> for a standard page nothing else knows.
+     *  2. what the shop publishes (prestashop.urls.pages), for standard pages,
+     *     when it is already known (read by goToPage(), or from the current
+     *     page if it is a page of the shop) — this method never navigates;
+     *  3. the library's tables (src/Urls/<locale>.json);
+     *  4. for a standard page outside English, index.php?controller=<x>,
+     *     which works in every language;
+     *  5. the page's own value (the English friendly URL).
      */
     public function getPageURL($page, $params = null): string
     {
@@ -206,60 +214,92 @@ class FrontOfficePage extends CommonPage
                 return $url . $override;
             }
 
-            $shopUrl = isset(self::SHOP_PAGES[$page]) ? $this->pfShopUrl($page) : null;
+            $standard = isset(self::SHOP_PAGES[$page]);
+
+            $shopUrl = $standard ? $this->pfShopUrl($page) : null;
             if ($shopUrl !== null) {
                 return $shopUrl;
             }
 
-            $pages = ['home', 'index', 'login', 'authentification', 'prices-drop', 'category', 'product'];
-            $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, $pages)) {
-                if ($pageUrl === $page && isset(self::SHOP_PAGES[$page]) && !$this->isEnglishFriendlyUrl($page)) {
-                    // Nothing knows this page in this language: the controller
-                    // works whatever the language and the friendly URLs.
-                    return $url . 'index.php?controller=' . self::SHOP_PAGES[$page][1];
-                }
+            $defaults = $this->getDefaultUrls();
+            if (isset($defaults[$page]) && is_string($defaults[$page]) && $defaults[$page] !== '') {
+                return $url . $defaults[$page];
+            }
 
-                return $url . $pageUrl;
+            if ($standard && !$this->isEnglishLocale()) {
+                // Nothing knows this page in this language: the controller
+                // works whatever the language and the friendly URLs.
+                return $url . 'index.php?controller=' . self::SHOP_PAGES[$page][1];
             }
 
             return $url . match ($page) {
                 'home', 'index' => '',
                 'login', 'authentification' => 'login',
-                'prices-drop' => 'prices-drop',
                 'category' => '{index}-category',
                 'product' => '{index}-product.html',
-                default => ''
+                default => $page,
             };
         }
 
         if (is_object($page)) {
-            $keys = array_values(array_filter([$page->url, $page->shopPage ?? null], 'is_string'));
+            $shopPage = $this->pfShopPageOf($page);
+            $keys = array_values(array_filter([$page->url, $shopPage], 'is_string'));
             $override = $this->overrideFor($keys);
             if ($override !== null) {
                 return $url . $override;
             }
 
-            if (is_string($page->shopPage ?? null)) {
-                $shopUrl = $this->pfShopUrl($page->shopPage);
+            if ($shopPage !== null) {
+                $shopUrl = $this->pfShopUrl($shopPage);
                 if ($shopUrl !== null) {
                     return $shopUrl;
                 }
             }
 
-            $pageUrl = $this->url($page->url);
+            $defaults = $this->getDefaultUrls();
+            foreach ($keys as $key) {
+                if (isset($defaults[$key]) && is_string($defaults[$key]) && $defaults[$key] !== '') {
+                    return $url . $defaults[$key];
+                }
+            }
 
-            return $url . (($pageUrl !== '' && $pageUrl !== null) ? $pageUrl : $page->url);
+            if ($shopPage !== null && isset(self::SHOP_PAGES[$shopPage]) && !$this->isEnglishLocale()) {
+                return $url . 'index.php?controller=' . self::SHOP_PAGES[$shopPage][1];
+            }
+
+            return $url . $page->url;
         }
 
         return $url;
     }
 
     /**
-     * Whether the untranslated key is itself the page's friendly URL, which is
-     * the case on an English shop: keep it rather than the controller form.
+     * The SHOP_PAGES key a page object may be resolved through, or null.
+     *
+     * Only while the page still has the $url its library class declares: a
+     * project page that extends a library page and declares its own $url
+     * (a module's login, say) keeps that URL — the shop's standard one would
+     * send it elsewhere.
      */
-    private function isEnglishFriendlyUrl(string $page): bool
+    protected function pfShopPageOf(object $page): ?string
+    {
+        $shopPage = $page->shopPage ?? null;
+        if (!is_string($shopPage) || $shopPage === '' || !property_exists($page, 'url')) {
+            return null;
+        }
+
+        try {
+            $declaring = (new \ReflectionProperty($page, 'shopPage'))->getDeclaringClass()->getName();
+            $default = (new \ReflectionProperty($declaring, 'url'))->getDefaultValue();
+        } catch (\ReflectionException) {
+            return null;
+        }
+
+        return $page->url === $default ? $shopPage : null;
+    }
+
+    /** English shops: the untranslated keys are their friendly URLs. */
+    private function isEnglishLocale(): bool
     {
         return str_starts_with($this->getLocale(), 'en');
     }
@@ -279,7 +319,8 @@ class FrontOfficePage extends CommonPage
     /**
      * Absolute URL the shop itself publishes for a standard page, in the
      * current language (prestashop.urls.pages, PrestaShop 1.7 to 9, any theme).
-     * Null when the page is not a standard one or the shop could not be read.
+     * Null when the page is not a standard one or the table is not known yet:
+     * this never navigates (see pfLoadShopUrls()).
      *
      * $page is a SHOP_PAGES key ('login', 'prices-drop'...) or a raw
      * prestashop.urls.pages key ('prices_drop').
@@ -304,9 +345,64 @@ class FrontOfficePage extends CommonPage
     }
 
     /**
-     * prestashop.urls.pages, read once per base URL: from the current page when
-     * it is already a page of this shop, otherwise from its home page. Only
-     * while a run drives a browser; any failure answers [] (the tables apply).
+     * Read prestashop.urls.pages before going to $page when resolving it
+     * needs the shop and the table is not known yet. Navigates to the home
+     * page when the current page is not a page of the shop.
+     */
+    protected function pfPrimeShopUrls($page): void
+    {
+        if ($this->shopUrls !== null) {
+            return;
+        }
+
+        if (is_string($page)) {
+            $needed = isset(self::SHOP_PAGES[$page]) && $this->overrideFor([$page]) === null;
+        } elseif (is_object($page)) {
+            $shopPage = $this->pfShopPageOf($page);
+            $needed = $shopPage !== null && $this->overrideFor([$page->url, $shopPage]) === null;
+        } else {
+            $needed = false;
+        }
+
+        if ($needed) {
+            $this->pfLoadShopUrls();
+        }
+    }
+
+    /**
+     * prestashop.urls.pages of this shop, reading it from the home page if the
+     * current page is not one of the shop's. [] when it cannot be read.
+     */
+    public function pfLoadShopUrls(): array
+    {
+        $known = $this->pfReadShopUrls();
+        if ($known !== [] || !self::$pfShopUrlDiscovery || !TestsSuite::pfHasBrowser()) {
+            return $known;
+        }
+
+        $base = $this->pfBaseUrl();
+        if (array_key_exists($base, self::$pfShopUrlsCache)) {
+            return self::$pfShopUrlsCache[$base];
+        }
+
+        $map = [];
+        try {
+            TestsSuite::recreatePageIfContextChanged('FO');
+            $this->getPage()->navigate($base)->waitForNavigation(DomPage::DOM_CONTENT_LOADED, $this->navigationTimeout);
+            $map = $this->pfShopUrlsOnCurrentPage() ?? [];
+        } catch (\Throwable) {
+            $map = [];
+        }
+
+        // Kept even when empty: a shop that cannot be read is not loaded
+        // again before every page of the suite.
+        return self::$pfShopUrlsCache[$base] = $map;
+    }
+
+    /**
+     * prestashop.urls.pages already known for this shop: cached, or read from
+     * the current page when it is a front-office page of this shop. Never
+     * navigates; [] when unknown.
      */
     protected function pfReadShopUrls(): array
     {
@@ -319,38 +415,47 @@ class FrontOfficePage extends CommonPage
             return self::$pfShopUrlsCache[$base];
         }
 
-        $script = '(function(){try{return (window.prestashop&&prestashop.urls&&prestashop.urls.pages)'
-            . '?JSON.stringify(prestashop.urls.pages):null;}catch(e){return null;}})()';
+        if (TestsSuite::$currentContext !== 'FO') {
+            return [];
+        }
 
-        $map = [];
         try {
-            $json = null;
-            if (TestsSuite::$currentContext === 'FO') {
-                $current = (string) $this->getPage()->evaluate('location.href')->getReturnValue();
-                if (str_starts_with($current, $base)) {
-                    $json = $this->getPage()->evaluate($script)->getReturnValue();
-                }
+            $current = (string) $this->getPage()->evaluate('location.href')->getReturnValue();
+            if (!str_starts_with($current, $base)) {
+                return [];
             }
-
-            if (!is_string($json)) {
-                TestsSuite::recreatePageIfContextChanged('FO');
-                $this->getPage()->navigate($base)->waitForNavigation(DomPage::DOM_CONTENT_LOADED);
-                $json = $this->getPage()->evaluate($script)->getReturnValue();
-            }
-
-            $decoded = is_string($json) ? json_decode($json, true) : null;
-            if (is_array($decoded)) {
-                $map = array_filter($decoded, fn ($value) => is_string($value) && $value !== '');
-            }
+            $map = $this->pfShopUrlsOnCurrentPage();
         } catch (\Throwable) {
-            $map = [];
+            return [];
+        }
+
+        // Only a successful read is cached: a passive miss must not stop
+        // goToPage() from loading the home page later.
+        if ($map === null || $map === []) {
+            return [];
         }
 
         return self::$pfShopUrlsCache[$base] = $map;
     }
 
+    /** prestashop.urls.pages of the page open now, null when it has none. */
+    private function pfShopUrlsOnCurrentPage(): ?array
+    {
+        $json = $this->getPage()->evaluate(
+            '(function(){try{return (window.prestashop&&prestashop.urls&&prestashop.urls.pages)'
+            . '?JSON.stringify(prestashop.urls.pages):null;}catch(e){return null;}})()'
+        )->getReturnValue();
+
+        $decoded = is_string($json) ? json_decode($json, true) : null;
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        return array_filter($decoded, fn ($value) => is_string($value) && $value !== '');
+    }
+
     /** Forget what was read from the shops (another shop, another language). */
-    public static function clearShopUrls(): void
+    public static function pfClearShopUrls(): void
     {
         self::$pfShopUrlsCache = [];
     }

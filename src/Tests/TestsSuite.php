@@ -704,7 +704,7 @@ class TestsSuite implements OutputStates
 
         // Each suite reads the shop's URLs afresh: the app runs many suites,
         // possibly against several shops, in one process.
-        \PrestaFlow\Library\Pages\FrontOfficePage::clearShopUrls();
+        \PrestaFlow\Library\Pages\FrontOfficePage::pfClearShopUrls();
 
         if (!$this->isVersionSupported()) {
             throw new Error('This version of PrestaShop is not supported by PrestaFlow.');

@@ -26,12 +26,28 @@ namespace PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures {
 
     class PricesDropLike extends FrontOfficePage
     {
-        public string $url = 'prices-drop';
+        public string $url = 'promotions';
         public $shopPage = 'prices-drop';
 
         public function __construct()
         {
         }
+    }
+
+    class LoginLike extends FrontOfficePage
+    {
+        public string $url = 'login';
+        public $shopPage = 'login';
+
+        public function __construct()
+        {
+        }
+    }
+
+    /** A project page reusing a library page for a module's own login. */
+    class ModuleLogin extends LoginLike
+    {
+        public string $url = 'module/mymodule/login';
     }
 }
 
@@ -40,6 +56,8 @@ namespace PrestaFlow\Tests\Unit\Pages {
     use PHPUnit\Framework\TestCase;
     use PrestaFlow\Library\Pages\FrontOfficePage;
     use PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures\Page as UrlPage;
+    use PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures\LoginLike;
+    use PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures\ModuleLogin;
     use PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures\PricesDropLike;
 
     /**
@@ -153,15 +171,41 @@ namespace PrestaFlow\Tests\Unit\Pages {
 
         public function test_a_page_object_falls_back_to_the_table_then_its_url(): void
         {
+            // fr: src/Urls/fr.json knows "prices-drop" (the shopPage key).
             $this->assertSame('https://shop.test/promotions', $this->page(shop: [])->getPageURL(new PricesDropLike()));
-            $this->assertSame('https://shop.test/prices-drop', $this->page('en', [])->getPageURL(new PricesDropLike()));
+            // en: no table entry, the page's own value as before.
+            $this->assertSame('https://shop.test/promotions', $this->page('en', [])->getPageURL(new PricesDropLike()));
         }
 
-        public function test_a_page_object_override_keyed_by_its_old_url_still_wins(): void
+        public function test_a_page_object_override_keyed_by_its_url_alias_still_wins(): void
         {
-            $page = $this->page(customs: ['prices-drop' => 'soldes']);
+            // The app writes overrides under the page's $url: "promotions".
+            $page = $this->page(customs: ['promotions' => 'soldes']);
 
             $this->assertSame('https://shop.test/soldes', $page->getPageURL(new PricesDropLike()));
+        }
+
+        public function test_a_project_page_with_its_own_url_never_takes_the_shop_one(): void
+        {
+            $this->assertSame('https://shop.test/fr/connexion', $this->page()->getPageURL(new LoginLike()));
+            $this->assertSame('https://shop.test/module/mymodule/login', $this->page()->getPageURL(new ModuleLogin()));
+
+            // Same when the URL is changed at run time.
+            $login = new LoginLike();
+            $login->url = 'module/other/login';
+            $this->assertSame('https://shop.test/module/other/login', $this->page()->getPageURL($login));
+        }
+
+        public function test_standard_keys_use_the_controller_outside_english(): void
+        {
+            $de = $this->page('de', []);
+
+            $this->assertSame('https://shop.test/index.php?controller=authentication', $de->getPageURL('login'));
+            $this->assertSame('https://shop.test/index.php?controller=prices-drop', $de->getPageURL('prices-drop'));
+            $this->assertSame('https://shop.test/index.php?controller=history', $de->getPageURL('order-history'));
+            $this->assertSame('https://shop.test/index.php?controller=history', $this->page(shop: [])->getPageURL('history'));
+            // The French table still wins over the controller.
+            $this->assertSame('https://shop.test/promotions', $this->page(shop: [])->getPageURL('prices-drop'));
         }
 
         public function test_shop_url_accepts_raw_keys_and_unknown_pages(): void
