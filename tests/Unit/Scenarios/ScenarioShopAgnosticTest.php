@@ -144,4 +144,13 @@ final class ScenarioShopAgnosticTest extends TestCase
             $this->assertStringNotContainsString('skipWithReason', $steps, basename($file));
         }
     }
+
+    public function test_out_of_stock_product_creates_its_own_product(): void
+    {
+        $params = $this->defaults('OutOfStockProduct');
+
+        $this->assertNull($params['locale']);
+        // null => a name unique to the run.
+        $this->assertNull($params['productName']);
+    }
 }

@@ -152,6 +152,53 @@ class Page extends BasePage
         return $this->pfIsAddableToCartHere($this->getSelector('addToCartButton'));
     }
 
+    /** Skip reason of requireOutOfStockRefused(). */
+    public const OUT_OF_STOCK_ORDERABLE = 'This shop accepts orders for out-of-stock products'
+        . ' (PS_ORDER_OUT_OF_STOCK, or stock management is disabled): an out-of-stock product stays orderable.';
+
+    /**
+     * The product as the page embeds it for the theme's JS (data-product on
+     * #product-details in Classic, .js-product-details in hummingbird;
+     * PrestaShop 1.7 to 9, any theme built on the core templates): quantity, availability, allow_oosp... [] when absent.
+     */
+    public function getProductData(): array
+    {
+        try {
+            $json = $this->getPage()->evaluate(
+                '(function(){var e=document.querySelector("#product-details[data-product]")'
+                . '||document.querySelector(".js-product-details[data-product]")||document.querySelector("[data-product]");'
+                . 'return e?e.getAttribute("data-product"):null;})()'
+            )->getReturnValue();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $data = is_string($json) ? json_decode($json, true) : null;
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Whether the shop lets this product be ordered without stock: the
+     * product's own setting, else PS_ORDER_OUT_OF_STOCK, or no stock
+     * management at all (allow_oosp in the embedded product data).
+     */
+    public function acceptsOutOfStockOrders(): bool
+    {
+        return !empty($this->getProductData()['allow_oosp']);
+    }
+
+    /**
+     * Skip this test (only) when the shop accepts orders for out-of-stock
+     * products: there, a product without stock rightly stays orderable.
+     */
+    public function requireOutOfStockRefused(): void
+    {
+        if ($this->acceptsOutOfStockOrders()) {
+            throw new SkipTestException(self::OUT_OF_STOCK_ORDERABLE);
+        }
+    }
+
     /**
      * URL of the first product of the shop a buyer can add to the cart as it
      * is, so scenarios do not depend on the demo catalogue. Browses the
