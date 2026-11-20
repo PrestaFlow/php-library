@@ -202,6 +202,11 @@ abstract class VisualTestsSuite extends TestsSuite
 
     public function visualScope(): string
     {
+        return $this->baseVisualScope().self::baselineSuffix();
+    }
+
+    private function baseVisualScope(): string
+    {
         if ($this->visualScope !== '') {
             if (preg_match('/^[a-z0-9-]+$/', $this->visualScope) !== 1) {
                 throw new \InvalidArgumentException(sprintf('%s : visualScope « %s » doit matcher [a-z0-9-]+', static::class, $this->visualScope));
@@ -216,6 +221,24 @@ abstract class VisualTestsSuite extends TestsSuite
         }
 
         return self::slugify(substr(strrchr('\\'.$class, '\\'), 1)) ?: 'visual';
+    }
+
+    /**
+     * Jeu de références visuelles distinct (environnement local, preprod… d'une même boutique) :
+     * PRESTAFLOW_VISUAL_BASELINE=pfenv3 suffixe le scope (`home-pfenv3.header--….png`), chaque
+     * environnement compare alors à ses propres références. Vide ou absent : aucun suffixe.
+     */
+    private static function baselineSuffix(): string
+    {
+        $raw = Env::get('PRESTAFLOW_VISUAL_BASELINE');
+        if (!is_string($raw) || $raw === '') {
+            return '';
+        }
+        if (preg_match('/^[a-z0-9]+$/', $raw) !== 1) {
+            throw new \InvalidArgumentException(sprintf('PRESTAFLOW_VISUAL_BASELINE « %s » doit matcher [a-z0-9]+', $raw));
+        }
+
+        return '-'.$raw;
     }
 
     /** Kebab-case filename-safe : NouvelleScene → nouvelle-scene, ProdVisual2 → prod-visual2. */
