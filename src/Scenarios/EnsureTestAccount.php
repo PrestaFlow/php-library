@@ -53,17 +53,13 @@ class EnsureTestAccount extends Scenario
             $frontOfficeLoginPage->goToPage('login');
             $frontOfficeLoginPage->login($email, $password);
 
-            if (!$frontOfficeLoginPage->isLoggedIn()) {
-                $frontOfficeRegistrationPage->goToRegistration();
-                $frontOfficeRegistrationPage->register([
-                    'firstName' => $this->getParam('firstName'),
-                    'lastName' => $this->getParam('lastName'),
-                    // login() resolved null to the globals; register() needs the
-                    // values themselves, so read them the same way it did.
-                    'email' => $email ?? $frontOfficeLoginPage->getGlobal('FO_EMAIL'),
-                    'password' => $password ?? $frontOfficeLoginPage->getGlobal('FO_PASSWD'),
-                ]);
-            }
+            // Registers only when that login did not open a session.
+            $frontOfficeRegistrationPage->registerUnlessLoggedIn([
+                'firstName' => $this->getParam('firstName'),
+                'lastName' => $this->getParam('lastName'),
+                'email' => $email,
+                'password' => $password,
+            ]);
 
             // Asserted whichever branch ran: the account exists AND its
             // credentials open a session.

@@ -43,46 +43,26 @@ class AddProductToCart extends Scenario
 
         $testSuite
         ->it('go to category page', function () use ($frontOfficeCategoryPage) {
-            $categoryId = $this->getParam('categoryId');
-            if ($categoryId !== null && $categoryId !== '') {
-                $frontOfficeCategoryPage->goToPage('category', (int) $categoryId);
-            } elseif (!$frontOfficeCategoryPage->goToDiscoveredCategory()) {
-                $this->skipWithReason('No category of this shop lists products: set the categoryId param.', skipRemaining: true);
-            }
+            // categoryId when given, else the first category of the shop that
+            // lists products (skips the suite when there is none).
+            $frontOfficeCategoryPage->goToCategory($this->getParam('categoryId'));
 
-            $title = $frontOfficeCategoryPage->getListingTitle();
-
-            Expect::that($title)->isNotEmpty();
-            if (is_string($this->getParam('categoryTitle')) && $this->getParam('categoryTitle') !== '') {
-                Expect::that($title)->contains($this->getParam('categoryTitle'));
-            }
+            Expect::that($frontOfficeCategoryPage->getListingTitle())->isNotEmpty();
+            // Only checked when the suite passes a categoryTitle.
+            $frontOfficeCategoryPage->expectTitleContains($this->getParam('categoryTitle'));
             Expect::that($frontOfficeCategoryPage->countProducts() > 0)->equals(true);
         })
         ->it('go to product page', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
-            $index = $this->getParam('productIndex');
-            if ($index !== null && $index !== '') {
-                // Read before the click: the product page must be the one the
-                // miniature advertised.
-                $name = (string) $frontOfficeCategoryPage->getProductName((int) $index);
-                $frontOfficeCategoryPage->goToProduct((int) $index);
-            } else {
-                $found = $frontOfficeCategoryPage->openPurchasableProduct();
-                if ($found === null) {
-                    $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
-                }
-                $name = $found['name'];
-            }
-
-            // Miniature titles may be truncated ("..."), and the product
-            // heading may be upper-cased by the theme's CSS.
-            $name = mb_strtolower(trim(rtrim(trim($name), '.…')));
-            $title = mb_strtolower((string) $frontOfficeProductPage->getTitle());
+            // The miniature at productIndex when given, else the first product
+            // that can be added to the cart (skips the suite when there is
+            // none); answers the name the miniature showed.
+            $name = $frontOfficeCategoryPage->openProductToBuy($this->getParam('productIndex'));
 
             Expect::that($name)->isNotEmpty();
-            Expect::that($title)->contains($name);
-            if (is_string($this->getParam('productTitle')) && $this->getParam('productTitle') !== '') {
-                Expect::that($title)->contains(mb_strtolower($this->getParam('productTitle')));
-            }
+            // Case and a truncating "..." ignored: themes upper-case headings.
+            $frontOfficeProductPage->expectTitleContains($name);
+            // Only checked when the suite passes a productTitle.
+            $frontOfficeProductPage->expectTitleContains($this->getParam('productTitle'));
         })
         ->it('add to cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             $modalTitle = $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));

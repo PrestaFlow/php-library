@@ -108,4 +108,40 @@ final class ScenarioShopAgnosticTest extends TestCase
         $this->assertSame(1, Scenario::pfShopIdFromGlobals(['SHOP_ID' => 'x']));
         $this->assertSame(2, Scenario::pfShopIdFromGlobals(['SHOP_ID' => '2']));
     }
+
+    public function test_pages_normalise_raw_params(): void
+    {
+        $this->assertSame(FrontOfficePage::OFFLINE_PAYMENT_MODULES, FrontOfficePage::pfPaymentModules(null));
+        $this->assertSame(FrontOfficePage::OFFLINE_PAYMENT_MODULES, FrontOfficePage::pfPaymentModules(''));
+        $this->assertSame(['ps_wirepayment'], FrontOfficePage::pfPaymentModules('ps_wirepayment'));
+        $this->assertSame(['a', 'b'], FrontOfficePage::pfPaymentModules(['a', '', 'b']));
+        $this->assertNull(FrontOfficePage::pfCarrierId(''));
+        $this->assertSame(4, FrontOfficePage::pfCarrierId('4'));
+    }
+
+    public function test_skip_reasons_are_unchanged(): void
+    {
+        // The app translates these by exact match.
+        $this->assertSame(FrontOfficePage::NO_PURCHASABLE_PRODUCT, Scenario::NO_PURCHASABLE_PRODUCT);
+        $this->assertSame(
+            'No product of this shop can be added to the cart as it is (in stock, available for order, no required customization): set the productUrl param.',
+            Scenario::NO_PURCHASABLE_PRODUCT
+        );
+        $this->assertSame(FrontOfficePage::pfNoPaymentMethodReason(['x']), Scenario::pfNoPaymentMethodReason(['x']));
+        $this->assertSame('No category of this shop lists products: set the categoryId param.', \PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page::NO_CATEGORY_WITH_PRODUCTS);
+    }
+
+    public function test_scenario_steps_hold_no_if_and_no_static_scenario_call(): void
+    {
+        foreach (glob(dirname(__DIR__, 3) . '/src/Scenarios/*.php') as $file) {
+            if (basename($file) === 'Scenario.php') {
+                continue;
+            }
+            $source = (string) file_get_contents($file);
+            $steps = substr($source, (int) strpos($source, '->it('));
+            $this->assertDoesNotMatchRegularExpression('/^\s*if \(/m', $steps, basename($file));
+            $this->assertStringNotContainsString('Scenario::', $steps, basename($file));
+            $this->assertStringNotContainsString('skipWithReason', $steps, basename($file));
+        }
+    }
 }

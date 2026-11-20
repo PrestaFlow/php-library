@@ -108,9 +108,8 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
-            }
+            // Skips the suite when no product of the shop can be added to the cart.
+            $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -141,11 +140,9 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
         })
         ->it('choose shipping and payment, then place the order', function () use ($frontOfficeOnePageCheckoutPage) {
-            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
-            $paymentModules = (array) $this->getParam('paymentModules');
-            if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
-                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
-            }
+            $frontOfficeOnePageCheckoutPage->selectCarrier($this->getParam('carrierId'));
+            // Skips the suite when the shop offers none of these payment modules.
+            $frontOfficeOnePageCheckoutPage->selectPayment($this->getParam('paymentModules'));
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 
             Expect::that($frontOfficeOnePageCheckoutPage->isReadyToPlaceOrder())->equals(true);

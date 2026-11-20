@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Listing;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
@@ -62,12 +63,32 @@ class Page extends BasePage
         return $this->readProductMiniatures('#js-product-list')[$index - 1]['url'] ?? null;
     }
 
+    /** Skip reason of openPurchasableProduct() on this kind of listing. */
+    public const NO_PURCHASABLE_ON_LISTING = 'No product of this listing can be added to the cart as it is.';
+
+    /** Skip reason of goToDiscoveredCategory(). */
+    public const NO_CATEGORY_WITH_PRODUCTS = 'No category of this shop lists products: set the categoryId param.';
+
+    /** Skip reason of requireWishlistButtons(). */
+    public const NO_WISHLIST_MODULE = 'The wishlist module (blockwishlist) is not installed, or not shown on product listings.';
+
     /**
      * Open a category found on the shop (main menu, else sitemap) that lists
-     * products, for callers that must not assume a category id. Tries the
-     * categories in turn; false when none lists a product.
+     * products, for callers that must not assume a category id. Skips the
+     * test and the rest of the suite when none does; tryDiscoveredCategory()
+     * answers false instead.
      */
     public function goToDiscoveredCategory(): bool
+    {
+        if (!$this->tryDiscoveredCategory()) {
+            throw new SkipTestException(self::NO_CATEGORY_WITH_PRODUCTS, skipRemaining: true);
+        }
+
+        return true;
+    }
+
+    /** goToDiscoveredCategory() without the skip: false when no category lists a product. */
+    public function tryDiscoveredCategory(): bool
     {
         foreach ($this->discoverListingUrls(allProducts: false) as $url) {
             try {
@@ -86,16 +107,69 @@ class Page extends BasePage
     }
 
     /**
+     * Category $categoryId when given (null, '' or an id, as a suite passes
+     * it), otherwise a discovered category that lists products.
+     */
+    public function goToCategory(mixed $categoryId = null): void
+    {
+        if ($categoryId !== null && $categoryId !== '') {
+            $this->goToPage('category', (int) $categoryId);
+
+            return;
+        }
+
+        $this->goToDiscoveredCategory();
+    }
+
+    /**
      * From this listing, open the first product a buyer can add to the cart
      * as it is (in stock, available for order, no required customization).
      * Answers its miniature (['name' => ..., 'url' => ...]) and leaves the
-     * browser on its page; null when none of the first $maxProducts does.
+     * browser on its page. Skips the test and the rest of the suite when none
+     * of the first $maxProducts qualifies; findPurchasableProduct() answers
+     * null instead.
      */
-    public function openPurchasableProduct(int $maxProducts = 10): ?array
+    public function openPurchasableProduct(int $maxProducts = 10): array
+    {
+        $found = $this->findPurchasableProduct($maxProducts);
+        if ($found === null) {
+            throw new SkipTestException(static::NO_PURCHASABLE_ON_LISTING, skipRemaining: true);
+        }
+
+        return $found;
+    }
+
+    /** openPurchasableProduct() without the skip: null when no product qualifies. */
+    public function findPurchasableProduct(int $maxProducts = 10): ?array
     {
         $seen = [];
 
         return $this->pfOpenFirstPurchasable($maxProducts, $seen, '.add-to-cart, .product__add-to-cart-button');
+    }
+
+    /**
+     * Open the product a scenario adds to its cart and answer the name its
+     * miniature showed: the miniature at $productIndex (1-based, as a suite
+     * passes it) when given, otherwise the first product of this listing that
+     * can be added to the cart — skipping with NO_PURCHASABLE_PRODUCT when none.
+     */
+    public function openProductToBuy(mixed $productIndex = null): string
+    {
+        if ($productIndex !== null && $productIndex !== '') {
+            // Read before the click: the product page must be the one the
+            // miniature advertised.
+            $name = (string) $this->getProductName((int) $productIndex);
+            $this->goToProduct((int) $productIndex);
+
+            return $name;
+        }
+
+        $found = $this->findPurchasableProduct();
+        if ($found === null) {
+            throw new SkipTestException(self::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+        }
+
+        return $found['name'];
     }
 
     /** Whether the wishlist module (blockwishlist) shows its buttons on this listing. */
@@ -107,6 +181,14 @@ class Page extends BasePage
             )->getReturnValue() === true;
         } catch (\Throwable) {
             return false;
+        }
+    }
+
+    /** Skip this test (only) when the wishlist module is not on this listing. */
+    public function requireWishlistButtons(): void
+    {
+        if (!$this->hasWishlistButtons()) {
+            throw new SkipTestException(self::NO_WISHLIST_MODULE);
         }
     }
 

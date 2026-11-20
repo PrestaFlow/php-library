@@ -725,6 +725,72 @@ class FrontOfficePage extends CommonPage
      */
     public const OFFLINE_PAYMENT_MODULES = ['ps_wirepayment', 'ps_checkpayment', 'ps_cashondelivery'];
 
+    /** Skip reason when no product of the shop can be added to the cart. */
+    public const NO_PURCHASABLE_PRODUCT = 'No product of this shop can be added to the cart as it is'
+        . ' (in stock, available for order, no required customization): set the productUrl param.';
+
+    /** Skip reason when the shop offers none of the payment modules a scenario may use. */
+    public static function pfNoPaymentMethodReason(array $modules): string
+    {
+        return sprintf(
+            'No offline payment method offered by the shop (looked for: %s). Set the paymentModules param'
+            . ' to a payment module that does not redirect to a payment provider.',
+            $modules === [] ? 'none' : implode(', ', $modules)
+        );
+    }
+
+    /** A carrier id as a suite passes it (null, '', int or numeric string) => ?int. */
+    public static function pfCarrierId(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    /** Payment modules as a suite passes them (list, one name, null) => list; null = the offline ones. */
+    public static function pfPaymentModules(mixed $modules): array
+    {
+        if ($modules === null || $modules === '') {
+            return self::OFFLINE_PAYMENT_MODULES;
+        }
+
+        return array_values(array_filter((array) $modules, fn ($module) => is_string($module) && $module !== ''));
+    }
+
+    /**
+     * Pick the first payment option whose module is in $modules, or skip the
+     * test and the rest of the suite with a reason: never pay for real.
+     */
+    protected function pfPayWithOrSkip(string $optionSelector, mixed $modules): string
+    {
+        $modules = self::pfPaymentModules($modules);
+
+        $module = $this->pfClickPaymentOption($optionSelector, $modules);
+        if ($module === null) {
+            throw new SkipTestException(self::pfNoPaymentMethodReason($modules), skipRemaining: true);
+        }
+
+        return $module;
+    }
+
+    /**
+     * Expect this page's title to contain $expected, ignoring case (themes
+     * upper-case headings in CSS) and a trailing "..." (truncated miniature
+     * names). Does nothing when $expected is null or '': an optional check a
+     * scenario can always call.
+     */
+    public function expectTitleContains(mixed $expected): void
+    {
+        $expected = is_scalar($expected) ? trim(rtrim(trim((string) $expected), '.…')) : '';
+        if ($expected === '') {
+            return;
+        }
+
+        Expect::that(mb_strtolower((string) $this->getTitle()))->contains(mb_strtolower($expected));
+    }
+
     /**
      * Click the first payment option, in page order, whose data-module-name
      * is in $modules, and answer that module's name; null when the shop offers

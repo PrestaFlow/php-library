@@ -56,9 +56,8 @@ class FrontOfficeSmoke extends TestsSuite
         // The first product that can be added to the cart as it is: product 1
         // may be out of stock or wait for a customization on a real shop.
         ->it('open a product and read its price', function () use ($frontOfficeListingPage, $frontOfficeProductPage) {
-            if ($frontOfficeListingPage->openPurchasableProduct() === null) {
-                $this->skipWithReason('No product of this listing can be added to the cart as it is.', skipRemaining: true);
-            }
+            // Skips the suite when no product of the listing qualifies.
+            $frontOfficeListingPage->openPurchasableProduct();
 
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
         })
@@ -81,13 +80,13 @@ class FrontOfficeSmoke extends TestsSuite
         // The first category the shop links to from its main menu (else its
         // sitemap): no id from the demo catalogue.
         ->it('reach a category listing', function () use ($frontOfficeCategoryPage) {
-            Expect::that($frontOfficeCategoryPage->goToDiscoveredCategory())->equals(true);
+            // Skips the suite when no category of the shop lists products.
+            $frontOfficeCategoryPage->goToDiscoveredCategory();
             Expect::that($frontOfficeCategoryPage->getListingTitle())->isNotEmpty();
         })
         ->it('open a product from the category listing', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
-            if ($frontOfficeCategoryPage->openPurchasableProduct() === null) {
-                $this->skipWithReason('No product of this category can be added to the cart as it is.', skipRemaining: true);
-            }
+            // Skips the suite when no product of the category qualifies.
+            $frontOfficeCategoryPage->openPurchasableProduct();
 
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
         })

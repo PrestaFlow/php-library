@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Tests\Browser\ShopAgnosticFixtures {
 
+    use PrestaFlow\Library\Pages\v9\FrontOffice\Category\Page as CategoryPage;
     use PrestaFlow\Library\Pages\v9\FrontOffice\Checkout\Page as CheckoutPage;
     use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as ListingPage;
     use PrestaFlow\Library\Pages\v9\FrontOffice\Product\Page as ProductPage;
@@ -51,6 +52,11 @@ namespace PrestaFlow\Tests\Browser\ShopAgnosticFixtures {
     {
         use OnGivenPage;
     }
+
+    class Category extends CategoryPage
+    {
+        use OnGivenPage;
+    }
 }
 
 namespace PrestaFlow\Tests\Browser {
@@ -58,6 +64,8 @@ namespace PrestaFlow\Tests\Browser {
     use HeadlessChromium\BrowserFactory;
     use PHPUnit\Framework\TestCase;
     use PrestaFlow\Library\Exceptions\SkipTestException;
+    use PrestaFlow\Library\Pages\FrontOfficePage;
+    use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Category;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Checkout;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Listing;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Product;
@@ -90,7 +98,7 @@ namespace PrestaFlow\Tests\Browser {
             }
 
             self::$page->navigate('data:text/html,'.rawurlencode('<meta charset="utf-8"><body>'.$body.'</body>'))->waitForNavigation();
-            Checkout::$chromePage = Product::$chromePage = Listing::$chromePage = self::$page;
+            Checkout::$chromePage = Product::$chromePage = Listing::$chromePage = Category::$chromePage = self::$page;
         }
 
         private const PAYMENTS = '<div id="checkout-payment-step">'
@@ -116,12 +124,47 @@ namespace PrestaFlow\Tests\Browser {
             $this->assertSame('ps_wirepayment', (new Checkout())->choosePayment(['ps_wirepayment']));
         }
 
-        public function test_no_offline_payment_clicks_nothing(): void
+        public function test_no_offline_payment_skips_the_suite_and_clicks_nothing(): void
         {
             $this->load('<input type="radio" name="payment-option" id="p" data-module-name="paypal">');
 
-            $this->assertNull((new Checkout())->choosePayment());
+            $skip = $this->skipOf(fn () => (new Checkout())->choosePayment());
+            $this->assertSame(FrontOfficePage::pfNoPaymentMethodReason(FrontOfficePage::OFFLINE_PAYMENT_MODULES), $skip->getMessage());
+            $this->assertTrue($skip->skipRemaining);
             $this->assertFalse(self::$page->evaluate('document.getElementById("p").checked')->getReturnValue());
+        }
+
+        public function test_payment_modules_as_a_suite_passes_them(): void
+        {
+            $this->load(self::PAYMENTS);
+            $this->assertSame('ps_wirepayment', (new Checkout())->choosePayment('ps_wirepayment'));
+
+            $this->load(self::PAYMENTS);
+            $this->assertSame('ps_checkpayment', (new Checkout())->choosePayment(null));
+        }
+
+        public function test_listing_skips_carry_the_exact_reasons(): void
+        {
+            $this->load('<div id="js-product-list"><div class="products"></div></div>');
+
+            $this->assertSame('No product of this listing can be added to the cart as it is.', $this->skipOf(fn () => (new Listing())->openPurchasableProduct())->getMessage());
+            $this->assertSame('No product of this category can be added to the cart as it is.', $this->skipOf(fn () => (new Category())->openPurchasableProduct())->getMessage());
+            $this->assertSame(FrontOfficePage::NO_PURCHASABLE_PRODUCT, $this->skipOf(fn () => (new Category())->openProductToBuy(null))->getMessage());
+            $this->assertNull((new Listing())->findPurchasableProduct());
+
+            $wishlist = $this->skipOf(fn () => (new Listing())->requireWishlistButtons());
+            $this->assertSame('The wishlist module (blockwishlist) is not installed, or not shown on product listings.', $wishlist->getMessage());
+            $this->assertFalse($wishlist->skipRemaining);
+        }
+
+        private function skipOf(callable $call): SkipTestException
+        {
+            try {
+                $call();
+            } catch (SkipTestException $e) {
+                return $e;
+            }
+            $this->fail('Expected a SkipTestException');
         }
 
         public function test_add_to_cart_button_state(): void

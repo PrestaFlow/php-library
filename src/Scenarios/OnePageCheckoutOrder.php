@@ -111,9 +111,8 @@ class OnePageCheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
-            }
+            // Skips the suite when no product of the shop can be added to the cart.
+            $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -129,31 +128,25 @@ class OnePageCheckoutOrder extends Scenario
             // that has never ordered — a freshly provisioned fixture, say — gets
             // the inline form instead. Both are legitimate states for a
             // logged-in buyer, and the carrier assertion below gates them alike.
-            if ($frontOfficeOnePageCheckoutPage->hasSavedAddresses()) {
-                $frontOfficeOnePageCheckoutPage->selectAddress();
-            } else {
-                $frontOfficeOnePageCheckoutPage->fillNewAddress([
-                    'firstName' => $this->getParam('firstName'),
-                    'lastName' => $this->getParam('lastName'),
-                    'street' => $this->getParam('addressStreet'),
-                    'postcode' => $this->getParam('addressPostcode'),
-                    'city' => $this->getParam('addressCity'),
-                    'country' => $this->getParam('addressCountry'),
-                    'state' => $this->getParam('addressState'),
-                    'phone' => $this->getParam('addressPhone'),
-                ]);
-            }
+            $frontOfficeOnePageCheckoutPage->selectSavedAddressOrFill([
+                'firstName' => $this->getParam('firstName'),
+                'lastName' => $this->getParam('lastName'),
+                'street' => $this->getParam('addressStreet'),
+                'postcode' => $this->getParam('addressPostcode'),
+                'city' => $this->getParam('addressCity'),
+                'country' => $this->getParam('addressCountry'),
+                'state' => $this->getParam('addressState'),
+                'phone' => $this->getParam('addressPhone'),
+            ]);
 
             // Carriers only appear once an address is selected and persisted:
             // assert it here rather than letting a silent failure surface later
             // as an unexplained timeout on the payment section.
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
 
-            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
-            $paymentModules = (array) $this->getParam('paymentModules');
-            if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
-                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
-            }
+            $frontOfficeOnePageCheckoutPage->selectCarrier($this->getParam('carrierId'));
+            // Skips the suite when the shop offers none of these payment modules.
+            $frontOfficeOnePageCheckoutPage->selectPayment($this->getParam('paymentModules'));
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 
             Expect::that($frontOfficeOnePageCheckoutPage->isReadyToPlaceOrder())->equals(true);
