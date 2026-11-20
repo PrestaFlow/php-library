@@ -20,7 +20,7 @@ class EditProduct extends Scenario
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\Products');
 
-        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PF Edit Test ' . self::uniqueSuffix();
+        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PF Edit Test ' . self::pfUniqueSuffix();
 
         extract($testSuite->pages);
 

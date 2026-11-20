@@ -64,7 +64,7 @@ class WishlistTest extends TestsSuite
         })
         ->it('the wishlist module is on the product listing', function () use ($frontOfficeListingPage) {
             if (!$frontOfficeListingPage->hasWishlistButtons()) {
-                $this->skipTest('The wishlist module (blockwishlist) is not installed, or not shown on product listings.');
+                $this->skipWithReason('The wishlist module (blockwishlist) is not installed, or not shown on product listings.');
             }
         });
 

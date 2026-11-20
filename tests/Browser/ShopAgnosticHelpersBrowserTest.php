@@ -23,12 +23,12 @@ namespace PrestaFlow\Tests\Browser\ShopAgnosticFixtures {
 
         public function state(string $selector, ?string $label = null): void
         {
-            $this->fillState($selector, $label);
+            $this->pfFillState($selector, $label);
         }
 
         public function countryIso(string $selector): ?string
         {
-            return $this->selectedCountryIso($selector);
+            return $this->pfSelectedCountryIso($selector);
         }
     }
 

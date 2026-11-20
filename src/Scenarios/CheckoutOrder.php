@@ -77,7 +77,7 @@ class CheckoutOrder extends Scenario
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
             }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
@@ -105,15 +105,15 @@ class CheckoutOrder extends Scenario
 
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
 
-            $frontOfficeCheckoutPage->chooseShipping(Scenario::carrierIdParam($this->getParam('carrierId')));
+            $frontOfficeCheckoutPage->chooseCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
             $paymentModules = (array) $this->getParam('paymentModules');
             if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
-                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
             }
-            $frontOfficeCheckoutPage->confirmOrder();
+            $frontOfficeCheckoutPage->acceptTermsAndPlaceOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {
             Expect::that($frontOfficeOrderConfirmationPage->isConfirmed())->equals(true);

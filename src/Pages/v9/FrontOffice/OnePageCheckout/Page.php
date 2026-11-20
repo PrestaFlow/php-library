@@ -19,7 +19,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
-    public ?string $shopPage = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -141,10 +141,10 @@ class Page extends BasePage
 
         $postcode = $address['postcode'] ?? null;
         if ($postcode === null || $postcode === '') {
-            $postcode = self::postcodeFor($this->selectedCountryIso($this->getSelector('addressCountrySelect')));
+            $postcode = self::postcodeFor($this->pfSelectedCountryIso($this->getSelector('addressCountrySelect')));
         }
 
-        $this->fillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
 
         foreach ([
             'addressFirstNameInput' => $address['firstName'] ?? '',
@@ -243,7 +243,7 @@ class Page extends BasePage
      */
     public function selectPayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
     {
-        return $this->clickPaymentOption($this->getSelector('paymentOption'), $modules);
+        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
     }
 
     /**

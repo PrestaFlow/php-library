@@ -20,7 +20,7 @@ class CreateProductAndVerify extends Scenario
         $testSuite->importPage('BackOffice\Products');
         $testSuite->importPage('FrontOffice\Product');
 
-        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PrestaFlow Scenario Product ' . self::uniqueSuffix();
+        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PrestaFlow Scenario Product ' . self::pfUniqueSuffix();
 
         extract($testSuite->pages);
 

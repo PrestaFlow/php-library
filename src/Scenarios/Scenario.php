@@ -34,7 +34,7 @@ class Scenario
         }
         // shopId null => the project's shop (SHOP_ID global, PRESTAFLOW_SHOP_ID).
         if (array_key_exists('shopId', $this->params) && ($this->params['shopId'] === null || $this->params['shopId'] === '')) {
-            $this->params['shopId'] = self::shopIdFromGlobals($this->globals);
+            $this->params['shopId'] = self::pfShopIdFromGlobals($this->globals);
         }
 
         $locale = $this->globals['LOCALE'] ?? $testSuite->getLocale();
@@ -56,19 +56,19 @@ class Scenario
      * A token unique to this run: data a scenario creates on the shop (an
      * e-mail, a product name) must not collide with what a previous run left.
      */
-    public static function uniqueSuffix(): string
+    public static function pfUniqueSuffix(): string
     {
         return date('Ymd-His') . '-' . bin2hex(random_bytes(3));
     }
 
     /** A per-run e-mail address; the shop rejects a duplicate customer e-mail. */
-    public static function uniqueEmail(string $prefix = 'pf'): string
+    public static function pfUniqueEmail(string $prefix = 'pf'): string
     {
-        return sprintf('%s-%s@example.com', $prefix, self::uniqueSuffix());
+        return sprintf('%s-%s@example.com', $prefix, self::pfUniqueSuffix());
     }
 
     /** Skip reason when the shop offers none of the payment modules a scenario may use. */
-    public static function noPaymentMethodReason(array $modules): string
+    public static function pfNoPaymentMethodReason(array $modules): string
     {
         return sprintf(
             'No offline payment method offered by the shop (looked for: %s). Set the paymentModules param'
@@ -78,7 +78,7 @@ class Scenario
     }
 
     /** SHOP_ID global (PRESTAFLOW_SHOP_ID), 1 when unset or invalid. */
-    public static function shopIdFromGlobals(array $globals): int
+    public static function pfShopIdFromGlobals(array $globals): int
     {
         $shopId = $globals['SHOP_ID'] ?? null;
 
@@ -86,7 +86,7 @@ class Scenario
     }
 
     /** carrierId param as given by a suite (null, int or numeric string) => ?int. */
-    public static function carrierIdParam(mixed $value): ?int
+    public static function pfCarrierIdParam(mixed $value): ?int
     {
         if ($value === null || $value === '' || !is_numeric($value)) {
             return null;
@@ -124,7 +124,7 @@ class Scenario
         // global one, so setting shop 1 and testing shop 2 silently walks the
         // wrong tunnel — the exact failure this precondition exists to prevent,
         // one level up. Scenarios carry a shopId param; the argument overrides.
-        $shopId ??= (int) ($this->params['shopId'] ?? self::shopIdFromGlobals($this->globals));
+        $shopId ??= (int) ($this->params['shopId'] ?? self::pfShopIdFromGlobals($this->globals));
 
         // Before 9.2 there is no ps_onepagecheckout module, so no setting could
         // have moved the shop off the four-page tunnel. Nothing to do, and the

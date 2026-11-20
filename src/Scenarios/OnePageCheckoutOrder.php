@@ -112,7 +112,7 @@ class OnePageCheckoutOrder extends Scenario
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
             }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
@@ -149,10 +149,10 @@ class OnePageCheckoutOrder extends Scenario
             // as an unexplained timeout on the payment section.
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
 
-            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::carrierIdParam($this->getParam('carrierId')));
+            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
             $paymentModules = (array) $this->getParam('paymentModules');
             if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
-                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
             }
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 

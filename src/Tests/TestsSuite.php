@@ -89,7 +89,7 @@ class TestsSuite implements OutputStates
     protected array $store = [];
 
     /** Set by a SkipTestException thrown with $skipRemaining: the later tests are skipped with it. */
-    protected ?string $skipRemainingReason = null;
+    protected $skipRemainingReason = null;
 
     protected $scenarioName = '';
     protected $scenarioParams = [];
@@ -374,7 +374,7 @@ class TestsSuite implements OutputStates
      * Skip the running test with a reason, from inside an it() closure.
      * $skipRemaining skips the rest of the suite with the same reason.
      */
-    public function skipTest(string $reason, bool $skipRemaining = false): never
+    public function skipWithReason(string $reason, bool $skipRemaining = false): never
     {
         throw new SkipTestException($reason, $skipRemaining);
     }
@@ -657,7 +657,7 @@ class TestsSuite implements OutputStates
      * something from the shop only when a run is actually driving one (never
      * from a unit test, never by launching Chrome as a side effect).
      */
-    public static function hasBrowser(): bool
+    public static function pfHasBrowser(): bool
     {
         return self::$browserInstance !== null;
     }

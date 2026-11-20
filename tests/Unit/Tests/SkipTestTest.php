@@ -7,7 +7,7 @@ use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Tests\TestsSuite;
 
 /**
- * skipTest() turns a missing shop capability (no offline payment method, no
+ * skipWithReason() turns a missing shop capability (no offline payment method, no
  * wishlist module) into a skip with its reason, not a failure.
  */
 final class SkipTestTest extends TestCase
@@ -20,8 +20,8 @@ final class SkipTestTest extends TestCase
     public function test_skip_test_throws_with_its_reason(): void
     {
         try {
-            $this->suite()->skipTest('No offline payment method');
-            $this->fail('skipTest() must throw');
+            $this->suite()->skipWithReason('No offline payment method');
+            $this->fail('skipWithReason() must throw');
         } catch (SkipTestException $e) {
             $this->assertSame('No offline payment method', $e->getMessage());
             $this->assertFalse($e->skipRemaining);
@@ -31,8 +31,8 @@ final class SkipTestTest extends TestCase
     public function test_skip_test_can_skip_the_rest_of_the_suite(): void
     {
         try {
-            $this->suite()->skipTest('No offline payment method', skipRemaining: true);
-            $this->fail('skipTest() must throw');
+            $this->suite()->skipWithReason('No offline payment method', skipRemaining: true);
+            $this->fail('skipWithReason() must throw');
         } catch (SkipTestException $e) {
             $this->assertTrue($e->skipRemaining);
         }

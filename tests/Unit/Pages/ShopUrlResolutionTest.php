@@ -27,7 +27,7 @@ namespace PrestaFlow\Tests\Unit\Pages\ShopUrlFixtures {
     class PricesDropLike extends FrontOfficePage
     {
         public string $url = 'prices-drop';
-        public ?string $shopPage = 'prices-drop';
+        public $shopPage = 'prices-drop';
 
         public function __construct()
         {
@@ -166,8 +166,8 @@ namespace PrestaFlow\Tests\Unit\Pages {
 
         public function test_shop_url_accepts_raw_keys_and_unknown_pages(): void
         {
-            $this->assertSame('https://shop.test/fr/promotions', $this->page()->shopUrl('prices_drop'));
-            $this->assertNull($this->page()->shopUrl('history'));
+            $this->assertSame('https://shop.test/fr/promotions', $this->page()->pfShopUrl('prices_drop'));
+            $this->assertNull($this->page()->pfShopUrl('history'));
         }
 
         public function test_no_browser_means_no_discovery(): void
@@ -175,7 +175,7 @@ namespace PrestaFlow\Tests\Unit\Pages {
             // shopUrls left null: a unit test holds no browser, so nothing is
             // read and nothing is launched.
             $this->assertSame('https://shop.test/connexion', $this->page(shop: null)->getPageURL('login'));
-            $this->assertTrue(FrontOfficePage::$shopUrlDiscovery);
+            $this->assertTrue(FrontOfficePage::$pfShopUrlDiscovery);
         }
     }
 }

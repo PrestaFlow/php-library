@@ -9,7 +9,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
-    public ?string $shopPage = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -135,13 +135,13 @@ class Page extends BasePage
 
         $postcode = $address['postcode'] ?? null;
         if ($postcode === null || $postcode === '') {
-            $postcode = self::postcodeFor($this->selectedCountryIso($this->getSelector('addressCountrySelect')));
+            $postcode = self::postcodeFor($this->pfSelectedCountryIso($this->getSelector('addressCountrySelect')));
         }
 
         $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
         $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
         $this->setValue($this->getSelector('addressPostcodeInput'), $postcode);
-        $this->fillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
         $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 
         $this->click($this->getSelector('addressesContinueButton'));
@@ -160,11 +160,19 @@ class Page extends BasePage
         ))->getReturnValue() === true;
     }
 
+    /** Pick the first carrier and confirm the delivery step. */
+    public function chooseShipping(): void
+    {
+        $this->chooseCarrier();
+    }
+
     /**
      * Pick a carrier and confirm the delivery step: $carrierId when given
      * (fails when the shop does not offer it here), else the first one.
+     * A new method rather than a parameter on chooseShipping(): a project
+     * page overriding chooseShipping() keeps a compatible signature.
      */
-    public function chooseShipping(?int $carrierId = null): void
+    public function chooseCarrier(?int $carrierId = null): void
     {
         if ($carrierId !== null) {
             $selector = $this->getSelector('shippingOptionById', ['carrierId' => $carrierId]);
@@ -185,11 +193,11 @@ class Page extends BasePage
      */
     public function choosePayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
     {
-        return $this->clickPaymentOption($this->getSelector('paymentOption'), $modules);
+        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
     }
 
     /** Accept the terms and place the order, once a payment option is selected. */
-    public function confirmOrder(): void
+    public function acceptTermsAndPlaceOrder(): void
     {
         $this->click($this->getSelector('termsCheckbox'));
         $this->click($this->getSelector('placeOrderButton'));
@@ -198,7 +206,7 @@ class Page extends BasePage
 
     /**
      * Select the FIRST payment option, whatever it is, and place the order.
-     * Prefer choosePayment() + confirmOrder(): the first option may be a
+     * Prefer choosePayment() + acceptTermsAndPlaceOrder(): the first option may be a
      * real payment provider.
      */
     public function choosePaymentAndConfirm(): void

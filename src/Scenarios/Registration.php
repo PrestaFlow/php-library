@@ -43,7 +43,7 @@ class Registration extends Scenario
         // and is only reachable from inside an ->it() closure, which is rebound
         // to the suite at execution time. $this->params already carries the
         // constructor overrides.
-        $email = ($this->params['email'] ?? null) ?: self::uniqueEmail('pf-register');
+        $email = ($this->params['email'] ?? null) ?: self::pfUniqueEmail('pf-register');
 
         $testSuite
         ->it('open the account creation form', function () use ($frontOfficeRegistrationPage) {

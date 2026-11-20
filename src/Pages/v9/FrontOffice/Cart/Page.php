@@ -8,7 +8,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Cart';
     public string $url = 'cart';
-    public ?string $shopPage = 'cart';
+    public $shopPage = 'cart';
 
     public function defineSelectors()
     {

@@ -75,7 +75,7 @@ class OnePageCheckoutGuest extends Scenario
         $testSuite->importPage('FrontOffice\OnePageCheckout');
         $testSuite->importPage('FrontOffice\OrderConfirmation');
 
-        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::uniqueEmail('pf-opc-guest');
+        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::pfUniqueEmail('pf-opc-guest');
 
         extract($testSuite->pages);
 
@@ -109,7 +109,7 @@ class OnePageCheckoutGuest extends Scenario
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
             }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
@@ -141,10 +141,10 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
         })
         ->it('choose shipping and payment, then place the order', function () use ($frontOfficeOnePageCheckoutPage) {
-            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::carrierIdParam($this->getParam('carrierId')));
+            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
             $paymentModules = (array) $this->getParam('paymentModules');
             if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
-                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
             }
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 

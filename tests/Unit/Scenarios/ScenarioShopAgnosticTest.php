@@ -47,7 +47,7 @@ final class ScenarioShopAgnosticTest extends TestCase
 
     public function test_no_payment_reason_names_the_modules_looked_for(): void
     {
-        $reason = Scenario::noPaymentMethodReason(['ps_wirepayment', 'ps_checkpayment']);
+        $reason = Scenario::pfNoPaymentMethodReason(['ps_wirepayment', 'ps_checkpayment']);
 
         $this->assertStringContainsString('No offline payment method', $reason);
         $this->assertStringContainsString('ps_wirepayment, ps_checkpayment', $reason);
@@ -56,16 +56,16 @@ final class ScenarioShopAgnosticTest extends TestCase
 
     public function test_carrier_id_param(): void
     {
-        $this->assertNull(Scenario::carrierIdParam(null));
-        $this->assertNull(Scenario::carrierIdParam(''));
-        $this->assertNull(Scenario::carrierIdParam('abc'));
-        $this->assertSame(3, Scenario::carrierIdParam(3));
-        $this->assertSame(7, Scenario::carrierIdParam('7'));
+        $this->assertNull(Scenario::pfCarrierIdParam(null));
+        $this->assertNull(Scenario::pfCarrierIdParam(''));
+        $this->assertNull(Scenario::pfCarrierIdParam('abc'));
+        $this->assertSame(3, Scenario::pfCarrierIdParam(3));
+        $this->assertSame(7, Scenario::pfCarrierIdParam('7'));
     }
 
     public function test_unique_email_and_suffix_differ_on_every_call(): void
     {
-        $emails = array_map(fn () => Scenario::uniqueEmail('pf-guest'), range(1, 20));
+        $emails = array_map(fn () => Scenario::pfUniqueEmail('pf-guest'), range(1, 20));
 
         $this->assertCount(20, array_unique($emails));
         foreach ($emails as $email) {
@@ -73,7 +73,7 @@ final class ScenarioShopAgnosticTest extends TestCase
             $this->assertNotFalse(filter_var($email, FILTER_VALIDATE_EMAIL));
         }
 
-        $this->assertNotSame(Scenario::uniqueSuffix(), Scenario::uniqueSuffix());
+        $this->assertNotSame(Scenario::pfUniqueSuffix(), Scenario::pfUniqueSuffix());
     }
 
     public function test_data_created_on_the_shop_is_unique_by_default(): void
@@ -101,9 +101,9 @@ final class ScenarioShopAgnosticTest extends TestCase
             $this->assertNull($this->defaults($name)['shopId'], $name);
         }
 
-        $this->assertSame(1, Scenario::shopIdFromGlobals([]));
-        $this->assertSame(1, Scenario::shopIdFromGlobals(['SHOP_ID' => 0]));
-        $this->assertSame(1, Scenario::shopIdFromGlobals(['SHOP_ID' => 'x']));
-        $this->assertSame(2, Scenario::shopIdFromGlobals(['SHOP_ID' => '2']));
+        $this->assertSame(1, Scenario::pfShopIdFromGlobals([]));
+        $this->assertSame(1, Scenario::pfShopIdFromGlobals(['SHOP_ID' => 0]));
+        $this->assertSame(1, Scenario::pfShopIdFromGlobals(['SHOP_ID' => 'x']));
+        $this->assertSame(2, Scenario::pfShopIdFromGlobals(['SHOP_ID' => '2']));
     }
 }

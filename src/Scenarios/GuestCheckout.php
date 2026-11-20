@@ -61,14 +61,14 @@ class GuestCheckout extends Scenario
         $testSuite->importPage('FrontOffice\Checkout');
         $testSuite->importPage('FrontOffice\OrderConfirmation');
 
-        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::uniqueEmail('pf-guest');
+        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::pfUniqueEmail('pf-guest');
 
         extract($testSuite->pages);
 
         $testSuite
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
             }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
@@ -96,15 +96,15 @@ class GuestCheckout extends Scenario
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
         })
         ->it('choose shipping and place the order', function () use ($frontOfficeCheckoutPage) {
-            $frontOfficeCheckoutPage->chooseShipping(Scenario::carrierIdParam($this->getParam('carrierId')));
+            $frontOfficeCheckoutPage->chooseCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
             $paymentModules = (array) $this->getParam('paymentModules');
             if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
-                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
             }
-            $frontOfficeCheckoutPage->confirmOrder();
+            $frontOfficeCheckoutPage->acceptTermsAndPlaceOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {
             Expect::that($frontOfficeOrderConfirmationPage->isConfirmed())->equals(true);

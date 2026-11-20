@@ -67,22 +67,24 @@ class FrontOfficePage extends CommonPage
     ];
 
     /** Off: getPageURL() never asks the shop (tables and page values only). */
-    public static bool $shopUrlDiscovery = true;
+    public static $pfShopUrlDiscovery = true;
 
     /** prestashop.urls.pages already read, per front-office base URL. */
-    protected static array $shopUrlsCache = [];
+    protected static $pfShopUrlsCache = [];
 
     /**
      * prestashop.urls.pages to use instead of reading the shop; null reads it.
      * Meant for tests and for callers that already hold the table.
      */
-    public ?array $shopUrls = null;
+    public $shopUrls = null;
 
     /**
      * The SHOP_PAGES key of this page, for goToPage($thisPage): lets a page
      * whose $url is a guess (a friendly URL) resolve to the shop's real one.
      */
-    public ?string $shopPage = null;
+    // Untyped on purpose: a project page declaring its own $shopPage must
+    // not hit a property type mismatch.
+    public $shopPage = null;
 
     public function __construct(string $locale, string $patchVersion, array $globals, array $customs = [])
     {
@@ -159,7 +161,7 @@ class FrontOfficePage extends CommonPage
      */
     public function getPageURL($page, $params = null): string
     {
-        $url = $this->resolvePageURL($page);
+        $url = $this->pfResolvePageUrl($page);
 
         // A scalar $params is the common call shape — goToPage('category', 3),
         // goToPage('product', $productId) — and means the single placeholder the
@@ -180,7 +182,7 @@ class FrontOfficePage extends CommonPage
     }
 
     /** Front-office base URL, with the language prefix when the shop uses one. */
-    public function getBaseURL(): string
+    public function pfBaseUrl(): string
     {
         $url = $this->getGlobals()['FO']['URL'];
         if (!str_ends_with($url, '/')) {
@@ -194,9 +196,9 @@ class FrontOfficePage extends CommonPage
         return $url;
     }
 
-    protected function resolvePageURL($page): string
+    protected function pfResolvePageUrl($page): string
     {
-        $url = $this->getBaseURL();
+        $url = $this->pfBaseUrl();
 
         if (is_string($page)) {
             $override = $this->overrideFor([$page]);
@@ -204,7 +206,7 @@ class FrontOfficePage extends CommonPage
                 return $url . $override;
             }
 
-            $shopUrl = isset(self::SHOP_PAGES[$page]) ? $this->shopUrl($page) : null;
+            $shopUrl = isset(self::SHOP_PAGES[$page]) ? $this->pfShopUrl($page) : null;
             if ($shopUrl !== null) {
                 return $shopUrl;
             }
@@ -239,7 +241,7 @@ class FrontOfficePage extends CommonPage
             }
 
             if (is_string($page->shopPage ?? null)) {
-                $shopUrl = $this->shopUrl($page->shopPage);
+                $shopUrl = $this->pfShopUrl($page->shopPage);
                 if ($shopUrl !== null) {
                     return $shopUrl;
                 }
@@ -282,11 +284,11 @@ class FrontOfficePage extends CommonPage
      * $page is a SHOP_PAGES key ('login', 'prices-drop'...) or a raw
      * prestashop.urls.pages key ('prices_drop').
      */
-    public function shopUrl(string $page): ?string
+    public function pfShopUrl(string $page): ?string
     {
         $key = self::SHOP_PAGES[$page][0] ?? $page;
 
-        $urls = $this->shopUrls ?? $this->readShopUrls();
+        $urls = $this->shopUrls ?? $this->pfReadShopUrls();
         $url = $urls[$key] ?? null;
         if (!is_string($url) || $url === '') {
             return null;
@@ -306,15 +308,15 @@ class FrontOfficePage extends CommonPage
      * it is already a page of this shop, otherwise from its home page. Only
      * while a run drives a browser; any failure answers [] (the tables apply).
      */
-    protected function readShopUrls(): array
+    protected function pfReadShopUrls(): array
     {
-        if (!self::$shopUrlDiscovery || !TestsSuite::hasBrowser()) {
+        if (!self::$pfShopUrlDiscovery || !TestsSuite::pfHasBrowser()) {
             return [];
         }
 
-        $base = $this->getBaseURL();
-        if (array_key_exists($base, self::$shopUrlsCache)) {
-            return self::$shopUrlsCache[$base];
+        $base = $this->pfBaseUrl();
+        if (array_key_exists($base, self::$pfShopUrlsCache)) {
+            return self::$pfShopUrlsCache[$base];
         }
 
         $script = '(function(){try{return (window.prestashop&&prestashop.urls&&prestashop.urls.pages)'
@@ -344,13 +346,13 @@ class FrontOfficePage extends CommonPage
             $map = [];
         }
 
-        return self::$shopUrlsCache[$base] = $map;
+        return self::$pfShopUrlsCache[$base] = $map;
     }
 
     /** Forget what was read from the shops (another shop, another language). */
     public static function clearShopUrls(): void
     {
-        self::$shopUrlsCache = [];
+        self::$pfShopUrlsCache = [];
     }
 
     public function goToUrl(string $url)
@@ -413,7 +415,7 @@ class FrontOfficePage extends CommonPage
      */
     public function discoverListingUrls(bool $allProducts = true): array
     {
-        $base = $this->getBaseURL();
+        $base = $this->pfBaseUrl();
 
         TestsSuite::recreatePageIfContextChanged('FO');
         $current = '';
@@ -427,12 +429,12 @@ class FrontOfficePage extends CommonPage
 
         $urls = [];
         if ($allProducts) {
-            $urls = $this->readLinks('a.all-product-link, .featured-products a.all-product-link, .ps-featuredproducts .module-products__buttons a');
+            $urls = $this->pfReadLinks('a.all-product-link, .featured-products a.all-product-link, .ps-featuredproducts .module-products__buttons a');
         }
 
         $categories = $this->readCategoryLinks();
         if ($categories === []) {
-            $sitemap = $this->shopUrl('sitemap') ?? $this->getPageURL('sitemap');
+            $sitemap = $this->pfShopUrl('sitemap') ?? $this->getPageURL('sitemap');
             try {
                 $this->goToUrlInPlace($sitemap);
                 $categories = $this->readCategoryLinks();
@@ -453,7 +455,7 @@ class FrontOfficePage extends CommonPage
     /** Links to category pages on the current page (main menu, sitemap tree). */
     public function readCategoryLinks(): array
     {
-        return $this->readLinks('[id^="category-"] > a[href], a[id^="category-"][href], [id^="category-"] a[href]');
+        return $this->pfReadLinks('[id^="category-"] > a[href], a[id^="category-"][href], [id^="category-"] a[href]');
     }
 
     /**
@@ -486,7 +488,7 @@ class FrontOfficePage extends CommonPage
     }
 
     /** ISO code of the country an address form currently shows, when known. */
-    protected function selectedCountryIso(string $countrySelector): ?string
+    protected function pfSelectedCountryIso(string $countrySelector): ?string
     {
         try {
             $value = $this->getPage()->evaluate(sprintf(
@@ -504,7 +506,7 @@ class FrontOfficePage extends CommonPage
      * The state of an address form: $label when given, otherwise, when the
      * country has states and none is chosen yet, its first real option.
      */
-    protected function fillState(string $stateSelector, ?string $label = null): void
+    protected function pfFillState(string $stateSelector, ?string $label = null): void
     {
         if ($label !== null && $label !== '') {
             $this->selectOption($stateSelector, $label);
@@ -531,7 +533,7 @@ class FrontOfficePage extends CommonPage
      * is in $modules, and answer that module's name; null when the shop offers
      * none of them (nothing is clicked then).
      */
-    protected function clickPaymentOption(string $optionSelector, array $modules): ?string
+    protected function pfClickPaymentOption(string $optionSelector, array $modules): ?string
     {
         $script = sprintf(
             '(function(sel,modules){var o=[].slice.call(document.querySelectorAll(sel)).find(function(i){'
@@ -547,7 +549,7 @@ class FrontOfficePage extends CommonPage
     }
 
     /** Distinct absolute hrefs of the links matching $selector, in page order. */
-    protected function readLinks(string $selector): array
+    protected function pfReadLinks(string $selector): array
     {
         $script = sprintf(
             '(function(){var out=[];[].slice.call(document.querySelectorAll(%s)).forEach(function(a){'
