@@ -43,7 +43,7 @@ class Registration extends Scenario
         // and is only reachable from inside an ->it() closure, which is rebound
         // to the suite at execution time. $this->params already carries the
         // constructor overrides.
-        $email = ($this->params['email'] ?? null) ?: $this->uniqueEmail();
+        $email = ($this->params['email'] ?? null) ?: self::uniqueEmail('pf-register');
 
         $testSuite
         ->it('open the account creation form', function () use ($frontOfficeRegistrationPage) {
@@ -68,14 +68,5 @@ class Registration extends Scenario
         });
 
         return $testSuite;
-    }
-
-    /**
-     * A per-run address. The shop rejects a duplicate e-mail, so reusing one
-     * would turn the second run into a false failure.
-     */
-    private function uniqueEmail(): string
-    {
-        return sprintf('pf-register-%s@example.com', date('Ymd-His'));
     }
 }

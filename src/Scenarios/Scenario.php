@@ -48,6 +48,21 @@ class Scenario
         return $this;
     }
 
+    /**
+     * A token unique to this run: data a scenario creates on the shop (an
+     * e-mail, a product name) must not collide with what a previous run left.
+     */
+    public static function uniqueSuffix(): string
+    {
+        return date('Ymd-His') . '-' . bin2hex(random_bytes(3));
+    }
+
+    /** A per-run e-mail address; the shop rejects a duplicate customer e-mail. */
+    public static function uniqueEmail(string $prefix = 'pf'): string
+    {
+        return sprintf('%s-%s@example.com', $prefix, self::uniqueSuffix());
+    }
+
     /** Skip reason when the shop offers none of the payment modules a scenario may use. */
     public static function noPaymentMethodReason(array $modules): string
     {

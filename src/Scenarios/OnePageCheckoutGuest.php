@@ -19,7 +19,9 @@ class OnePageCheckoutGuest extends Scenario
         // null => the suite's locale (the project's language in the app). Friendly
         // URLs and their per-language overrides are read in that language.
         'locale' => null,
-        'guestEmail' => 'pf-opc-guest@example.com',
+        // null => a unique address per run (a guest e-mail already used by a
+        // registered customer would be refused).
+        'guestEmail' => null,
         'firstName' => 'PrestaFlow',
         'lastName' => 'Guest',
         'addressStreet' => '16 Main street',
@@ -72,6 +74,8 @@ class OnePageCheckoutGuest extends Scenario
         $testSuite->importPage('FrontOffice\Cart');
         $testSuite->importPage('FrontOffice\OnePageCheckout');
         $testSuite->importPage('FrontOffice\OrderConfirmation');
+
+        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::uniqueEmail('pf-opc-guest');
 
         extract($testSuite->pages);
 

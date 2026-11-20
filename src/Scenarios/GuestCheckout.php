@@ -21,7 +21,9 @@ class GuestCheckout extends Scenario
         // default: no redirection to a payment provider, nothing charged. When
         // the shop offers none of them the order steps are skipped.
         'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
-        'guestEmail' => 'pf-guest@example.com',
+        // null => a unique address per run (a guest e-mail already used by a
+        // registered customer would be refused).
+        'guestEmail' => null,
         'firstName' => 'PrestaFlow',
         'lastName' => 'Guest',
         'addressStreet' => '16 Main street',
@@ -57,6 +59,8 @@ class GuestCheckout extends Scenario
         $testSuite->importPage('FrontOffice\Cart');
         $testSuite->importPage('FrontOffice\Checkout');
         $testSuite->importPage('FrontOffice\OrderConfirmation');
+
+        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::uniqueEmail('pf-guest');
 
         extract($testSuite->pages);
 

@@ -62,4 +62,27 @@ final class ScenarioShopAgnosticTest extends TestCase
         $this->assertSame(3, Scenario::carrierIdParam(3));
         $this->assertSame(7, Scenario::carrierIdParam('7'));
     }
+
+    public function test_unique_email_and_suffix_differ_on_every_call(): void
+    {
+        $emails = array_map(fn () => Scenario::uniqueEmail('pf-guest'), range(1, 20));
+
+        $this->assertCount(20, array_unique($emails));
+        foreach ($emails as $email) {
+            $this->assertMatchesRegularExpression('/^pf-guest-\d{8}-\d{6}-[0-9a-f]{6}@example\.com$/', $email);
+            $this->assertNotFalse(filter_var($email, FILTER_VALIDATE_EMAIL));
+        }
+
+        $this->assertNotSame(Scenario::uniqueSuffix(), Scenario::uniqueSuffix());
+    }
+
+    public function test_data_created_on_the_shop_is_unique_by_default(): void
+    {
+        foreach (['GuestCheckout', 'OnePageCheckoutGuest'] as $name) {
+            $this->assertNull($this->defaults($name)['guestEmail'], $name);
+        }
+        foreach (['CreateProductAndVerify', 'EditProduct'] as $name) {
+            $this->assertNull($this->defaults($name)['productName'], $name);
+        }
+    }
 }

@@ -181,6 +181,14 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /** getFormPrice() as a number rounded to cents ("19.990000", "19,99" => 19.99). */
+    public function getFormPriceValue(): float
+    {
+        $value = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], $this->getFormPrice());
+
+        return round((float) $value, 2);
+    }
+
     public function getFormPrice(): string
     {
         $sel = json_encode($this->getSelector('formPriceInput'));
