@@ -55,12 +55,8 @@ class WishlistTest extends TestsSuite
         ->it('should go to all products page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
             $frontOfficeHomePage->goToAllProducts();
 
-            // Locale-agnostic, as in FrontOfficeSmoke: a heading, and the same
-            // one in the document title.
-            $title = $frontOfficeListingPage->getListingTitle();
-
-            Expect::that($title)->isNotEmpty();
-            Expect::that($frontOfficeListingPage->getMetaTitle())->contains($title);
+            // Locale-agnostic, as in FrontOfficeSmoke.
+            Expect::that($frontOfficeListingPage->getListingTitle())->isNotEmpty();
         })
         ->it('the wishlist module is on the product listing', function () use ($frontOfficeListingPage) {
             if (!$frontOfficeListingPage->hasWishlistButtons()) {

@@ -63,38 +63,39 @@ class Page extends BasePage
     }
 
     /**
-     * Open a category found on the shop (main menu, else sitemap), for
-     * callers that must not assume a category id. False when none was found.
+     * Open a category found on the shop (main menu, else sitemap) that lists
+     * products, for callers that must not assume a category id. Tries the
+     * categories in turn; false when none lists a product.
      */
     public function goToDiscoveredCategory(): bool
     {
-        $url = $this->discoverListingUrls(allProducts: false)[0] ?? null;
-        if ($url === null) {
-            return false;
+        foreach ($this->discoverListingUrls(allProducts: false) as $url) {
+            try {
+                $this->goToUrlInPlace($url);
+                $this->waitForPageLoaded();
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if ($this->countProducts() > 0) {
+                return true;
+            }
         }
 
-        $this->goToUrlInPlace($url);
-        $this->waitForPageLoaded();
-
-        return true;
+        return false;
     }
 
     /**
-     * Click the nth product miniature and wait for the product page.
-     *
-     * Returns whether the click found its target: navigateTo() answers false on
-     * a selector that matched nothing, and swallowing that answer here is how a
-     * missing link turned into a failure three steps later, on the product page.
+     * From this listing, open the first product a buyer can add to the cart
+     * as it is (in stock, available for order, no required customization).
+     * Answers its miniature (['name' => ..., 'url' => ...]) and leaves the
+     * browser on its page; null when none of the first $maxProducts does.
      */
-    public function goToProduct(int $index = 1)
+    public function openPurchasableProduct(int $maxProducts = 10): ?array
     {
-        $clicked = $this->navigateTo($this->selector('productArticleLink', ['index' => $index]));
+        $seen = [];
 
-        // waitForNavigation() waits on a navigation started by navigate(); this
-        // one is started by a click, so it needs waitForPageReload().
-        $this->waitForPageReload();
-
-        return $clicked;
+        return $this->pfOpenFirstPurchasable($maxProducts, $seen, '.add-to-cart, .product__add-to-cart-button');
     }
 
     /** Whether the wishlist module (blockwishlist) shows its buttons on this listing. */

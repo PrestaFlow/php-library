@@ -16,9 +16,16 @@ class AddProductToCart extends Scenario
     public $params = [
         // null => the suite's locale (the project's language in the app).
         'locale' => null,
-        // null => the first category of the main menu (else the sitemap's).
+        // null => the first category of the main menu (else the sitemap's)
+        // that lists products.
         'categoryId' => null,
-        'productIndex' => 1,
+        // Optional: checked against the listing title when given.
+        'categoryTitle' => null,
+        // null => the first product of the category that can be added to the
+        // cart as it is; a position (1-based) opens that miniature instead.
+        'productIndex' => null,
+        // Optional: checked against the product page title when given.
+        'productTitle' => null,
         'cartQuantity' => 1,
     ];
 
@@ -39,27 +46,43 @@ class AddProductToCart extends Scenario
             $categoryId = $this->getParam('categoryId');
             if ($categoryId !== null && $categoryId !== '') {
                 $frontOfficeCategoryPage->goToPage('category', (int) $categoryId);
-            } else {
-                Expect::that($frontOfficeCategoryPage->goToDiscoveredCategory())->equals(true);
+            } elseif (!$frontOfficeCategoryPage->goToDiscoveredCategory()) {
+                $this->skipWithReason('No category of this shop lists products: set the categoryId param.', skipRemaining: true);
             }
 
-            Expect::that($frontOfficeCategoryPage->getListingTitle())->isNotEmpty();
+            $title = $frontOfficeCategoryPage->getListingTitle();
+
+            Expect::that($title)->isNotEmpty();
+            if (is_string($this->getParam('categoryTitle')) && $this->getParam('categoryTitle') !== '') {
+                Expect::that($title)->contains($this->getParam('categoryTitle'));
+            }
             Expect::that($frontOfficeCategoryPage->countProducts() > 0)->equals(true);
         })
         ->it('go to product page', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
-            $index = (int) $this->getParam('productIndex');
+            $index = $this->getParam('productIndex');
+            if ($index !== null && $index !== '') {
+                // Read before the click: the product page must be the one the
+                // miniature advertised.
+                $name = (string) $frontOfficeCategoryPage->getProductName((int) $index);
+                $frontOfficeCategoryPage->goToProduct((int) $index);
+            } else {
+                $found = $frontOfficeCategoryPage->openPurchasableProduct();
+                if ($found === null) {
+                    $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                }
+                $name = $found['name'];
+            }
 
-            // Read before the click: the product page must be the one the
-            // miniature advertised. Miniature titles may be truncated ("..."),
-            // and the product heading may be upper-cased by the theme's CSS.
-            $name = (string) $frontOfficeCategoryPage->getProductName($index);
+            // Miniature titles may be truncated ("..."), and the product
+            // heading may be upper-cased by the theme's CSS.
             $name = mb_strtolower(trim(rtrim(trim($name), '.…')));
+            $title = mb_strtolower((string) $frontOfficeProductPage->getTitle());
 
             Expect::that($name)->isNotEmpty();
-
-            $frontOfficeCategoryPage->goToProduct($index);
-
-            Expect::that(mb_strtolower((string) $frontOfficeProductPage->getTitle()))->contains($name);
+            Expect::that($title)->contains($name);
+            if (is_string($this->getParam('productTitle')) && $this->getParam('productTitle') !== '') {
+                Expect::that($title)->contains(mb_strtolower($this->getParam('productTitle')));
+            }
         })
         ->it('add to cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
             $modalTitle = $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));

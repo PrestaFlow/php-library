@@ -557,6 +557,64 @@ class FrontOfficePage extends CommonPage
         return array_values(array_unique($urls));
     }
 
+    /**
+     * Whether the product page open now lets a buyer add the product as it
+     * is: an add-to-cart button (core's data-button-action, else
+     * $buttonSelector), enabled — PrestaShop disables it when the product is
+     * out of stock, not available for order, or waits for a required
+     * customization — and no required customization field.
+     */
+    protected function pfIsAddableToCartHere(string $buttonSelector): bool
+    {
+        $script = sprintf(
+            '(function(sel){var b=document.querySelector(\'[data-button-action="add-to-cart"]\')||document.querySelector(sel);'
+            . 'if(!b)return false;'
+            . 'if(b.disabled||b.hasAttribute("disabled")||b.classList.contains("disabled"))return false;'
+            . 'if(document.querySelector(".product-customization [required]"))return false;'
+            . 'return true;})(%s)',
+            json_encode($buttonSelector)
+        );
+
+        try {
+            return $this->getPage()->evaluate($script)->getReturnValue() === true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * From the listing open now, open its products in turn and stop on the
+     * first one that can be added to the cart: answers its miniature
+     * (['name' => ..., 'url' => ...]) and leaves the browser on it. Null when
+     * none qualifies within $maxProducts product pages ($seen counts and
+     * skips the ones already tried, across listings).
+     */
+    protected function pfOpenFirstPurchasable(int $maxProducts, array &$seen, string $buttonSelector): ?array
+    {
+        foreach ($this->readProductMiniatures('#js-product-list') as $miniature) {
+            $url = $miniature['url'] ?? null;
+            if (!is_string($url) || isset($seen[$url])) {
+                continue;
+            }
+            if (count($seen) >= $maxProducts) {
+                return null;
+            }
+            $seen[$url] = true;
+
+            try {
+                $this->goToUrlInPlace($url);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if ($this->pfIsAddableToCartHere($buttonSelector)) {
+                return ['name' => (string) ($miniature['name'] ?? ''), 'url' => $url];
+            }
+        }
+
+        return null;
+    }
+
     /** Links to category pages on the current page (main menu, sitemap tree). */
     public function readCategoryLinks(): array
     {

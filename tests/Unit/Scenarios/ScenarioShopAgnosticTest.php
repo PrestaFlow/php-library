@@ -41,8 +41,10 @@ final class ScenarioShopAgnosticTest extends TestCase
     {
         $params = $this->defaults('AddProductToCart');
         $this->assertNull($params['categoryId']);
-        $this->assertArrayNotHasKey('categoryTitle', $params);
-        $this->assertArrayNotHasKey('productTitle', $params);
+        $this->assertNull($params['productIndex']);
+        // Still accepted, and checked, when a suite passes them.
+        $this->assertNull($params['categoryTitle']);
+        $this->assertNull($params['productTitle']);
     }
 
     public function test_no_payment_reason_names_the_modules_looked_for(): void

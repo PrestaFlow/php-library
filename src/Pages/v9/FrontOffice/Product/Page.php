@@ -143,20 +143,7 @@ class Page extends BasePage
      */
     public function isAddableToCart(): bool
     {
-        $script = sprintf(
-            '(function(sel){var b=document.querySelector(\'[data-button-action="add-to-cart"]\')||document.querySelector(sel);'
-            . 'if(!b)return false;'
-            . 'if(b.disabled||b.hasAttribute("disabled")||b.classList.contains("disabled"))return false;'
-            . 'if(document.querySelector(".product-customization [required]"))return false;'
-            . 'return true;})(%s)',
-            json_encode($this->getSelector('addToCartButton'))
-        );
-
-        try {
-            return $this->getPage()->evaluate($script)->getReturnValue() === true;
-        } catch (\Throwable) {
-            return false;
-        }
+        return $this->pfIsAddableToCartHere($this->getSelector('addToCartButton'));
     }
 
     /**
@@ -180,25 +167,12 @@ class Page extends BasePage
                 continue;
             }
 
-            foreach ($this->readProductMiniatures('#js-product-list') as $miniature) {
-                $url = $miniature['url'] ?? null;
-                if (!is_string($url) || isset($seen[$url])) {
-                    continue;
-                }
-                if (count($seen) >= $maxProducts) {
-                    return null;
-                }
-                $seen[$url] = true;
-
-                try {
-                    $this->goToUrlInPlace($url);
-                } catch (\Throwable) {
-                    continue;
-                }
-
-                if ($this->isAddableToCart()) {
-                    return $url;
-                }
+            $found = $this->pfOpenFirstPurchasable($maxProducts, $seen, $this->getSelector('addToCartButton'));
+            if ($found !== null) {
+                return $found['url'];
+            }
+            if (count($seen) >= $maxProducts) {
+                return null;
             }
         }
 

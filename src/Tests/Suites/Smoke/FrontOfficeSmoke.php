@@ -44,22 +44,21 @@ class FrontOfficeSmoke extends TestsSuite
 
             Expect::that($frontOfficeHomePage->isDisplayed())->equals(true);
         })
-        // notEquals('') was satisfied by anything at all, including the home
-        // page and the whitespace blob the listing header used to return on
-        // hummingbird. Cross-checking the heading against the document title
-        // is locale-agnostic and comes from an independent server-side render
-        // (meta title vs. rendered h1), so it fails both when the heading
-        // selector drifts back to the container and when we never left home.
+        // The listing heading (the h1, not its container) and products in it.
+        // No comparison with the document title: shops customise their meta
+        // titles for SEO.
         ->it('reach the product listing from the home page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
             $frontOfficeHomePage->goToAllProducts();
 
-            $title = $frontOfficeListingPage->getListingTitle();
-
-            Expect::that($title)->isNotEmpty();
-            Expect::that($frontOfficeListingPage->getMetaTitle())->contains($title);
+            Expect::that($frontOfficeListingPage->getListingTitle())->isNotEmpty();
+            Expect::that($frontOfficeListingPage->countProducts() > 0)->equals(true);
         })
+        // The first product that can be added to the cart as it is: product 1
+        // may be out of stock or wait for a customization on a real shop.
         ->it('open a product and read its price', function () use ($frontOfficeListingPage, $frontOfficeProductPage) {
-            $frontOfficeListingPage->goToProduct(1);
+            if ($frontOfficeListingPage->openPurchasableProduct() === null) {
+                $this->skipWithReason('No product of this listing can be added to the cart as it is.', skipRemaining: true);
+            }
 
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
         })
@@ -83,14 +82,12 @@ class FrontOfficeSmoke extends TestsSuite
         // sitemap): no id from the demo catalogue.
         ->it('reach a category listing', function () use ($frontOfficeCategoryPage) {
             Expect::that($frontOfficeCategoryPage->goToDiscoveredCategory())->equals(true);
-
-            $title = $frontOfficeCategoryPage->getListingTitle();
-
-            Expect::that($title)->isNotEmpty();
-            Expect::that($frontOfficeCategoryPage->getMetaTitle())->contains($title);
+            Expect::that($frontOfficeCategoryPage->getListingTitle())->isNotEmpty();
         })
         ->it('open a product from the category listing', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
-            $frontOfficeCategoryPage->goToProduct(1);
+            if ($frontOfficeCategoryPage->openPurchasableProduct() === null) {
+                $this->skipWithReason('No product of this category can be added to the cart as it is.', skipRemaining: true);
+            }
 
             Expect::that($frontOfficeProductPage->getPrice() > 0)->equals(true);
         })
