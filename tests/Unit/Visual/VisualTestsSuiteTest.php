@@ -45,6 +45,7 @@ final class VisualTestsSuiteTest extends TestCase
         $_ENV = $this->envBackup;
         $_SERVER = $this->serverBackup;
         putenv('PRESTAFLOW_VISUAL_ONLY');
+        putenv('PRESTAFLOW_VISUAL_BASELINE');
     }
 
     /** Suite construite avec loadGlobals: true (chemin CLI), sans navigateur. */
@@ -266,6 +267,25 @@ final class VisualTestsSuiteTest extends TestCase
     public function test_visual_scope_property_overrides_slug(): void
     {
         $this->assertSame('home-fr', $this->scopedSuite($this->recordingPage(), 'home-fr')->visualScope());
+    }
+
+    public function test_a_visual_baseline_suffixes_the_scope(): void
+    {
+        putenv('PRESTAFLOW_VISUAL_BASELINE=pfenv3');
+
+        $this->assertSame('home-fr-pfenv3', $this->scopedSuite($this->recordingPage(), 'home-fr')->visualScope());
+        $suite = new \PrestaFlow\Tests\Unit\Visual\Fixtures\ProdVisual2(loadGlobals: false, getBrowser: false);
+        $this->assertSame('prod-visual2-pfenv3', $suite->visualScope());
+    }
+
+    public function test_an_empty_or_unsafe_visual_baseline_is_ignored(): void
+    {
+        putenv('PRESTAFLOW_VISUAL_BASELINE=');
+        $this->assertSame('home-fr', $this->scopedSuite($this->recordingPage(), 'home-fr')->visualScope());
+
+        putenv('PRESTAFLOW_VISUAL_BASELINE=../x');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->scopedSuite($this->recordingPage(), 'home-fr')->visualScope();
     }
 
     public function test_invalid_visual_scope_throws(): void
