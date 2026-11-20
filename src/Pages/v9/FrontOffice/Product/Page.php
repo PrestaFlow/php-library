@@ -66,14 +66,11 @@ class Page extends BasePage
             return true;
         }
 
-        $found = $this->findPurchasable();
-        if ($found === null) {
-            return false;
-        }
-
-        $this->goToUrl($found);
-
-        return true;
+        // findPurchasable() leaves the browser on the product it found.
+        // Navigating there again would hang: its URL often carries the
+        // combination as a fragment (#/1-size-s), and a same-document
+        // navigation never fires the load event waited for.
+        return $this->findPurchasable() !== null;
     }
 
     public function getPrice()
