@@ -1322,6 +1322,9 @@ class TestsSuite implements OutputStates
                 'EMAIL' => (string) Env::get('PRESTAFLOW_FO_EMAIL', ''),
                 'PASSWD' => (string) Env::get('PRESTAFLOW_FO_PASSWD', ''),
             ],
+            // Shop the back-office settings of the scenarios are written for
+            // (multistore). 1 is the shop every install starts with.
+            'SHOP_ID' => max(1, (int) Env::get('PRESTAFLOW_SHOP_ID', 1)),
             'DEBUG' => (bool) Env::get('PRESTAFLOW_DEBUG', false),
             'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),
             'BROWSER' => [

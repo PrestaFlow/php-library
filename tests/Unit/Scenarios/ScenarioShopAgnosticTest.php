@@ -94,4 +94,16 @@ final class ScenarioShopAgnosticTest extends TestCase
         $this->assertSame(2, $params['orderStatusId']);
         $this->assertNull($params['orderStatus']);
     }
+
+    public function test_shop_id_comes_from_the_project_unless_given(): void
+    {
+        foreach (['CheckoutOrder', 'GuestCheckout', 'OnePageCheckoutGuest', 'OnePageCheckoutOrder', 'SwitchTheme'] as $name) {
+            $this->assertNull($this->defaults($name)['shopId'], $name);
+        }
+
+        $this->assertSame(1, Scenario::shopIdFromGlobals([]));
+        $this->assertSame(1, Scenario::shopIdFromGlobals(['SHOP_ID' => 0]));
+        $this->assertSame(1, Scenario::shopIdFromGlobals(['SHOP_ID' => 'x']));
+        $this->assertSame(2, Scenario::shopIdFromGlobals(['SHOP_ID' => '2']));
+    }
 }

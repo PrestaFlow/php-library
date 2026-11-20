@@ -52,7 +52,8 @@ class OnePageCheckoutOrder extends Scenario
         'addressPhone' => '0102030405',
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)

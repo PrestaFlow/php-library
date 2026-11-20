@@ -35,7 +35,8 @@ class SwitchTheme extends Scenario
         'theme' => null,
         // Which shop to act on: the "Use this theme" button is rendered
         // disabled outside a single-shop context.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)

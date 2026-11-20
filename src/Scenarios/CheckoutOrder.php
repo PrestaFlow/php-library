@@ -37,7 +37,8 @@ class CheckoutOrder extends Scenario
         'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)

@@ -32,6 +32,10 @@ class Scenario
         if (isset($this->params['useIsoCode'])) {
             $this->globals['PREFIX_LOCALE'] = (bool) $this->params['useIsoCode'];
         }
+        // shopId null => the project's shop (SHOP_ID global, PRESTAFLOW_SHOP_ID).
+        if (array_key_exists('shopId', $this->params) && ($this->params['shopId'] === null || $this->params['shopId'] === '')) {
+            $this->params['shopId'] = self::shopIdFromGlobals($this->globals);
+        }
 
         $locale = $this->globals['LOCALE'] ?? $testSuite->getLocale();
 
@@ -73,6 +77,14 @@ class Scenario
         );
     }
 
+    /** SHOP_ID global (PRESTAFLOW_SHOP_ID), 1 when unset or invalid. */
+    public static function shopIdFromGlobals(array $globals): int
+    {
+        $shopId = $globals['SHOP_ID'] ?? null;
+
+        return is_numeric($shopId) && (int) $shopId > 0 ? (int) $shopId : 1;
+    }
+
     /** carrierId param as given by a suite (null, int or numeric string) => ?int. */
     public static function carrierIdParam(mixed $value): ?int
     {
@@ -112,7 +124,7 @@ class Scenario
         // global one, so setting shop 1 and testing shop 2 silently walks the
         // wrong tunnel — the exact failure this precondition exists to prevent,
         // one level up. Scenarios carry a shopId param; the argument overrides.
-        $shopId ??= (int) ($this->params['shopId'] ?? 1);
+        $shopId ??= (int) ($this->params['shopId'] ?? self::shopIdFromGlobals($this->globals));
 
         // Before 9.2 there is no ps_onepagecheckout module, so no setting could
         // have moved the shop off the four-page tunnel. Nothing to do, and the
