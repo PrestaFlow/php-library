@@ -1273,11 +1273,13 @@ class CommonPage
         $page = $this->getPage();
 
         if ($textContent !== null && $textContent !== '') {
-            $element = $page->dom()->querySelector($selector);
-            if ($element !== null) {
-                // Clear the input value
-                $element->setAttributeValue('value', '');
-            }
+            // Clear the live value, not only the attribute: typing used to be
+            // appended to what the field held, so a quantity field showing 1
+            // became 11 once 1 was typed (Classic's product page).
+            $page->evaluate(sprintf(
+                '(function(){var e=document.querySelector(%s);if(e){e.value="";e.setAttribute("value","");}})()',
+                json_encode($selector)
+            ));
         }
 
         // Alternatively, you can use the keyboard to delete the text
