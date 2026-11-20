@@ -139,10 +139,11 @@ class Page extends BasePage
             );
         }
 
-        $postcode = $address['postcode'] ?? null;
-        if ($postcode === null || $postcode === '') {
-            $postcode = self::postcodeFor($this->pfSelectedCountryIso($this->getSelector('addressCountrySelect')));
-        }
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
 
         $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
 

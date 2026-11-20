@@ -30,6 +30,11 @@ namespace PrestaFlow\Tests\Browser\ShopAgnosticFixtures {
         {
             return $this->pfSelectedCountryIso($selector);
         }
+
+        public function postcode(?string $given): string
+        {
+            return $this->pfPostcodeForForm($given, '#c', '#z');
+        }
     }
 
     class Checkout extends CheckoutPage
@@ -52,6 +57,7 @@ namespace PrestaFlow\Tests\Browser {
 
     use HeadlessChromium\BrowserFactory;
     use PHPUnit\Framework\TestCase;
+    use PrestaFlow\Library\Exceptions\SkipTestException;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Checkout;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Listing;
     use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Product;
@@ -171,6 +177,26 @@ namespace PrestaFlow\Tests\Browser {
 
             $checkout->state('#s', 'Alaska');
             $this->assertSame('13', self::$page->evaluate('document.getElementById("s").value')->getReturnValue());
+        }
+
+        public function test_postcode_follows_the_preselected_country(): void
+        {
+            $this->load('<select id="c"><option value="8" selected>France</option></select><input id="z" required>');
+            $this->assertSame('75002', (new Checkout())->postcode(null));
+            $this->assertSame('99999', (new Checkout())->postcode('99999'));
+
+            // 244: a country added after the install, format unknown.
+            $this->load('<select id="c"><option value="244" selected>Elsewhere</option></select><input id="z">');
+            $this->assertSame('', (new Checkout())->postcode(null));
+
+            $this->load('<select id="c"><option value="244" selected>Elsewhere</option></select><input id="z" required>');
+            try {
+                (new Checkout())->postcode(null);
+                $this->fail('A required postcode of an unknown format must skip');
+            } catch (SkipTestException $e) {
+                $this->assertStringContainsString('addressPostcode', $e->getMessage());
+                $this->assertTrue($e->skipRemaining);
+            }
         }
     }
 }

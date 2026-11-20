@@ -133,10 +133,11 @@ class Page extends BasePage
             $this->waitForStable(3000);
         }
 
-        $postcode = $address['postcode'] ?? null;
-        if ($postcode === null || $postcode === '') {
-            $postcode = self::postcodeFor($this->pfSelectedCountryIso($this->getSelector('addressCountrySelect')));
-        }
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
 
         $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
         $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');

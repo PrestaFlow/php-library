@@ -29,10 +29,11 @@ final class AddressDefaultsTest extends TestCase
         $this->assertSame('SW1A 1AA', FrontOfficePage::postcodeFor('GB'));
     }
 
-    public function test_unknown_country_gets_five_digits(): void
+    public function test_unknown_country_has_no_postcode(): void
     {
-        $this->assertSame('75002', FrontOfficePage::postcodeFor(null));
-        $this->assertSame('75002', FrontOfficePage::postcodeFor('ZZ'));
+        // The form then skips with a reason when the postcode is required.
+        $this->assertNull(FrontOfficePage::postcodeFor(null));
+        $this->assertNull(FrontOfficePage::postcodeFor('ZZ'));
         $this->assertSame('1000', FrontOfficePage::postcodeFor('be'));
     }
 

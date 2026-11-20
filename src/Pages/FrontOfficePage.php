@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages;
 use Exception;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Page as DomPage;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Translations;
@@ -638,10 +639,43 @@ class FrontOfficePage extends CommonPage
         'NL' => '1012 AB', 'PT' => '1000-001', 'LU' => '1009', 'PL' => '00-001',
     ];
 
-    /** Valid postcode for an ISO country code; five digits for an unknown one. */
-    public static function postcodeFor(?string $iso): string
+    /** Valid postcode for an ISO country code; null for a country not in POSTCODES. */
+    public static function postcodeFor(?string $iso): ?string
     {
-        return self::POSTCODES[strtoupper((string) $iso)] ?? '75002';
+        return self::POSTCODES[strtoupper((string) $iso)] ?? null;
+    }
+
+    /**
+     * The postcode to type in an address form: $given when set, else one
+     * valid for the country the form shows. A country we know no format for
+     * skips the test (and the suite) when the form requires a postcode,
+     * rather than typing one the shop would refuse.
+     */
+    protected function pfPostcodeForForm(?string $given, string $countrySelector, string $postcodeSelector): string
+    {
+        if ($given !== null && $given !== '') {
+            return $given;
+        }
+
+        $postcode = self::postcodeFor($this->pfSelectedCountryIso($countrySelector));
+        if ($postcode !== null) {
+            return $postcode;
+        }
+
+        $required = $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);return !!e&&(e.required||e.hasAttribute("required"));})()',
+            json_encode($postcodeSelector)
+        ))->getReturnValue();
+
+        if ($required === true) {
+            throw new SkipTestException(
+                'No known postcode format for the country this shop preselects: set the addressPostcode param'
+                . ' (or addressCountry to a country such as France).',
+                skipRemaining: true
+            );
+        }
+
+        return '';
     }
 
     /** ISO code of an install country id, null for a country added later. */
