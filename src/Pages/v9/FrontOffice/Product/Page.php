@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Product;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
@@ -56,7 +57,8 @@ class Page extends BasePage
     /**
      * Open $productUrl (a path or an absolute URL) when given, otherwise the
      * first product of the shop that can be added to the cart (findPurchasable()).
-     * False when nothing was given and nothing qualifies.
+     * When nothing was given and nothing qualifies, skips the test and the
+     * rest of the suite (NO_PURCHASABLE_PRODUCT). Returns true otherwise.
      */
     public function goToPurchasableProduct(?string $productUrl = null): bool
     {
@@ -70,7 +72,11 @@ class Page extends BasePage
         // Navigating there again would hang: its URL often carries the
         // combination as a fragment (#/1-size-s), and a same-document
         // navigation never fires the load event waited for.
-        return $this->findPurchasable() !== null;
+        if ($this->findPurchasable() === null) {
+            throw new SkipTestException(self::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+        }
+
+        return true;
     }
 
     public function getPrice()

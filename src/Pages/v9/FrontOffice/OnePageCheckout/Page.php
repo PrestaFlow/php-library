@@ -178,8 +178,10 @@ class Page extends BasePage
      * Select $carrierId (fails when it is not offered), else the first
      * carrier, then wait for the payment options the module fetches.
      */
-    public function selectCarrier(?int $carrierId = null): void
+    public function selectCarrier(mixed $carrierId = null): void
     {
+        // As a suite passes it: null, '', an int or a numeric string.
+        $carrierId = self::pfCarrierId($carrierId);
         $this->waitForCarriers();
         if ($carrierId !== null) {
             $selector = $this->getSelector('carrierOptionById', ['carrierId' => $carrierId]);
@@ -193,6 +195,22 @@ class Page extends BasePage
         $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
         );
+    }
+
+    /**
+     * Use the customer's first saved address, or fill $address (see
+     * fillNewAddress()) when there is none: a customer who never ordered
+     * gets the inline form instead of the address cards.
+     */
+    public function selectSavedAddressOrFill(array $address): void
+    {
+        if ($this->hasSavedAddresses()) {
+            $this->selectAddress();
+
+            return;
+        }
+
+        $this->fillNewAddress($address);
     }
 
     /**
@@ -239,12 +257,14 @@ class Page extends BasePage
     }
 
     /**
-     * Select the first payment option whose module is in $modules (offline
-     * ones by default); null when the shop offers none of them.
+     * Select the first payment option whose module is in $modules (a list, a
+     * module name, or null for the offline ones) and answer that module. When
+     * the shop offers none of them, skips the test and the rest of the suite
+     * rather than pay for real.
      */
-    public function selectPayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    public function selectPayment(mixed $modules = self::OFFLINE_PAYMENT_MODULES): ?string
     {
-        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
+        return $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
     }
 
     /**

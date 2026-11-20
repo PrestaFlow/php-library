@@ -93,6 +93,21 @@ class Page extends BasePage
     }
 
     /**
+     * The addresses step whatever the account: confirm its saved address, or
+     * fill and submit $address (see fillNewAddress()) when it has none yet.
+     */
+    public function confirmOrFillAddress(array $address): void
+    {
+        if ($this->hasAddressForm()) {
+            $this->fillNewAddress($address);
+
+            return;
+        }
+
+        $this->confirmAddresses();
+    }
+
+    /**
      * Fill and submit the addresses step's form.
      *
      * 'country' (a label) is only selected when given: the shop's preselected
@@ -172,9 +187,12 @@ class Page extends BasePage
      * (fails when the shop does not offer it here), else the first one.
      * A new method rather than a parameter on chooseShipping(): a project
      * page overriding chooseShipping() keeps a compatible signature.
+     * $carrierId is taken as a suite passes it: null, '', an int or a
+     * numeric string.
      */
-    public function chooseCarrier(?int $carrierId = null): void
+    public function chooseCarrier(mixed $carrierId = null): void
     {
+        $carrierId = self::pfCarrierId($carrierId);
         if ($carrierId !== null) {
             $selector = $this->getSelector('shippingOptionById', ['carrierId' => $carrierId]);
             Expect::that($this->elementIsVisible($selector, 5000))
@@ -188,13 +206,14 @@ class Page extends BasePage
     }
 
     /**
-     * Select the first payment option whose module is in $modules (offline
-     * ones by default). Answers the module chosen, or null when the shop
-     * offers none of them: the caller skips rather than pays for real.
+     * Select the first payment option whose module is in $modules (a list, a
+     * module name, or null for the offline ones) and answer that module. When
+     * the shop offers none of them, skips the test and the rest of the suite
+     * rather than pay for real.
      */
-    public function choosePayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    public function choosePayment(mixed $modules = self::OFFLINE_PAYMENT_MODULES): ?string
     {
-        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
+        return $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
     }
 
     /** Accept the terms and place the order, once a payment option is selected. */

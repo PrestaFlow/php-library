@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Scenarios;
 
 use PrestaFlow\Library\Expects\Expect;
+use PrestaFlow\Library\Pages\FrontOfficePage;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
 use PrestaFlow\Library\Traits\Version;
@@ -14,8 +15,7 @@ class Scenario
     use ImportPage;
 
     /** Skip reason when no product of the shop can be added to the cart. */
-    public const NO_PURCHASABLE_PRODUCT = 'No product of this shop can be added to the cart as it is'
-        . ' (in stock, available for order, no required customization): set the productUrl param.';
+    public const NO_PURCHASABLE_PRODUCT = FrontOfficePage::NO_PURCHASABLE_PRODUCT;
 
     public $globals = [];
     public $params = [];
@@ -70,11 +70,7 @@ class Scenario
     /** Skip reason when the shop offers none of the payment modules a scenario may use. */
     public static function pfNoPaymentMethodReason(array $modules): string
     {
-        return sprintf(
-            'No offline payment method offered by the shop (looked for: %s). Set the paymentModules param'
-            . ' to a payment module that does not redirect to a payment provider.',
-            $modules === [] ? 'none' : implode(', ', $modules)
-        );
+        return FrontOfficePage::pfNoPaymentMethodReason($modules);
     }
 
     /** SHOP_ID global (PRESTAFLOW_SHOP_ID), 1 when unset or invalid. */
@@ -88,11 +84,7 @@ class Scenario
     /** carrierId param as given by a suite (null, int or numeric string) => ?int. */
     public static function pfCarrierIdParam(mixed $value): ?int
     {
-        if ($value === null || $value === '' || !is_numeric($value)) {
-            return null;
-        }
-
-        return (int) $value;
+        return FrontOfficePage::pfCarrierId($value);
     }
 
     /**

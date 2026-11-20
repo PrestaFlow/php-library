@@ -83,6 +83,22 @@ class Page extends BasePage
         return $label;
     }
 
+    /**
+     * Move the order to $statusLabel when given (as the list shows it, in the
+     * employee's language), otherwise to $stateId (as a suite passes it).
+     * Answers the label of the status chosen, to check the result against.
+     */
+    public function changeStatus(mixed $stateId, mixed $statusLabel = null): string
+    {
+        if (is_string($statusLabel) && $statusLabel !== '') {
+            $this->updateStatus($statusLabel);
+
+            return $statusLabel;
+        }
+
+        return $this->updateStatusById((int) $stateId);
+    }
+
     /** Label of a status in the status list, '' when the list has no such id. */
     public function getStatusLabel(int $stateId): string
     {
