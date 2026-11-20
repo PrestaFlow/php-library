@@ -966,33 +966,39 @@ class TestsSuite implements OutputStates
     }
 
     /**
-     * PRESTAFLOW_ONLY_TEST="<titre>" : ne garde que ce test (rejeu d'un test en échec). Un titre
-     * introuvable donne un test en échec, jamais une suite vide qui passerait pour verte.
+     * PRESTAFLOW_ONLY_TEST="<titre>" : ne garde que ce test (rejeu d'un test en échec). Plusieurs titres,
+     * un par ligne, gardent ces tests dans l'ordre de la suite (rejeu des tests en échec d'un run). Un
+     * titre introuvable donne un test en échec, jamais une suite vide qui passerait pour verte.
      *
      * @param  list<array<string, mixed>>  $tests
      * @return list<array<string, mixed>>
      */
     public static function onlyTest(array $tests): array
     {
-        $only = trim((string) Env::get('PRESTAFLOW_ONLY_TEST', ''));
-        if ($only === '') {
+        $only = array_values(array_unique(array_filter(
+            array_map('trim', explode("\n", str_replace("\r", '', (string) Env::get('PRESTAFLOW_ONLY_TEST', '')))),
+            fn (string $title) => $title !== '',
+        )));
+        if ($only === []) {
             return $tests;
         }
-        $kept = array_values(array_filter($tests, fn (array $t) => trim((string) ($t['title'] ?? '')) === $only));
-        if ($kept !== []) {
-            return $kept;
+
+        $kept = array_values(array_filter($tests, fn (array $t) => in_array(trim((string) ($t['title'] ?? '')), $only, true)));
+        $found = array_map(fn (array $t) => trim((string) ($t['title'] ?? '')), $kept);
+        foreach (array_diff($only, $found) as $missing) {
+            $kept[] = [
+                'title' => $missing,
+                'steps' => static function () use ($missing): void {
+                    throw new \RuntimeException(sprintf('Test introuvable dans la suite : « %s ».', $missing));
+                },
+                'datasets' => [],
+                'dataset' => 1,
+                'file' => __FILE__,
+                'line' => __LINE__,
+            ];
         }
 
-        return [[
-            'title' => $only,
-            'steps' => static function () use ($only): void {
-                throw new \RuntimeException(sprintf('Test introuvable dans la suite : « %s ».', $only));
-            },
-            'datasets' => [],
-            'dataset' => 1,
-            'file' => __FILE__,
-            'line' => __LINE__,
-        ]];
+        return $kept;
     }
 
     /**
