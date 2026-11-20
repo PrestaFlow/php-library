@@ -16,6 +16,14 @@ class CheckoutOrder extends Scenario
         // Set these params only to use another account for one suite.
         'customerEmail' => null,
         'customerPassword' => null,
+        // Used only when the account has no address yet (the tunnel then shows
+        // the address form). Same defaults as GuestCheckout.
+        'addressStreet' => '16 Main street',
+        'addressCity' => 'Paris',
+        'addressPostcode' => null,
+        'addressCountry' => null,
+        'addressState' => null,
+        'addressPhone' => '0102030405',
         // null => the first product of the shop that can be added to the cart
         // as it is (Product::findPurchasable()). Set a product path or URL to
         // pin one product.
@@ -78,7 +86,21 @@ class CheckoutOrder extends Scenario
         ->it('go through the checkout tunnel', function () use ($frontOfficeCartPage, $frontOfficeCheckoutPage) {
             $frontOfficeCartPage->goToCart();
             $frontOfficeCartPage->proceedToCheckout();
-            $frontOfficeCheckoutPage->confirmAddresses();
+
+            // An account that never ordered has no address: the step shows
+            // its form instead of the address cards.
+            if ($frontOfficeCheckoutPage->hasAddressForm()) {
+                $frontOfficeCheckoutPage->fillNewAddress([
+                    'street' => $this->getParam('addressStreet'),
+                    'city' => $this->getParam('addressCity'),
+                    'postcode' => $this->getParam('addressPostcode'),
+                    'country' => $this->getParam('addressCountry'),
+                    'state' => $this->getParam('addressState'),
+                    'phone' => $this->getParam('addressPhone'),
+                ]);
+            } else {
+                $frontOfficeCheckoutPage->confirmAddresses();
+            }
 
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
 

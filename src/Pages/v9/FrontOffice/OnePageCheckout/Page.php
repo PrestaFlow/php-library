@@ -33,6 +33,7 @@ class Page extends BasePage
             'addressRadioById' => '#opc-address-delivery-${idAddress}',
             'addressFields' => '#opc-delivery-address-fields',
             'addressCountrySelect' => '#opc-delivery-address-fields select[name="id_country"]',
+            'addressStateSelect' => '#opc-delivery-address-fields select[name="id_state"]',
             'addressFirstNameInput' => '#opc-delivery-address-fields input[name="firstname"]',
             'addressLastNameInput' => '#opc-delivery-address-fields input[name="lastname"]',
             'addressStreetInput' => '#opc-delivery-address-fields input[name="address1"]',
@@ -121,7 +122,11 @@ class Page extends BasePage
      * there is no save button to click — the carrier list appearing is the signal
      * that the address was persisted.
      *
-     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:string,city?:string,country?:string,phone?:string} $address
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:?string,city?:string,country?:?string,state?:?string,phone?:string} $address
      */
     public function fillNewAddress(array $address): void
     {
@@ -134,11 +139,18 @@ class Page extends BasePage
             );
         }
 
+        $postcode = $address['postcode'] ?? null;
+        if ($postcode === null || $postcode === '') {
+            $postcode = self::postcodeFor($this->selectedCountryIso($this->getSelector('addressCountrySelect')));
+        }
+
+        $this->fillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
+
         foreach ([
             'addressFirstNameInput' => $address['firstName'] ?? '',
             'addressLastNameInput' => $address['lastName'] ?? '',
             'addressStreetInput' => $address['street'] ?? '',
-            'addressPostcodeInput' => $address['postcode'] ?? '',
+            'addressPostcodeInput' => $postcode,
             'addressCityInput' => $address['city'] ?? '',
             'addressPhoneInput' => $address['phone'] ?? '',
         ] as $selectorKey => $value) {

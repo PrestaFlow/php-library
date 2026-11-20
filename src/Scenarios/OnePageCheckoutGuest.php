@@ -24,8 +24,13 @@ class OnePageCheckoutGuest extends Scenario
         'lastName' => 'Guest',
         'addressStreet' => '16 Main street',
         'addressCity' => 'Paris',
-        'addressPostcode' => '75002',
-        'addressCountry' => 'France',
+        // null => a postcode valid for the country the form shows.
+        'addressPostcode' => null,
+        // null => keep the country the shop preselects; a label (as listed in
+        // the form, in the shop's language) selects that one.
+        'addressCountry' => null,
+        // null => the first state when the country requires one; or a label.
+        'addressState' => null,
         'addressPhone' => '0102030405',
         // null => the first product of the shop that can be added to the cart
         // as it is (Product::findPurchasable()). Set a product path or URL to
@@ -121,6 +126,7 @@ class OnePageCheckoutGuest extends Scenario
                 'postcode' => $this->getParam('addressPostcode'),
                 'city' => $this->getParam('addressCity'),
                 'country' => $this->getParam('addressCountry'),
+                    'state' => $this->getParam('addressState'),
                 'phone' => $this->getParam('addressPhone'),
             ]);
 

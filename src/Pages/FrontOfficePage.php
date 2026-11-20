@@ -457,6 +457,70 @@ class FrontOfficePage extends CommonPage
     }
 
     /**
+     * id_country => ISO code of the countries a PrestaShop install creates
+     * with fixed ids (same ids from 1.7 to 9). Lets a test know which country
+     * a form preselected without reading its translated name.
+     */
+    public const INSTALL_COUNTRY_IDS = [
+        1 => 'DE', 2 => 'AT', 3 => 'BE', 4 => 'CA', 6 => 'ES', 8 => 'FR', 10 => 'IT',
+        12 => 'LU', 13 => 'NL', 14 => 'PL', 15 => 'PT', 17 => 'GB', 19 => 'CH', 21 => 'US',
+    ];
+
+    /** A postcode each country's zip_code_format accepts. */
+    public const POSTCODES = [
+        'FR' => '75002', 'BE' => '1000', 'CH' => '1200', 'DE' => '10115', 'AT' => '1010',
+        'ES' => '28001', 'IT' => '00184', 'GB' => 'SW1A 1AA', 'US' => '10001', 'CA' => 'K1A 0B1',
+        'NL' => '1012 AB', 'PT' => '1000-001', 'LU' => '1009', 'PL' => '00-001',
+    ];
+
+    /** Valid postcode for an ISO country code; five digits for an unknown one. */
+    public static function postcodeFor(?string $iso): string
+    {
+        return self::POSTCODES[strtoupper((string) $iso)] ?? '75002';
+    }
+
+    /** ISO code of an install country id, null for a country added later. */
+    public static function countryIsoFromId(mixed $idCountry): ?string
+    {
+        return is_numeric($idCountry) ? (self::INSTALL_COUNTRY_IDS[(int) $idCountry] ?? null) : null;
+    }
+
+    /** ISO code of the country an address form currently shows, when known. */
+    protected function selectedCountryIso(string $countrySelector): ?string
+    {
+        try {
+            $value = $this->getPage()->evaluate(sprintf(
+                '(function(){var s=document.querySelector(%s);return s?s.value:null;})()',
+                json_encode($countrySelector)
+            ))->getReturnValue();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::countryIsoFromId($value);
+    }
+
+    /**
+     * The state of an address form: $label when given, otherwise, when the
+     * country has states and none is chosen yet, its first real option.
+     */
+    protected function fillState(string $stateSelector, ?string $label = null): void
+    {
+        if ($label !== null && $label !== '') {
+            $this->selectOption($stateSelector, $label);
+
+            return;
+        }
+
+        $this->getPage()->evaluate(sprintf(
+            '(function(){var s=document.querySelector(%s);if(!s||(s.value&&s.value!=="0"))return;'
+            . 'var o=[].slice.call(s.options).find(function(x){return x.value&&x.value!=="0";});'
+            . 'if(!o)return;s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));})()',
+            json_encode($stateSelector)
+        ));
+    }
+
+    /**
      * Offline payment modules a scenario may pay with: no redirection to a
      * payment provider, no card, nothing really charged.
      */

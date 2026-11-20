@@ -33,6 +33,7 @@ class Page extends BasePage
             'addressCityInput' => '#checkout-addresses-step input[name="city"]',
             'addressPostcodeInput' => '#checkout-addresses-step input[name="postcode"]',
             'addressCountrySelect' => '#checkout-addresses-step select[name="id_country"]',
+            'addressStateSelect' => '#checkout-addresses-step select[name="id_state"]',
             'addressPhoneInput' => '#checkout-addresses-step input[name="phone"]',
         ];
     }
@@ -82,11 +83,29 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Whether the addresses step shows the address form, i.e. the customer
+     * has no address yet (a guest, or an account that never ordered).
+     */
+    public function hasAddressForm(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('addressStreetInput'), 3000);
+    }
+
+    /**
+     * Fill and submit the addresses step's form.
+     *
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{street?:string,city?:string,postcode?:?string,country?:?string,state?:?string,phone?:string} $address
+     */
     public function fillNewAddress(array $address): void
     {
-        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
-        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
-        $this->setValue($this->getSelector('addressPostcodeInput'), $address['postcode'] ?? '');
+        // Country first: changing it re-renders the form for that country's
+        // address format (postcode, state).
+        //
         // Only touch the country <select> when it doesn't already show the
         // requested country: a "change" here makes the checkout re-render the
         // address form through an AJAX call, and re-rendering costs a round
@@ -111,7 +130,18 @@ class Page extends BasePage
         // its own, not because it works around a defect.
         if (!empty($address['country']) && !$this->countryAlreadySelected($address['country'])) {
             $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
+            $this->waitForStable(3000);
         }
+
+        $postcode = $address['postcode'] ?? null;
+        if ($postcode === null || $postcode === '') {
+            $postcode = self::postcodeFor($this->selectedCountryIso($this->getSelector('addressCountrySelect')));
+        }
+
+        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
+        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
+        $this->setValue($this->getSelector('addressPostcodeInput'), $postcode);
+        $this->fillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
         $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 
         $this->click($this->getSelector('addressesContinueButton'));

@@ -43,8 +43,13 @@ class OnePageCheckoutOrder extends Scenario
         'lastName' => 'Fixture',
         'addressStreet' => '16 Main street',
         'addressCity' => 'Paris',
-        'addressPostcode' => '75002',
-        'addressCountry' => 'France',
+        // null => a postcode valid for the country the form shows.
+        'addressPostcode' => null,
+        // null => keep the country the shop preselects; a label (as listed in
+        // the form, in the shop's language) selects that one.
+        'addressCountry' => null,
+        // null => the first state when the country requires one; or a label.
+        'addressState' => null,
         'addressPhone' => '0102030405',
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
@@ -134,6 +139,7 @@ class OnePageCheckoutOrder extends Scenario
                     'postcode' => $this->getParam('addressPostcode'),
                     'city' => $this->getParam('addressCity'),
                     'country' => $this->getParam('addressCountry'),
+                    'state' => $this->getParam('addressState'),
                     'phone' => $this->getParam('addressPhone'),
                 ]);
             }
