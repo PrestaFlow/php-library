@@ -7,7 +7,9 @@ use PrestaFlow\Library\Expects\Expect;
 class ManageOrder extends Scenario
 {
     public $params = [
-        'locale' => 'fr',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // Status label as shown in the BackOffice dropdown — the admin employee's
         // language is English on this shop (only the FrontOffice is French).
         'orderStatus' => 'Payment accepted',
@@ -20,7 +22,9 @@ class ManageOrder extends Scenario
 
     public function steps($testSuite)
     {
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\Orders');
