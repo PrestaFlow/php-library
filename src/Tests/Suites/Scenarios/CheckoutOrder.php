@@ -10,7 +10,6 @@ class CheckoutOrder extends TestsSuite
     {
         $this
         ->describe('Log in, add to cart, checkout, and verify the order in the BackOffice')
-        // French demo shop: friendly URLs in French.
-        ->scenario(\PrestaFlow\Library\Scenarios\CheckoutOrder::class, ['locale' => 'fr']);
+        ->scenario(\PrestaFlow\Library\Scenarios\CheckoutOrder::class);
     }
 }
