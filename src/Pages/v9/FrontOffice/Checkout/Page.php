@@ -2,12 +2,14 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Checkout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -15,6 +17,7 @@ class Page extends BasePage
             // Best-effort PS 9 checkout tunnel (order controller) — corrected live.
             'addressesContinueButton' => '#checkout-addresses-step button[name="confirm-addresses"]',
             'shippingOption' => '#checkout-delivery-step input[name^="delivery_option"]',
+            'shippingOptionById' => '#checkout-delivery-step input[name^="delivery_option"][id="delivery_option_${carrierId}"]',
             'shippingContinueButton' => '#checkout-delivery-step button[name="confirmDeliveryOption"]',
             'paymentOption' => 'input[name="payment-option"]',
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
@@ -30,6 +33,7 @@ class Page extends BasePage
             'addressCityInput' => '#checkout-addresses-step input[name="city"]',
             'addressPostcodeInput' => '#checkout-addresses-step input[name="postcode"]',
             'addressCountrySelect' => '#checkout-addresses-step select[name="id_country"]',
+            'addressStateSelect' => '#checkout-addresses-step select[name="id_state"]',
             'addressPhoneInput' => '#checkout-addresses-step input[name="phone"]',
         ];
     }
@@ -79,11 +83,29 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Whether the addresses step shows the address form, i.e. the customer
+     * has no address yet (a guest, or an account that never ordered).
+     */
+    public function hasAddressForm(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('addressStreetInput'), 3000);
+    }
+
+    /**
+     * Fill and submit the addresses step's form.
+     *
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{street?:string,city?:string,postcode?:?string,country?:?string,state?:?string,phone?:string} $address
+     */
     public function fillNewAddress(array $address): void
     {
-        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
-        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
-        $this->setValue($this->getSelector('addressPostcodeInput'), $address['postcode'] ?? '');
+        // Country first: changing it re-renders the form for that country's
+        // address format (postcode, state).
+        //
         // Only touch the country <select> when it doesn't already show the
         // requested country: a "change" here makes the checkout re-render the
         // address form through an AJAX call, and re-rendering costs a round
@@ -108,7 +130,19 @@ class Page extends BasePage
         // its own, not because it works around a defect.
         if (!empty($address['country']) && !$this->countryAlreadySelected($address['country'])) {
             $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
+            $this->waitForStable(3000);
         }
+
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
+
+        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
+        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
+        $this->setValue($this->getSelector('addressPostcodeInput'), $postcode);
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
         $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 
         $this->click($this->getSelector('addressesContinueButton'));
@@ -127,13 +161,55 @@ class Page extends BasePage
         ))->getReturnValue() === true;
     }
 
+    /** Pick the first carrier and confirm the delivery step. */
     public function chooseShipping(): void
     {
-        $this->click($this->getSelector('shippingOption'));
+        $this->chooseCarrier();
+    }
+
+    /**
+     * Pick a carrier and confirm the delivery step: $carrierId when given
+     * (fails when the shop does not offer it here), else the first one.
+     * A new method rather than a parameter on chooseShipping(): a project
+     * page overriding chooseShipping() keeps a compatible signature.
+     */
+    public function chooseCarrier(?int $carrierId = null): void
+    {
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('shippingOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('shippingOption'));
+        }
         $this->click($this->getSelector('shippingContinueButton'));
         $this->waitForPageReload();
     }
 
+    /**
+     * Select the first payment option whose module is in $modules (offline
+     * ones by default). Answers the module chosen, or null when the shop
+     * offers none of them: the caller skips rather than pays for real.
+     */
+    public function choosePayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
+    }
+
+    /** Accept the terms and place the order, once a payment option is selected. */
+    public function acceptTermsAndPlaceOrder(): void
+    {
+        $this->click($this->getSelector('termsCheckbox'));
+        $this->click($this->getSelector('placeOrderButton'));
+        $this->waitForPageReload();
+    }
+
+    /**
+     * Select the FIRST payment option, whatever it is, and place the order.
+     * Prefer choosePayment() + acceptTermsAndPlaceOrder(): the first option may be a
+     * real payment provider.
+     */
     public function choosePaymentAndConfirm(): void
     {
         $this->click($this->getSelector('paymentOption'));

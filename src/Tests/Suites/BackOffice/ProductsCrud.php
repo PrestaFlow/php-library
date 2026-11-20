@@ -14,7 +14,8 @@ class ProductsCrud extends TestsSuite
 
         extract($this->pages);
 
-        $productName = 'PrestaFlow Test Product';
+        // Unique per run: products earlier runs left behind would match the filter.
+        $productName = 'PrestaFlow Test Product ' . \PrestaFlow\Library\Scenarios\Scenario::pfUniqueSuffix();
 
         $this
         ->describe('Create, find and delete a product from the BackOffice')

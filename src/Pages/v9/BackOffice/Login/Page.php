@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\BackOffice\Login;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\BackOffice\Page as BasePage;
 
 class Page extends BasePage
@@ -72,6 +73,13 @@ class Page extends BasePage
         }
         if ($password === null) {
             $password = $this->getGlobal('BO_PASSWD');
+        }
+        if ((string) $email === '' || (string) $password === '') {
+            throw new SkipTestException(
+                'No back-office account configured: set PRESTAFLOW_BO_EMAIL and PRESTAFLOW_BO_PASSWD'
+                . ' (the project\'s back-office credentials).',
+                skipRemaining: true
+            );
         }
 
         $this->setValue($this->getSelector('emailInput'), $email);

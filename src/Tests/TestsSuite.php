@@ -13,6 +13,7 @@ use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\FailedRequests;
@@ -86,6 +87,9 @@ class TestsSuite implements OutputStates
     protected $datasets = [];
 
     protected array $store = [];
+
+    /** Set by a SkipTestException thrown with $skipRemaining: the later tests are skipped with it. */
+    protected $skipRemainingReason = null;
 
     protected $scenarioName = '';
     protected $scenarioParams = [];
@@ -366,6 +370,15 @@ class TestsSuite implements OutputStates
         return $this;
     }
 
+    /**
+     * Skip the running test with a reason, from inside an it() closure.
+     * $skipRemaining skips the rest of the suite with the same reason.
+     */
+    public function skipWithReason(string $reason, bool $skipRemaining = false): never
+    {
+        throw new SkipTestException($reason, $skipRemaining);
+    }
+
     public function skip(string $description, Closure $steps)
     {
         $reflection = new \ReflectionFunction($steps);
@@ -639,6 +652,16 @@ class TestsSuite implements OutputStates
         return $browser;
     }
 
+    /**
+     * Whether this process already holds a browser. Lets a page decide to read
+     * something from the shop only when a run is actually driving one (never
+     * from a unit test, never by launching Chrome as a side effect).
+     */
+    public static function pfHasBrowser(): bool
+    {
+        return self::$browserInstance !== null;
+    }
+
     public static function getPage()
     {
         // L'énumération des targets (getPages) peut floter au démarrage à froid,
@@ -678,6 +701,10 @@ class TestsSuite implements OutputStates
     {
         $this->suite = get_class($this);
         $this->start_time = hrtime(true);
+
+        // Each suite reads the shop's URLs afresh: the app runs many suites,
+        // possibly against several shops, in one process.
+        \PrestaFlow\Library\Pages\FrontOfficePage::pfClearShopUrls();
 
         if (!$this->isVersionSupported()) {
             throw new Error('This version of PrestaShop is not supported by PrestaFlow.');
@@ -1284,14 +1311,20 @@ class TestsSuite implements OutputStates
             'PREFIX_LOCALE' => (bool) Env::get('PRESTAFLOW_PREFIX_LOCALE', false),
             'BO' => [
                 'URL' => $backOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_BO_EMAIL', 'demo@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_BO_PASSWD', 'Correct Horse Battery Staple'),
+                // No default account: a run against the user's shop must not
+                // silently try PrestaShop's demo credentials. Login pages skip
+                // with a clear reason when these are empty.
+                'EMAIL' => (string) Env::get('PRESTAFLOW_BO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_BO_PASSWD', ''),
             ],
             'FO' => [
                 'URL' => $frontOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_FO_EMAIL', 'pub@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_FO_PASSWD', '123456789'),
+                'EMAIL' => (string) Env::get('PRESTAFLOW_FO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_FO_PASSWD', ''),
             ],
+            // Shop the back-office settings of the scenarios are written for
+            // (multistore). 1 is the shop every install starts with.
+            'SHOP_ID' => max(1, (int) Env::get('PRESTAFLOW_SHOP_ID', 1)),
             'DEBUG' => (bool) Env::get('PRESTAFLOW_DEBUG', false),
             'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),
             'BROWSER' => [
@@ -1377,6 +1410,7 @@ class TestsSuite implements OutputStates
                 }
             }
             $this->tests = self::onlyTest($tests);
+            $this->skipRemainingReason = null;
             $recorder = ScreenRecorder::current();
 
             foreach ($this->tests as $testIndex => &$test) {
@@ -1389,7 +1423,11 @@ class TestsSuite implements OutputStates
 
                     $this->getInstructions($test);
 
-                    if ($this->isSkippable($test) === true) {
+                    if ($this->skipRemainingReason !== null) {
+                        $test['state'] = 'skip';
+                        $this->stats['skips']++;
+                        Expect::$expectMessage['skip'][] = $this->skipRemainingReason;
+                    } else if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
                     } else if ($this->isSkippableCauseFailed($test) === true) {
@@ -1418,6 +1456,16 @@ class TestsSuite implements OutputStates
 
                         $test['state'] = 'pass';
                         $this->stats['passes']++;
+                    }
+                } catch (SkipTestException $e) {
+                    // The shop lacks what the test needs: a skip with its reason,
+                    // not a failure, and never a reason to skip as if it failed.
+                    $test['state'] = 'skip';
+                    $this->stats['skips']++;
+                    $this->stats['assertions'] += Expect::getNbAssertions();
+                    Expect::$expectMessage['skip'][] = $e->getMessage();
+                    if ($e->skipRemaining) {
+                        $this->skipRemainingReason = $e->getMessage();
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';

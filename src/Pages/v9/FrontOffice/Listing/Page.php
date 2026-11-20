@@ -44,22 +44,70 @@ class Page extends BasePage
         return $this->getTitle();
     }
 
-    /**
-     * Click the nth product miniature and wait for the product page.
-     *
-     * Returns whether the click found its target: navigateTo() answers false on
-     * a selector that matched nothing, and swallowing that answer here is how a
-     * missing link turned into a failure three steps later, on the product page.
-     */
-    public function goToProduct(int $index = 1)
+    /** Number of product miniatures in the listing. */
+    public function countProducts(): int
     {
-        $clicked = $this->navigateTo($this->selector('productArticleLink', ['index' => $index]));
+        return count($this->readProductMiniatures('#js-product-list'));
+    }
 
-        // waitForNavigation() waits on a navigation started by navigate(); this
-        // one is started by a click, so it needs waitForPageReload().
-        $this->waitForPageReload();
+    /** Name shown on the nth miniature (1-based), null when there is none. */
+    public function getProductName(int $index = 1): ?string
+    {
+        return $this->readProductMiniatures('#js-product-list')[$index - 1]['name'] ?? null;
+    }
 
-        return $clicked;
+    /** Product page URL of the nth miniature (1-based), null when there is none. */
+    public function getProductUrl(int $index = 1): ?string
+    {
+        return $this->readProductMiniatures('#js-product-list')[$index - 1]['url'] ?? null;
+    }
+
+    /**
+     * Open a category found on the shop (main menu, else sitemap) that lists
+     * products, for callers that must not assume a category id. Tries the
+     * categories in turn; false when none lists a product.
+     */
+    public function goToDiscoveredCategory(): bool
+    {
+        foreach ($this->discoverListingUrls(allProducts: false) as $url) {
+            try {
+                $this->goToUrlInPlace($url);
+                $this->waitForPageLoaded();
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if ($this->countProducts() > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * From this listing, open the first product a buyer can add to the cart
+     * as it is (in stock, available for order, no required customization).
+     * Answers its miniature (['name' => ..., 'url' => ...]) and leaves the
+     * browser on its page; null when none of the first $maxProducts does.
+     */
+    public function openPurchasableProduct(int $maxProducts = 10): ?array
+    {
+        $seen = [];
+
+        return $this->pfOpenFirstPurchasable($maxProducts, $seen, '.add-to-cart, .product__add-to-cart-button');
+    }
+
+    /** Whether the wishlist module (blockwishlist) shows its buttons on this listing. */
+    public function hasWishlistButtons(): bool
+    {
+        try {
+            return $this->getPage()->evaluate(
+                '!!document.querySelector(".wishlist-button-add, .wishlist-button, [class*=\\"wishlist\\"]")'
+            )->getReturnValue() === true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function addToWishList($index)

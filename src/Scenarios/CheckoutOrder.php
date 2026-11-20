@@ -16,17 +16,29 @@ class CheckoutOrder extends Scenario
         // Set these params only to use another account for one suite.
         'customerEmail' => null,
         'customerPassword' => null,
-        // A canonical product path. An id would work too — PrestaShop
-        // canonicalises on the id and ignores the slug (/1-anything redirects to
-        // the real URL), and goToPage('product', $id) now substitutes the
-        // {index} placeholder for scalar params. The path is kept because it
-        // pins this exact product *and* combination (id_product 1,
-        // id_product_attribute 1), which an id alone cannot express.
-        'productUrl' => '1-1-hummingbird-printed-t-shirt.html',
+        // Used only when the account has no address yet (the tunnel then shows
+        // the address form). Same defaults as GuestCheckout.
+        'addressStreet' => '16 Main street',
+        'addressCity' => 'Paris',
+        'addressPostcode' => null,
+        'addressCountry' => null,
+        'addressState' => null,
+        'addressPhone' => '0102030405',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
+        // null => the first carrier offered; an id_carrier picks that one.
+        'carrierId' => null,
+        // The first payment option of these modules is used. Offline ones by
+        // default: no redirection to a payment provider, nothing charged. When
+        // the shop offers none of them the order steps are skipped.
+        'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)
@@ -64,7 +76,9 @@ class CheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -73,15 +87,33 @@ class CheckoutOrder extends Scenario
         ->it('go through the checkout tunnel', function () use ($frontOfficeCartPage, $frontOfficeCheckoutPage) {
             $frontOfficeCartPage->goToCart();
             $frontOfficeCartPage->proceedToCheckout();
-            $frontOfficeCheckoutPage->confirmAddresses();
+
+            // An account that never ordered has no address: the step shows
+            // its form instead of the address cards.
+            if ($frontOfficeCheckoutPage->hasAddressForm()) {
+                $frontOfficeCheckoutPage->fillNewAddress([
+                    'street' => $this->getParam('addressStreet'),
+                    'city' => $this->getParam('addressCity'),
+                    'postcode' => $this->getParam('addressPostcode'),
+                    'country' => $this->getParam('addressCountry'),
+                    'state' => $this->getParam('addressState'),
+                    'phone' => $this->getParam('addressPhone'),
+                ]);
+            } else {
+                $frontOfficeCheckoutPage->confirmAddresses();
+            }
 
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
 
-            $frontOfficeCheckoutPage->chooseShipping();
+            $frontOfficeCheckoutPage->chooseCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
-            $frontOfficeCheckoutPage->choosePaymentAndConfirm();
+            $paymentModules = (array) $this->getParam('paymentModules');
+            if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
+            }
+            $frontOfficeCheckoutPage->acceptTermsAndPlaceOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {
             Expect::that($frontOfficeOrderConfirmationPage->isConfirmed())->equals(true);

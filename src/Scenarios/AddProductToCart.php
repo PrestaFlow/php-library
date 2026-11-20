@@ -4,38 +4,94 @@ namespace PrestaFlow\Library\Scenarios;
 
 use PrestaFlow\Library\Expects\Expect;
 
+/**
+ * Open a category, open one of its products, add it to the cart.
+ *
+ * Nothing here depends on the demo catalogue or the shop's language: the
+ * category is found on the shop, and the product page is checked against the
+ * name its miniature showed, not against a fixed label.
+ */
 class AddProductToCart extends Scenario
 {
     public $params = [
-        'categoryId' => 3,
-        'categoryTitle' => 'Vêtements',
-        'productIndex' => 1,
-        'productTitle' => 'T-shirt imprimé colibri',
+        // null => the suite's locale (the project's language in the app).
+        'locale' => null,
+        // null => the first category of the main menu (else the sitemap's)
+        // that lists products.
+        'categoryId' => null,
+        // Optional: checked against the listing title when given.
+        'categoryTitle' => null,
+        // null => the first product of the category that can be added to the
+        // cart as it is; a position (1-based) opens that miniature instead.
+        'productIndex' => null,
+        // Optional: checked against the product page title when given.
+        'productTitle' => null,
         'cartQuantity' => 1,
     ];
 
     public function steps($testSuite)
     {
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
+
         $testSuite->importPage('FrontOffice\Category');
         $testSuite->importPage('FrontOffice\Product');
+        $testSuite->importPage('FrontOffice\Cart');
 
         extract($testSuite->pages);
 
         $testSuite
         ->it('go to category page', function () use ($frontOfficeCategoryPage) {
-            $frontOfficeCategoryPage->goToPage('category', (int) $this->getParam('categoryId'));
+            $categoryId = $this->getParam('categoryId');
+            if ($categoryId !== null && $categoryId !== '') {
+                $frontOfficeCategoryPage->goToPage('category', (int) $categoryId);
+            } elseif (!$frontOfficeCategoryPage->goToDiscoveredCategory()) {
+                $this->skipWithReason('No category of this shop lists products: set the categoryId param.', skipRemaining: true);
+            }
 
-            Expect::that($frontOfficeCategoryPage->getListingTitle())->contains($this->getParam('categoryTitle'));
+            $title = $frontOfficeCategoryPage->getListingTitle();
+
+            Expect::that($title)->isNotEmpty();
+            if (is_string($this->getParam('categoryTitle')) && $this->getParam('categoryTitle') !== '') {
+                Expect::that($title)->contains($this->getParam('categoryTitle'));
+            }
+            Expect::that($frontOfficeCategoryPage->countProducts() > 0)->equals(true);
         })
         ->it('go to product page', function () use ($frontOfficeCategoryPage, $frontOfficeProductPage) {
-            $frontOfficeCategoryPage->goToProduct((int) $this->getParam('productIndex'));
+            $index = $this->getParam('productIndex');
+            if ($index !== null && $index !== '') {
+                // Read before the click: the product page must be the one the
+                // miniature advertised.
+                $name = (string) $frontOfficeCategoryPage->getProductName((int) $index);
+                $frontOfficeCategoryPage->goToProduct((int) $index);
+            } else {
+                $found = $frontOfficeCategoryPage->openPurchasableProduct();
+                if ($found === null) {
+                    $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+                }
+                $name = $found['name'];
+            }
 
-            Expect::that($frontOfficeProductPage->getTitle())->contains($this->getParam('productTitle'));
+            // Miniature titles may be truncated ("..."), and the product
+            // heading may be upper-cased by the theme's CSS.
+            $name = mb_strtolower(trim(rtrim(trim($name), '.…')));
+            $title = mb_strtolower((string) $frontOfficeProductPage->getTitle());
+
+            Expect::that($name)->isNotEmpty();
+            Expect::that($title)->contains($name);
+            if (is_string($this->getParam('productTitle')) && $this->getParam('productTitle') !== '') {
+                Expect::that($title)->contains(mb_strtolower($this->getParam('productTitle')));
+            }
         })
-        ->it('add to cart', function () use ($frontOfficeProductPage) {
-            $textResult = $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
+        ->it('add to cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
+            $modalTitle = $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
-            Expect::that($textResult)->contains($frontOfficeProductPage->message('addedToCart'));
+            Expect::that($modalTitle)->isNotEmpty();
+
+            $frontOfficeCartPage->goToCart();
+
+            Expect::that($frontOfficeCartPage->hasItems())->equals(true);
         });
 
         return $testSuite;

@@ -15,26 +15,39 @@ use PrestaFlow\Library\Expects\Expect;
 class OnePageCheckoutGuest extends Scenario
 {
     public $params = [
-        // The reference shop (ps92rc1 container) runs in English.
         // null => the suite's locale (the project's language in the app). Friendly
         // URLs and their per-language overrides are read in that language.
         'locale' => null,
-        'guestEmail' => 'pf-opc-guest@example.com',
+        // null => a unique address per run (a guest e-mail already used by a
+        // registered customer would be refused).
+        'guestEmail' => null,
         'firstName' => 'PrestaFlow',
         'lastName' => 'Guest',
         'addressStreet' => '16 Main street',
         'addressCity' => 'Paris',
-        'addressPostcode' => '75002',
-        'addressCountry' => 'France',
+        // null => a postcode valid for the country the form shows.
+        'addressPostcode' => null,
+        // null => keep the country the shop preselects; a label (as listed in
+        // the form, in the shop's language) selects that one.
+        'addressCountry' => null,
+        // null => the first state when the country requires one; or a label.
+        'addressState' => null,
         'addressPhone' => '0102030405',
-        // Canonical product path — friendly URLs can't be rebuilt from an id.
-        // Mug (id 6): no combinations, so add-to-cart works without posting an
-        // id_product_attribute, unlike the demo t-shirt this used to point to.
-        'productUrl' => '6-mug-the-best-is-yet-to-come.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
+        // null => the first carrier offered; an id_carrier picks that one.
+        'carrierId' => null,
+        // The first payment option of these modules is used. Offline ones by
+        // default: no redirection to a payment provider, nothing charged. When
+        // the shop offers none of them the order steps are skipped.
+        'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)
@@ -61,6 +74,8 @@ class OnePageCheckoutGuest extends Scenario
         $testSuite->importPage('FrontOffice\Cart');
         $testSuite->importPage('FrontOffice\OnePageCheckout');
         $testSuite->importPage('FrontOffice\OrderConfirmation');
+
+        $this->params['guestEmail'] = ($this->params['guestEmail'] ?? null) ?: self::pfUniqueEmail('pf-opc-guest');
 
         extract($testSuite->pages);
 
@@ -93,7 +108,9 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -113,6 +130,7 @@ class OnePageCheckoutGuest extends Scenario
                 'postcode' => $this->getParam('addressPostcode'),
                 'city' => $this->getParam('addressCity'),
                 'country' => $this->getParam('addressCountry'),
+                    'state' => $this->getParam('addressState'),
                 'phone' => $this->getParam('addressPhone'),
             ]);
 
@@ -123,8 +141,11 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
         })
         ->it('choose shipping and payment, then place the order', function () use ($frontOfficeOnePageCheckoutPage) {
-            $frontOfficeOnePageCheckoutPage->selectFirstCarrier();
-            $frontOfficeOnePageCheckoutPage->selectFirstPayment();
+            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
+            $paymentModules = (array) $this->getParam('paymentModules');
+            if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
+                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
+            }
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 
             Expect::that($frontOfficeOnePageCheckoutPage->isReadyToPlaceOrder())->equals(true);

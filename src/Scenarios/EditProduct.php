@@ -7,7 +7,9 @@ use PrestaFlow\Library\Expects\Expect;
 class EditProduct extends Scenario
 {
     public $params = [
-        'productName' => 'PF Edit Test',
+        // null => 'PF Edit Test <unique suffix>': a fixed name would match the
+        // products earlier runs left behind when filtering the list.
+        'productName' => null,
         'initialPrice' => 9.99,
         'newPrice' => 19.99,
         'quantity' => 10,
@@ -17,6 +19,8 @@ class EditProduct extends Scenario
     {
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\Products');
+
+        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PF Edit Test ' . self::pfUniqueSuffix();
 
         extract($testSuite->pages);
 
@@ -47,7 +51,8 @@ class EditProduct extends Scenario
 
             $backOfficeProductsPage->updatePrice((float) $this->getParam('newPrice'));
 
-            Expect::that($backOfficeProductsPage->getFormPrice())->contains((string) $this->getParam('newPrice'));
+            // Numeric: the field may read "19.990000" or "19,99".
+            Expect::that($backOfficeProductsPage->getFormPriceValue())->equals(round((float) $this->getParam('newPrice'), 2));
         })
         ->it('delete the product from the BackOffice', function () use ($backOfficeProductsPage) {
             $backOfficeProductsPage->goTo();

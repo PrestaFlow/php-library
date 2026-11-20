@@ -6,7 +6,9 @@ use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as BasePage;
 
 class Page extends BasePage
 {
-    // PS9: page renamed from "Prices drop" to "Promotions"; URL slug changed accordingly.
     public string $pageTitle = 'Promotions';
+    // Kept as it always was: the app writes a project's URL overrides under
+    // this alias. The shop's own URL (prestashop.urls.pages) is used first.
     public string $url = 'promotions';
+    public $shopPage = 'prices-drop';
 }

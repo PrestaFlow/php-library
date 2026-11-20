@@ -13,6 +13,10 @@ class Scenario
     use Version;
     use ImportPage;
 
+    /** Skip reason when no product of the shop can be added to the cart. */
+    public const NO_PURCHASABLE_PRODUCT = 'No product of this shop can be added to the cart as it is'
+        . ' (in stock, available for order, no required customization): set the productUrl param.';
+
     public $globals = [];
     public $params = [];
     public $pages = [];
@@ -28,6 +32,10 @@ class Scenario
         if (isset($this->params['useIsoCode'])) {
             $this->globals['PREFIX_LOCALE'] = (bool) $this->params['useIsoCode'];
         }
+        // shopId null => the project's shop (SHOP_ID global, PRESTAFLOW_SHOP_ID).
+        if (array_key_exists('shopId', $this->params) && ($this->params['shopId'] === null || $this->params['shopId'] === '')) {
+            $this->params['shopId'] = self::pfShopIdFromGlobals($this->globals);
+        }
 
         $locale = $this->globals['LOCALE'] ?? $testSuite->getLocale();
 
@@ -42,6 +50,49 @@ class Scenario
     public function steps($testSuite)
     {
         return $this;
+    }
+
+    /**
+     * A token unique to this run: data a scenario creates on the shop (an
+     * e-mail, a product name) must not collide with what a previous run left.
+     */
+    public static function pfUniqueSuffix(): string
+    {
+        return date('Ymd-His') . '-' . bin2hex(random_bytes(3));
+    }
+
+    /** A per-run e-mail address; the shop rejects a duplicate customer e-mail. */
+    public static function pfUniqueEmail(string $prefix = 'pf'): string
+    {
+        return sprintf('%s-%s@example.com', $prefix, self::pfUniqueSuffix());
+    }
+
+    /** Skip reason when the shop offers none of the payment modules a scenario may use. */
+    public static function pfNoPaymentMethodReason(array $modules): string
+    {
+        return sprintf(
+            'No offline payment method offered by the shop (looked for: %s). Set the paymentModules param'
+            . ' to a payment module that does not redirect to a payment provider.',
+            $modules === [] ? 'none' : implode(', ', $modules)
+        );
+    }
+
+    /** SHOP_ID global (PRESTAFLOW_SHOP_ID), 1 when unset or invalid. */
+    public static function pfShopIdFromGlobals(array $globals): int
+    {
+        $shopId = $globals['SHOP_ID'] ?? null;
+
+        return is_numeric($shopId) && (int) $shopId > 0 ? (int) $shopId : 1;
+    }
+
+    /** carrierId param as given by a suite (null, int or numeric string) => ?int. */
+    public static function pfCarrierIdParam(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        return (int) $value;
     }
 
     /**
@@ -73,7 +124,7 @@ class Scenario
         // global one, so setting shop 1 and testing shop 2 silently walks the
         // wrong tunnel — the exact failure this precondition exists to prevent,
         // one level up. Scenarios carry a shopId param; the argument overrides.
-        $shopId ??= (int) ($this->params['shopId'] ?? 1);
+        $shopId ??= (int) ($this->params['shopId'] ?? self::pfShopIdFromGlobals($this->globals));
 
         // Before 9.2 there is no ps_onepagecheckout module, so no setting could
         // have moved the shop off the four-page tunnel. Nothing to do, and the

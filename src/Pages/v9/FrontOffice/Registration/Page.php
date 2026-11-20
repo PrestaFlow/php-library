@@ -22,6 +22,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Registration';
     public string $url = 'registration';
+    public $shopPage = 'registration';
 
     public function defineSelectors()
     {

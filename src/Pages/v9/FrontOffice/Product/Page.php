@@ -43,8 +43,34 @@ class Page extends BasePage
      */
     public function goToProductPath(string $path)
     {
+        if (preg_match('#^https?://#i', $path)) {
+            $this->goToUrl($path);
+
+            return;
+        }
+
         $base = rtrim($this->getGlobal('FO_URL'), '/') . '/';
         $this->goToUrl($base . ltrim($path, '/'));
+    }
+
+    /**
+     * Open $productUrl (a path or an absolute URL) when given, otherwise the
+     * first product of the shop that can be added to the cart (findPurchasable()).
+     * False when nothing was given and nothing qualifies.
+     */
+    public function goToPurchasableProduct(?string $productUrl = null): bool
+    {
+        if ($productUrl !== null && $productUrl !== '') {
+            $this->goToProductPath($productUrl);
+
+            return true;
+        }
+
+        // findPurchasable() leaves the browser on the product it found.
+        // Navigating there again would hang: its URL often carries the
+        // combination as a fragment (#/1-size-s), and a same-document
+        // navigation never fires the load event waited for.
+        return $this->findPurchasable() !== null;
     }
 
     public function getPrice()
@@ -107,6 +133,50 @@ class Page extends BasePage
         $grouping = $decimal === '.' ? ',' : '.';
 
         return (float) str_replace($decimal, '.', str_replace($grouping, '', $number));
+    }
+
+    /**
+     * Whether this product page lets a buyer add the product as it is: an
+     * add-to-cart button, enabled (PrestaShop disables it when the product is
+     * out of stock, not available for order, or waits for a required
+     * customization), and no required customization field.
+     */
+    public function isAddableToCart(): bool
+    {
+        return $this->pfIsAddableToCartHere($this->getSelector('addToCartButton'));
+    }
+
+    /**
+     * URL of the first product of the shop a buyer can add to the cart as it
+     * is, so scenarios do not depend on the demo catalogue. Browses the
+     * listings discoverListingUrls() finds (or $listingUrls), opening at most
+     * $maxProducts product pages. Null when none qualifies. Leaves the browser
+     * on the product found.
+     */
+    public function findPurchasable(int $maxProducts = 10, array $listingUrls = []): ?string
+    {
+        if ($listingUrls === []) {
+            $listingUrls = $this->discoverListingUrls();
+        }
+
+        $seen = [];
+        foreach ($listingUrls as $listingUrl) {
+            try {
+                $this->goToUrlInPlace($listingUrl);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $found = $this->pfOpenFirstPurchasable($maxProducts, $seen, $this->getSelector('addToCartButton'));
+            if ($found !== null) {
+                return $found['url'];
+            }
+            if (count($seen) >= $maxProducts) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     public function addToCart(int $quantity = 1)

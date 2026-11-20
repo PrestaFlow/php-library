@@ -7,7 +7,9 @@ use PrestaFlow\Library\Expects\Expect;
 class CreateProductAndVerify extends Scenario
 {
     public $params = [
-        'productName' => 'PrestaFlow Scenario Product',
+        // null => 'PrestaFlow Scenario Product <unique suffix>': a fixed name would match the
+        // products earlier runs left behind when filtering the list.
+        'productName' => null,
         'productPrice' => 9.99,
         'productQuantity' => 10,
     ];
@@ -17,6 +19,8 @@ class CreateProductAndVerify extends Scenario
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\Products');
         $testSuite->importPage('FrontOffice\Product');
+
+        $this->params['productName'] = ($this->params['productName'] ?? null) ?: 'PrestaFlow Scenario Product ' . self::pfUniqueSuffix();
 
         extract($testSuite->pages);
 

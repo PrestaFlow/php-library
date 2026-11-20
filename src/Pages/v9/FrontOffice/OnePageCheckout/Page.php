@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 /**
@@ -18,6 +19,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -31,6 +33,7 @@ class Page extends BasePage
             'addressRadioById' => '#opc-address-delivery-${idAddress}',
             'addressFields' => '#opc-delivery-address-fields',
             'addressCountrySelect' => '#opc-delivery-address-fields select[name="id_country"]',
+            'addressStateSelect' => '#opc-delivery-address-fields select[name="id_state"]',
             'addressFirstNameInput' => '#opc-delivery-address-fields input[name="firstname"]',
             'addressLastNameInput' => '#opc-delivery-address-fields input[name="lastname"]',
             'addressStreetInput' => '#opc-delivery-address-fields input[name="address1"]',
@@ -39,6 +42,7 @@ class Page extends BasePage
             'addressPhoneInput' => '#opc-delivery-address-fields input[name="phone"]',
             // Delivery
             'carrierOption' => '#opc-delivery-methods input[name="delivery_option"]',
+            'carrierOptionById' => '#opc-delivery-methods input[name="delivery_option"][id="opc_delivery_option_${carrierId}"]',
             // Payment
             'paymentOption' => '#opc-payment-methods input[name="payment-option"]',
             // Footer
@@ -118,7 +122,11 @@ class Page extends BasePage
      * there is no save button to click — the carrier list appearing is the signal
      * that the address was persisted.
      *
-     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:string,city?:string,country?:string,phone?:string} $address
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:?string,city?:string,country?:?string,state?:?string,phone?:string} $address
      */
     public function fillNewAddress(array $address): void
     {
@@ -131,11 +139,19 @@ class Page extends BasePage
             );
         }
 
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
+
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
+
         foreach ([
             'addressFirstNameInput' => $address['firstName'] ?? '',
             'addressLastNameInput' => $address['lastName'] ?? '',
             'addressStreetInput' => $address['street'] ?? '',
-            'addressPostcodeInput' => $address['postcode'] ?? '',
+            'addressPostcodeInput' => $postcode,
             'addressCityInput' => $address['city'] ?? '',
             'addressPhoneInput' => $address['phone'] ?? '',
         ] as $selectorKey => $value) {
@@ -155,8 +171,24 @@ class Page extends BasePage
      */
     public function selectFirstCarrier(): void
     {
+        $this->selectCarrier();
+    }
+
+    /**
+     * Select $carrierId (fails when it is not offered), else the first
+     * carrier, then wait for the payment options the module fetches.
+     */
+    public function selectCarrier(?int $carrierId = null): void
+    {
         $this->waitForCarriers();
-        $this->click($this->getSelector('carrierOption'));
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('carrierOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('carrierOption'));
+        }
 
         $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
@@ -207,7 +239,17 @@ class Page extends BasePage
     }
 
     /**
-     * Select the first payment option.
+     * Select the first payment option whose module is in $modules (offline
+     * ones by default); null when the shop offers none of them.
+     */
+    public function selectPayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        return $this->pfClickPaymentOption($this->getSelector('paymentOption'), $modules);
+    }
+
+    /**
+     * Select the first payment option, whatever it is. Prefer selectPayment():
+     * the first option may be a real payment provider.
      */
     public function selectFirstPayment(): void
     {
