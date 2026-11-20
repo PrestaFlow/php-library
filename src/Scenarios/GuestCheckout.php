@@ -7,9 +7,9 @@ use PrestaFlow\Library\Expects\Expect;
 class GuestCheckout extends Scenario
 {
     public $params = [
-        // French demo shop: locale drives the friendly URLs (connexion/panier/
-        // commande) resolved from src/Urls/fr.json.
-        'locale' => 'fr',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // A canonical product path. An id would work too — PrestaShop
         // canonicalises on the id and ignores the slug (/1-anything redirects to
         // the real URL), and goToPage('product', $id) now substitutes the
@@ -36,7 +36,9 @@ class GuestCheckout extends Scenario
         // importPage() resolves friendly URLs from the SUITE's locale, so
         // propagate this scenario's locale (fr on the demo shop) before importing
         // pages — otherwise cart/checkout URLs fall back to English and 404.
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         // Same precondition as CheckoutOrder: this scenario walks the four-page
         // tunnel, and the layout is a shop-wide setting another scenario may

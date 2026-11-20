@@ -16,7 +16,9 @@ class OnePageCheckoutGuest extends Scenario
 {
     public $params = [
         // The reference shop (ps92rc1 container) runs in English.
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         'guestEmail' => 'pf-opc-guest@example.com',
         'firstName' => 'PrestaFlow',
         'lastName' => 'Guest',
@@ -48,7 +50,9 @@ class OnePageCheckoutGuest extends Scenario
 
         // importPage() resolves friendly URLs from the SUITE's locale, so propagate
         // this scenario's locale before importing pages.
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\CheckoutLayout');

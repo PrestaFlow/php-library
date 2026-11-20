@@ -10,7 +10,8 @@ class OrderLifecycle extends TestsSuite
     {
         $this
         ->describe('Create an order then manage its lifecycle in the BackOffice')
-        ->scenario(\PrestaFlow\Library\Scenarios\CheckoutOrder::class)
-        ->scenario(\PrestaFlow\Library\Scenarios\ManageOrder::class);
+        // French demo shop: friendly URLs in French.
+        ->scenario(\PrestaFlow\Library\Scenarios\CheckoutOrder::class, ['locale' => 'fr'])
+        ->scenario(\PrestaFlow\Library\Scenarios\ManageOrder::class, ['locale' => 'fr']);
     }
 }

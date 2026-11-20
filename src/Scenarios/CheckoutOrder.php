@@ -7,12 +7,15 @@ use PrestaFlow\Library\Expects\Expect;
 class CheckoutOrder extends Scenario
 {
     public $params = [
-        // French demo shop: locale drives the friendly URLs (connexion/panier/
-        // commande) resolved from src/Urls/fr.json.
-        'locale' => 'fr',
-        // PrestaShop demo customer (John DOE); override per shop.
-        'customerEmail' => 'pub@prestashop.com',
-        'customerPassword' => 'PrestaFlow2026!',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
+        // Left null on purpose: FrontOffice\Login::login() then falls back to the
+        // project's customer account (FO_EMAIL / FO_PASSWD globals, fed by
+        // PRESTAFLOW_FO_EMAIL and PRESTAFLOW_FO_PASSWD), like OnePageCheckoutOrder.
+        // Set these params only to use another account for one suite.
+        'customerEmail' => null,
+        'customerPassword' => null,
         // A canonical product path. An id would work too — PrestaShop
         // canonicalises on the id and ignores the slug (/1-anything redirects to
         // the real URL), and goToPage('product', $id) now substitutes the
@@ -29,9 +32,11 @@ class CheckoutOrder extends Scenario
     public function steps($testSuite)
     {
         // importPage() resolves friendly URLs from the SUITE's locale, so
-        // propagate this scenario's locale (fr on the demo shop) before importing
-        // pages — otherwise login/cart/order URLs fall back to English and 404.
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'fr';
+        // propagate an explicit locale before importing pages. Without one,
+        // the suite's own locale applies.
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         // The four-page tunnel this scenario drives only exists while the shop
         // is on the four-page layout. Set it before anything touches the front

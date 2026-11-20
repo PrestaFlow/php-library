@@ -18,7 +18,9 @@ use PrestaFlow\Library\Expects\Expect;
 class Registration extends Scenario
 {
     public $params = [
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // null => a unique address is generated for this run.
         'email' => null,
         'password' => 'PrestaFlow2026!',
@@ -28,7 +30,9 @@ class Registration extends Scenario
 
     public function steps($testSuite)
     {
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('FrontOffice\Registration');
         $testSuite->importPage('FrontOffice\Login');

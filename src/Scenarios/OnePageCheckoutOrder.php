@@ -17,7 +17,9 @@ class OnePageCheckoutOrder extends Scenario
 {
     public $params = [
         // The reference shop (ps92rc1 container) runs in English.
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // Left null on purpose: FrontOffice\Login::login() then falls back to the
         // FO_EMAIL / FO_PASSWD globals, fed by PRESTAFLOW_FO_EMAIL and
         // PRESTAFLOW_FO_PASSWD — the same route the back-office step already
@@ -60,7 +62,9 @@ class OnePageCheckoutOrder extends Scenario
 
         // importPage() resolves friendly URLs from the SUITE's locale, so propagate
         // this scenario's locale before importing pages.
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\CheckoutLayout');
