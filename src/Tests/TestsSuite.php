@@ -13,6 +13,7 @@ use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\FailedRequests;
@@ -86,6 +87,9 @@ class TestsSuite implements OutputStates
     protected $datasets = [];
 
     protected array $store = [];
+
+    /** Set by a SkipTestException thrown with $skipRemaining: the later tests are skipped with it. */
+    protected ?string $skipRemainingReason = null;
 
     protected $scenarioName = '';
     protected $scenarioParams = [];
@@ -364,6 +368,15 @@ class TestsSuite implements OutputStates
         ];
 
         return $this;
+    }
+
+    /**
+     * Skip the running test with a reason, from inside an it() closure.
+     * $skipRemaining skips the rest of the suite with the same reason.
+     */
+    public function skipTest(string $reason, bool $skipRemaining = false): never
+    {
+        throw new SkipTestException($reason, $skipRemaining);
     }
 
     public function skip(string $description, Closure $steps)
@@ -1377,6 +1390,7 @@ class TestsSuite implements OutputStates
                 }
             }
             $this->tests = self::onlyTest($tests);
+            $this->skipRemainingReason = null;
             $recorder = ScreenRecorder::current();
 
             foreach ($this->tests as $testIndex => &$test) {
@@ -1389,7 +1403,11 @@ class TestsSuite implements OutputStates
 
                     $this->getInstructions($test);
 
-                    if ($this->isSkippable($test) === true) {
+                    if ($this->skipRemainingReason !== null) {
+                        $test['state'] = 'skip';
+                        $this->stats['skips']++;
+                        Expect::$expectMessage['skip'][] = $this->skipRemainingReason;
+                    } else if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
                     } else if ($this->isSkippableCauseFailed($test) === true) {
@@ -1418,6 +1436,16 @@ class TestsSuite implements OutputStates
 
                         $test['state'] = 'pass';
                         $this->stats['passes']++;
+                    }
+                } catch (SkipTestException $e) {
+                    // The shop lacks what the test needs: a skip with its reason,
+                    // not a failure, and never a reason to skip as if it failed.
+                    $test['state'] = 'skip';
+                    $this->stats['skips']++;
+                    $this->stats['assertions'] += Expect::getNbAssertions();
+                    Expect::$expectMessage['skip'][] = $e->getMessage();
+                    if ($e->skipRemaining) {
+                        $this->skipRemainingReason = $e->getMessage();
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';
