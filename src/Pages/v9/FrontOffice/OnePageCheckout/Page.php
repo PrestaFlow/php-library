@@ -18,6 +18,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
+    public ?string $shopPage = 'order';
 
     public function defineSelectors()
     {

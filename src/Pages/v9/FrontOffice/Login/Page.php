@@ -9,6 +9,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Login';
     public string $url = 'login';
+    public ?string $shopPage = 'login';
 
     public function defineSelectors()
     {

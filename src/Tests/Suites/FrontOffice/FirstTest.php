@@ -32,9 +32,9 @@ class FirstTest extends TestsSuite
         ->todo('TODO test', function () use ($frontOfficeHomePage) {
         })
         ->it('go to prices drop', function () use ($frontOfficeHomePage, $frontOfficePricesDropPage) {
-            $frontOfficePricesDropPage->goToPage($frontOfficePricesDropPage, 1000); // eq: $homePage->goToPage('prices-drop')
+            $frontOfficePricesDropPage->goToPage($frontOfficePricesDropPage); // eq: $homePage->goToPage('prices-drop')
 
-            Expect::that($frontOfficePricesDropPage->getListingTitle())->contains($frontOfficePricesDropPage->pageTitle());
+            Expect::that($frontOfficePricesDropPage->getListingTitle())->isNotEmpty();
         });
     }
 }

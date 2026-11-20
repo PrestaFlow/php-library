@@ -652,6 +652,16 @@ class TestsSuite implements OutputStates
         return $browser;
     }
 
+    /**
+     * Whether this process already holds a browser. Lets a page decide to read
+     * something from the shop only when a run is actually driving one (never
+     * from a unit test, never by launching Chrome as a side effect).
+     */
+    public static function hasBrowser(): bool
+    {
+        return self::$browserInstance !== null;
+    }
+
     public static function getPage()
     {
         // L'énumération des targets (getPages) peut floter au démarrage à froid,
@@ -691,6 +701,10 @@ class TestsSuite implements OutputStates
     {
         $this->suite = get_class($this);
         $this->start_time = hrtime(true);
+
+        // Each suite reads the shop's URLs afresh: the app runs many suites,
+        // possibly against several shops, in one process.
+        \PrestaFlow\Library\Pages\FrontOfficePage::clearShopUrls();
 
         if (!$this->isVersionSupported()) {
             throw new Error('This version of PrestaShop is not supported by PrestaFlow.');

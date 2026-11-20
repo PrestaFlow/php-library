@@ -2,5 +2,7 @@
 	"guest-tracking": "suivi-commande-invite",
 	"login": "connexion",
 	"cart": "panier?action=show",
-	"order": "commande"
+	"order": "commande",
+	"prices-drop": "promotions",
+	"registration": "inscription"
 }
