@@ -1311,13 +1311,16 @@ class TestsSuite implements OutputStates
             'PREFIX_LOCALE' => (bool) Env::get('PRESTAFLOW_PREFIX_LOCALE', false),
             'BO' => [
                 'URL' => $backOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_BO_EMAIL', 'demo@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_BO_PASSWD', 'Correct Horse Battery Staple'),
+                // No default account: a run against the user's shop must not
+                // silently try PrestaShop's demo credentials. Login pages skip
+                // with a clear reason when these are empty.
+                'EMAIL' => (string) Env::get('PRESTAFLOW_BO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_BO_PASSWD', ''),
             ],
             'FO' => [
                 'URL' => $frontOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_FO_EMAIL', 'pub@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_FO_PASSWD', '123456789'),
+                'EMAIL' => (string) Env::get('PRESTAFLOW_FO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_FO_PASSWD', ''),
             ],
             'DEBUG' => (bool) Env::get('PRESTAFLOW_DEBUG', false),
             'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),

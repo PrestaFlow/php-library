@@ -49,4 +49,34 @@ final class SkipTestTest extends TestCase
         $this->assertNotFalse($generic);
         $this->assertLessThan($generic, $skip);
     }
+
+    /** No silent fallback on PrestaShop's demo accounts. */
+    public function test_globals_carry_no_demo_account(): void
+    {
+        $keys = ['PRESTAFLOW_BO_EMAIL', 'PRESTAFLOW_BO_PASSWD', 'PRESTAFLOW_FO_EMAIL', 'PRESTAFLOW_FO_PASSWD'];
+        $saved = [];
+        foreach ($keys as $key) {
+            $saved[$key] = [$_ENV[$key] ?? null, getenv($key)];
+            unset($_ENV[$key]);
+            putenv($key);
+        }
+
+        try {
+            $globals = (new class (loadGlobals: true, getBrowser: false) extends TestsSuite {})->getGlobals();
+        } finally {
+            foreach ($saved as $key => [$env, $process]) {
+                if ($env !== null) {
+                    $_ENV[$key] = $env;
+                }
+                if ($process !== false) {
+                    putenv($key . '=' . $process);
+                }
+            }
+        }
+
+        $this->assertSame('', $globals['BO']['EMAIL']);
+        $this->assertSame('', $globals['BO']['PASSWD']);
+        $this->assertSame('', $globals['FO']['EMAIL']);
+        $this->assertSame('', $globals['FO']['PASSWD']);
+    }
 }

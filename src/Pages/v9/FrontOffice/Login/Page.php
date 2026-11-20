@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Login;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 use PrestaFlow\Library\Tests\TestsSuite;
 
@@ -32,6 +33,13 @@ class Page extends BasePage
         }
         if ($password === null) {
             $password = $this->getGlobal('FO_PASSWD');
+        }
+        if ((string) $email === '' || (string) $password === '') {
+            throw new SkipTestException(
+                'No customer account configured: set PRESTAFLOW_FO_EMAIL and PRESTAFLOW_FO_PASSWD'
+                . ' (the project\'s customer account), or the customerEmail / customerPassword params.',
+                skipRemaining: true
+            );
         }
 
         $this->setValue($this->getSelector('emailInput'), $email);
