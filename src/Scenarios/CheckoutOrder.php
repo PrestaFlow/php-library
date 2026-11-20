@@ -76,9 +76,8 @@ class CheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
-            }
+            // Skips the suite when no product of the shop can be added to the cart.
+            $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -89,30 +88,24 @@ class CheckoutOrder extends Scenario
             $frontOfficeCartPage->proceedToCheckout();
 
             // An account that never ordered has no address: the step shows
-            // its form instead of the address cards.
-            if ($frontOfficeCheckoutPage->hasAddressForm()) {
-                $frontOfficeCheckoutPage->fillNewAddress([
-                    'street' => $this->getParam('addressStreet'),
-                    'city' => $this->getParam('addressCity'),
-                    'postcode' => $this->getParam('addressPostcode'),
-                    'country' => $this->getParam('addressCountry'),
-                    'state' => $this->getParam('addressState'),
-                    'phone' => $this->getParam('addressPhone'),
-                ]);
-            } else {
-                $frontOfficeCheckoutPage->confirmAddresses();
-            }
+            // its form instead of the address cards, and this fills it.
+            $frontOfficeCheckoutPage->confirmOrFillAddress([
+                'street' => $this->getParam('addressStreet'),
+                'city' => $this->getParam('addressCity'),
+                'postcode' => $this->getParam('addressPostcode'),
+                'country' => $this->getParam('addressCountry'),
+                'state' => $this->getParam('addressState'),
+                'phone' => $this->getParam('addressPhone'),
+            ]);
 
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
 
-            $frontOfficeCheckoutPage->chooseCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
+            $frontOfficeCheckoutPage->chooseCarrier($this->getParam('carrierId'));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
-            $paymentModules = (array) $this->getParam('paymentModules');
-            if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
-                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
-            }
+            // Skips the suite when the shop offers none of these payment modules.
+            $frontOfficeCheckoutPage->choosePayment($this->getParam('paymentModules'));
             $frontOfficeCheckoutPage->acceptTermsAndPlaceOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {

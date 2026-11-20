@@ -67,9 +67,8 @@ class GuestCheckout extends Scenario
 
         $testSuite
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
-                $this->skipWithReason(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
-            }
+            // Skips the suite when no product of the shop can be added to the cart.
+            $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
@@ -96,14 +95,12 @@ class GuestCheckout extends Scenario
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
         })
         ->it('choose shipping and place the order', function () use ($frontOfficeCheckoutPage) {
-            $frontOfficeCheckoutPage->chooseCarrier(Scenario::pfCarrierIdParam($this->getParam('carrierId')));
+            $frontOfficeCheckoutPage->chooseCarrier($this->getParam('carrierId'));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
-            $paymentModules = (array) $this->getParam('paymentModules');
-            if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
-                $this->skipWithReason(Scenario::pfNoPaymentMethodReason($paymentModules), skipRemaining: true);
-            }
+            // Skips the suite when the shop offers none of these payment modules.
+            $frontOfficeCheckoutPage->choosePayment($this->getParam('paymentModules'));
             $frontOfficeCheckoutPage->acceptTermsAndPlaceOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {

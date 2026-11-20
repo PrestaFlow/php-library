@@ -49,15 +49,11 @@ class ManageOrder extends Scenario
             Expect::that($backOfficeOrderViewPage->getOrderReference())->contains((string) $reference);
         })
         ->it('change the order status', function () use ($backOfficeOrderViewPage) {
-            $label = $this->getParam('orderStatus');
-            if (is_string($label) && $label !== '') {
-                $backOfficeOrderViewPage->updateStatus($label);
-            } else {
-                $label = $backOfficeOrderViewPage->updateStatusById((int) $this->getParam('orderStatusId'));
+            // The label when the suite gives one, else the status id; answers
+            // the label as the list shows it.
+            $label = $backOfficeOrderViewPage->changeStatus($this->getParam('orderStatusId'), $this->getParam('orderStatus'));
 
-                Expect::that($label)->isNotEmpty();
-            }
-
+            Expect::that($label)->isNotEmpty();
             Expect::that($backOfficeOrderViewPage->hasStatusInHistory($label))->equals(true);
         })
         ->it('add an internal note', function () use ($backOfficeOrderViewPage) {
