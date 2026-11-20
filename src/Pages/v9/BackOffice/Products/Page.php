@@ -37,7 +37,11 @@ class Page extends BasePage
             // is the stable part; the old class stays for the versions that have it.
             'rowDeleteLink' => '#product_grid_table tbody tr:nth-child(${row}) a.grid-delete-row-link, #product_grid_table tbody tr:nth-child(${row}) a.js-submit-row-action[data-url*="/delete"]',
             'deleteConfirmButton' => '.modal.show .btn-confirm-submit',
-            'formNameInput' => '#product_header_name_1',
+            // One input per language (product_header_name_<id_lang>); only the
+            // employee's language is shown. Not "_1": id_lang 1 is whichever
+            // language was installed first, not necessarily one shown here.
+            'formNameInput' => 'input[id^="product_header_name_"]',
+            'formNameInputFallback' => '#product_header_name_1',
             'formPriceInput' => '#product_pricing_retail_price_price_tax_excluded',
             'formQuantityInput' => '#product_stock_quantities_delta_quantity_delta',
             'formSaveButton' => '#product_footer_save',
@@ -104,13 +108,38 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Give the product $name in every language of the form, so it is named
+     * whichever language the back office and the front office are viewed in.
+     * The input shown (the employee's language) is typed into like a person
+     * would, so the form's own listeners run; the hidden ones are set by JS.
+     */
+    public function fillProductName(string $name): void
+    {
+        $visibleId = $this->getPage()->evaluate(sprintf(
+            '(function(sel,v){var shown=null;[].slice.call(document.querySelectorAll(sel)).forEach(function(e){'
+            . 'if(e.type!=="text")return;'
+            . 'if(shown===null&&e.offsetParent!==null&&e.id){shown=e.id;return;}'
+            . 'e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));});'
+            . 'return shown;})(%s,%s)',
+            json_encode($this->getSelector('formNameInput')),
+            json_encode($name)
+        ))->getReturnValue();
+
+        $selector = is_string($visibleId) && $visibleId !== ''
+            ? '#' . $visibleId
+            : $this->getSelector('formNameInputFallback');
+
+        $this->setValue($selector, $name);
+    }
+
     public function createProduct(string $name, float $price = 0, int $quantity = 0): void
     {
         $this->goToNewProduct();
         // The name lives in the always-visible header; price/quantity sit on the
         // Pricing/Stocks tabs, which are inactive by default — a click+type there
         // can't focus the field and leaks the text into the name. Set those via JS.
-        $this->setValue($this->getSelector('formNameInput'), $name);
+        $this->fillProductName($name);
         $this->setValueByJs($this->getSelector('formPriceInput'), (string) $price);
         $this->setValueByJs($this->getSelector('formQuantityInput'), (string) $quantity);
         // Enable the product BEFORE saving so the online state persists.
