@@ -456,6 +456,32 @@ class FrontOfficePage extends CommonPage
         return $this->readLinks('[id^="category-"] > a[href], a[id^="category-"][href], [id^="category-"] a[href]');
     }
 
+    /**
+     * Offline payment modules a scenario may pay with: no redirection to a
+     * payment provider, no card, nothing really charged.
+     */
+    public const OFFLINE_PAYMENT_MODULES = ['ps_wirepayment', 'ps_checkpayment', 'ps_cashondelivery'];
+
+    /**
+     * Click the first payment option, in page order, whose data-module-name
+     * is in $modules, and answer that module's name; null when the shop offers
+     * none of them (nothing is clicked then).
+     */
+    protected function clickPaymentOption(string $optionSelector, array $modules): ?string
+    {
+        $script = sprintf(
+            '(function(sel,modules){var o=[].slice.call(document.querySelectorAll(sel)).find(function(i){'
+            . 'return modules.indexOf(i.getAttribute("data-module-name"))!==-1;});'
+            . 'if(!o)return null;o.click();return o.getAttribute("data-module-name");})(%s,%s)',
+            json_encode($optionSelector),
+            json_encode(array_values($modules))
+        );
+
+        $module = $this->getPage()->evaluate($script)->getReturnValue();
+
+        return is_string($module) && $module !== '' ? $module : null;
+    }
+
     /** Distinct absolute hrefs of the links matching $selector, in page order. */
     protected function readLinks(string $selector): array
     {

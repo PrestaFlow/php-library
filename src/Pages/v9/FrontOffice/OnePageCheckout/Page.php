@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 /**
@@ -40,6 +41,7 @@ class Page extends BasePage
             'addressPhoneInput' => '#opc-delivery-address-fields input[name="phone"]',
             // Delivery
             'carrierOption' => '#opc-delivery-methods input[name="delivery_option"]',
+            'carrierOptionById' => '#opc-delivery-methods input[name="delivery_option"][id="opc_delivery_option_${carrierId}"]',
             // Payment
             'paymentOption' => '#opc-payment-methods input[name="payment-option"]',
             // Footer
@@ -156,8 +158,24 @@ class Page extends BasePage
      */
     public function selectFirstCarrier(): void
     {
+        $this->selectCarrier();
+    }
+
+    /**
+     * Select $carrierId (fails when it is not offered), else the first
+     * carrier, then wait for the payment options the module fetches.
+     */
+    public function selectCarrier(?int $carrierId = null): void
+    {
         $this->waitForCarriers();
-        $this->click($this->getSelector('carrierOption'));
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('carrierOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('carrierOption'));
+        }
 
         $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
@@ -208,7 +226,17 @@ class Page extends BasePage
     }
 
     /**
-     * Select the first payment option.
+     * Select the first payment option whose module is in $modules (offline
+     * ones by default); null when the shop offers none of them.
+     */
+    public function selectPayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        return $this->clickPaymentOption($this->getSelector('paymentOption'), $modules);
+    }
+
+    /**
+     * Select the first payment option, whatever it is. Prefer selectPayment():
+     * the first option may be a real payment provider.
      */
     public function selectFirstPayment(): void
     {

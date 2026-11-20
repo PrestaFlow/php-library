@@ -32,6 +32,12 @@ class OnePageCheckoutGuest extends Scenario
         // pin one product.
         'productUrl' => null,
         'cartQuantity' => 1,
+        // null => the first carrier offered; an id_carrier picks that one.
+        'carrierId' => null,
+        // The first payment option of these modules is used. Offline ones by
+        // default: no redirection to a payment provider, nothing charged. When
+        // the shop offers none of them the order steps are skipped.
+        'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
         'shopId' => 1,
@@ -125,8 +131,11 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
         })
         ->it('choose shipping and payment, then place the order', function () use ($frontOfficeOnePageCheckoutPage) {
-            $frontOfficeOnePageCheckoutPage->selectFirstCarrier();
-            $frontOfficeOnePageCheckoutPage->selectFirstPayment();
+            $frontOfficeOnePageCheckoutPage->selectCarrier(Scenario::carrierIdParam($this->getParam('carrierId')));
+            $paymentModules = (array) $this->getParam('paymentModules');
+            if ($frontOfficeOnePageCheckoutPage->selectPayment($paymentModules) === null) {
+                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+            }
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 
             Expect::that($frontOfficeOnePageCheckoutPage->isReadyToPlaceOrder())->equals(true);

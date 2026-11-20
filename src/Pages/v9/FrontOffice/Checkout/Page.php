@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Checkout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
@@ -16,6 +17,7 @@ class Page extends BasePage
             // Best-effort PS 9 checkout tunnel (order controller) — corrected live.
             'addressesContinueButton' => '#checkout-addresses-step button[name="confirm-addresses"]',
             'shippingOption' => '#checkout-delivery-step input[name^="delivery_option"]',
+            'shippingOptionById' => '#checkout-delivery-step input[name^="delivery_option"][id="delivery_option_${carrierId}"]',
             'shippingContinueButton' => '#checkout-delivery-step button[name="confirmDeliveryOption"]',
             'paymentOption' => 'input[name="payment-option"]',
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
@@ -128,13 +130,47 @@ class Page extends BasePage
         ))->getReturnValue() === true;
     }
 
-    public function chooseShipping(): void
+    /**
+     * Pick a carrier and confirm the delivery step: $carrierId when given
+     * (fails when the shop does not offer it here), else the first one.
+     */
+    public function chooseShipping(?int $carrierId = null): void
     {
-        $this->click($this->getSelector('shippingOption'));
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('shippingOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('shippingOption'));
+        }
         $this->click($this->getSelector('shippingContinueButton'));
         $this->waitForPageReload();
     }
 
+    /**
+     * Select the first payment option whose module is in $modules (offline
+     * ones by default). Answers the module chosen, or null when the shop
+     * offers none of them: the caller skips rather than pays for real.
+     */
+    public function choosePayment(array $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        return $this->clickPaymentOption($this->getSelector('paymentOption'), $modules);
+    }
+
+    /** Accept the terms and place the order, once a payment option is selected. */
+    public function confirmOrder(): void
+    {
+        $this->click($this->getSelector('termsCheckbox'));
+        $this->click($this->getSelector('placeOrderButton'));
+        $this->waitForPageReload();
+    }
+
+    /**
+     * Select the FIRST payment option, whatever it is, and place the order.
+     * Prefer choosePayment() + confirmOrder(): the first option may be a
+     * real payment provider.
+     */
     public function choosePaymentAndConfirm(): void
     {
         $this->click($this->getSelector('paymentOption'));

@@ -15,6 +15,12 @@ class GuestCheckout extends Scenario
         // pin one product.
         'productUrl' => null,
         'cartQuantity' => 1,
+        // null => the first carrier offered; an id_carrier picks that one.
+        'carrierId' => null,
+        // The first payment option of these modules is used. Offline ones by
+        // default: no redirection to a payment provider, nothing charged. When
+        // the shop offers none of them the order steps are skipped.
+        'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         'guestEmail' => 'pf-guest@example.com',
         'firstName' => 'PrestaFlow',
         'lastName' => 'Guest',
@@ -79,11 +85,15 @@ class GuestCheckout extends Scenario
             Expect::that($frontOfficeCheckoutPage->hasReachedShippingStep())->equals(true);
         })
         ->it('choose shipping and place the order', function () use ($frontOfficeCheckoutPage) {
-            $frontOfficeCheckoutPage->chooseShipping();
+            $frontOfficeCheckoutPage->chooseShipping(Scenario::carrierIdParam($this->getParam('carrierId')));
 
             Expect::that($frontOfficeCheckoutPage->hasReachedPaymentStep())->equals(true);
 
-            $frontOfficeCheckoutPage->choosePaymentAndConfirm();
+            $paymentModules = (array) $this->getParam('paymentModules');
+            if ($frontOfficeCheckoutPage->choosePayment($paymentModules) === null) {
+                $this->skipTest(Scenario::noPaymentMethodReason($paymentModules), skipRemaining: true);
+            }
+            $frontOfficeCheckoutPage->confirmOrder();
         })
         ->it('reach the order confirmation', function () use ($frontOfficeOrderConfirmationPage) {
             Expect::that($frontOfficeOrderConfirmationPage->isConfirmed())->equals(true);

@@ -48,6 +48,26 @@ class Scenario
         return $this;
     }
 
+    /** Skip reason when the shop offers none of the payment modules a scenario may use. */
+    public static function noPaymentMethodReason(array $modules): string
+    {
+        return sprintf(
+            'No offline payment method offered by the shop (looked for: %s). Set the paymentModules param'
+            . ' to a payment module that does not redirect to a payment provider.',
+            $modules === [] ? 'none' : implode(', ', $modules)
+        );
+    }
+
+    /** carrierId param as given by a suite (null, int or numeric string) => ?int. */
+    public static function carrierIdParam(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
     /**
      * Put the shop on the four-page checkout tunnel, and prove it.
      *
