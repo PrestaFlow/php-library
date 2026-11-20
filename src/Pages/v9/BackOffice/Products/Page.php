@@ -71,6 +71,27 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Delete every product whose name contains $name (at most $max), for a
+     * scenario to clear what an earlier run left behind when it stopped
+     * before its own cleanup. Answers how many were deleted.
+     */
+    public function deleteProductsNamed(string $name, int $max = 10): int
+    {
+        $deleted = 0;
+        $this->goTo();
+        $this->filterByName($name);
+
+        while ($deleted < $max && $this->getListCount() > 0) {
+            $this->deleteProduct(1);
+            $deleted++;
+            $this->goTo();
+            $this->filterByName($name);
+        }
+
+        return $deleted;
+    }
+
     public function getListCount(): int
     {
         return (int) preg_replace('/\D+/', '', $this->getTextContent($this->getSelector('resultCount')));

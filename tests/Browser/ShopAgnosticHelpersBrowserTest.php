@@ -241,5 +241,29 @@ namespace PrestaFlow\Tests\Browser {
                 $this->assertTrue($e->skipRemaining);
             }
         }
+
+        public function test_out_of_stock_orders_read_from_the_embedded_product(): void
+        {
+            // hummingbird
+            $this->load('<div class="js-product-details" data-product="' . htmlspecialchars(json_encode(['allow_oosp' => 1, 'quantity' => 0])) . '"></div>');
+            $this->assertTrue((new Product())->acceptsOutOfStockOrders());
+            $skip = $this->skipOf(fn () => (new Product())->requireOutOfStockRefused());
+            $this->assertSame(
+                'This shop accepts orders for out-of-stock products (PS_ORDER_OUT_OF_STOCK, or stock management is disabled): an out-of-stock product stays orderable.',
+                $skip->getMessage()
+            );
+            $this->assertFalse($skip->skipRemaining);
+
+            // Classic
+            $this->load('<div id="product-details" data-product="' . htmlspecialchars(json_encode(['allow_oosp' => 0, 'availability' => 'unavailable'])) . '"></div>');
+            $this->assertFalse((new Product())->acceptsOutOfStockOrders());
+            $this->assertSame('unavailable', (new Product())->getProductData()['availability']);
+            (new Product())->requireOutOfStockRefused();
+
+            // No embedded data: nothing to skip on.
+            $this->load('<p>Custom theme</p>');
+            $this->assertSame([], (new Product())->getProductData());
+            $this->assertFalse((new Product())->acceptsOutOfStockOrders());
+        }
     }
 }
