@@ -13,6 +13,10 @@ class Scenario
     use Version;
     use ImportPage;
 
+    /** Skip reason when no product of the shop can be added to the cart. */
+    public const NO_PURCHASABLE_PRODUCT = 'No product of this shop can be added to the cart as it is'
+        . ' (in stock, available for order, no required customization): set the productUrl param.';
+
     public $globals = [];
     public $params = [];
     public $pages = [];

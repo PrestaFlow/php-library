@@ -44,6 +44,41 @@ class Page extends BasePage
         return $this->getTitle();
     }
 
+    /** Number of product miniatures in the listing. */
+    public function countProducts(): int
+    {
+        return count($this->readProductMiniatures('#js-product-list'));
+    }
+
+    /** Name shown on the nth miniature (1-based), null when there is none. */
+    public function getProductName(int $index = 1): ?string
+    {
+        return $this->readProductMiniatures('#js-product-list')[$index - 1]['name'] ?? null;
+    }
+
+    /** Product page URL of the nth miniature (1-based), null when there is none. */
+    public function getProductUrl(int $index = 1): ?string
+    {
+        return $this->readProductMiniatures('#js-product-list')[$index - 1]['url'] ?? null;
+    }
+
+    /**
+     * Open a category found on the shop (main menu, else sitemap), for
+     * callers that must not assume a category id. False when none was found.
+     */
+    public function goToDiscoveredCategory(): bool
+    {
+        $url = $this->discoverListingUrls(allProducts: false)[0] ?? null;
+        if ($url === null) {
+            return false;
+        }
+
+        $this->goToUrlInPlace($url);
+        $this->waitForPageLoaded();
+
+        return true;
+    }
+
     /**
      * Click the nth product miniature and wait for the product page.
      *

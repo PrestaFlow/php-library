@@ -27,12 +27,34 @@ class Page extends BasePage
         return $this->elementIsVisible($this->getSelector('homePageSection'), 5000);
     }
 
+    /**
+     * Open the "all products" listing linked from the featured products block.
+     * A shop without that block (module off, other theme) gets the first
+     * listing discoverListingUrls() finds instead: a menu category, the
+     * sitemap's, then the root category.
+     */
     public function goToAllProducts()
     {
         $this->goToPage('home');
 
-        $elem = $this->getPage()->dom()->querySelector($this->selector('allProductsLink'));
-        $url = $elem->getAttribute('href');
+        $url = $this->getAllProductsUrl() ?? ($this->discoverListingUrls()[0] ?? null);
+        if ($url === null) {
+            return;
+        }
+
         $this->getPage()->navigate($url)->waitForNavigation();
+    }
+
+    /** href of the featured products' "all products" link, null without one. */
+    public function getAllProductsUrl(): ?string
+    {
+        try {
+            $elem = $this->getPage()->dom()->querySelector($this->selector('allProductsLink'));
+            $url = $elem?->getAttribute('href');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 }

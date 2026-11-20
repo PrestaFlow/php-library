@@ -373,6 +373,108 @@ class FrontOfficePage extends CommonPage
         parent::goToUrl($url);
     }
 
+    /**
+     * Product miniatures of the current page, in page order, as
+     * [['name' => ..., 'url' => ...], ...]. Theme-agnostic: every theme keeps
+     * the .product-miniature / .js-product-miniature classes the core JS
+     * relies on. $scope narrows the search (e.g. '#js-product-list'); when it
+     * matches nothing, the whole page is searched.
+     */
+    public function readProductMiniatures(?string $scope = null): array
+    {
+        $script = '(function(scope){'
+            . 'var sel=".js-product-miniature, .product-miniature";'
+            . 'var root=(scope&&document.querySelector(scope))||document;'
+            . 'var items=[].slice.call(root.querySelectorAll(sel)).filter(function(e){'
+            . 'return !(e.parentElement&&e.parentElement.closest(sel));});'
+            . 'var out=[];items.forEach(function(e){'
+            . 'var a=e.querySelector(".product-title a, a.product-miniature__title, [itemprop=name] a")||e.querySelector("a[href]");'
+            . 'if(!a||!a.href)return;'
+            . 'var t=e.querySelector(".product-title, .product-miniature__title, [itemprop=name]")||a;'
+            . 'out.push({name:(t.textContent||"").replace(/\\s+/g," ").trim(),url:a.href});});'
+            . 'return JSON.stringify(out);})(' . json_encode($scope) . ')';
+
+        try {
+            $decoded = json_decode((string) $this->getPage()->evaluate($script)->getReturnValue(), true);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
+    }
+
+    /**
+     * Product listings worth browsing on this shop, best first: the home
+     * page's "all products" link, the categories of the main menu, those of
+     * the sitemap, the root category by id, then the home page itself (its
+     * featured products). Leaves the browser on the home page or the sitemap.
+     *
+     * $allProducts false keeps only real category pages (menu, sitemap).
+     */
+    public function discoverListingUrls(bool $allProducts = true): array
+    {
+        $base = $this->getBaseURL();
+
+        TestsSuite::recreatePageIfContextChanged('FO');
+        $current = '';
+        try {
+            $current = (string) $this->getPage()->evaluate('location.href')->getReturnValue();
+        } catch (\Throwable) {
+        }
+        if (rtrim($current, '/') !== rtrim($base, '/')) {
+            $this->goToUrlInPlace($base);
+        }
+
+        $urls = [];
+        if ($allProducts) {
+            $urls = $this->readLinks('a.all-product-link, .featured-products a.all-product-link, .ps-featuredproducts .module-products__buttons a');
+        }
+
+        $categories = $this->readCategoryLinks();
+        if ($categories === []) {
+            $sitemap = $this->shopUrl('sitemap') ?? $this->getPageURL('sitemap');
+            try {
+                $this->goToUrlInPlace($sitemap);
+                $categories = $this->readCategoryLinks();
+            } catch (\Throwable) {
+            }
+        }
+        $urls = [...$urls, ...$categories];
+
+        if ($allProducts) {
+            // id_category 2 is the root ("Home") category of every install.
+            $urls[] = $base . 'index.php?id_category=2&controller=category';
+            $urls[] = $base;
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /** Links to category pages on the current page (main menu, sitemap tree). */
+    public function readCategoryLinks(): array
+    {
+        return $this->readLinks('[id^="category-"] > a[href], a[id^="category-"][href], [id^="category-"] a[href]');
+    }
+
+    /** Distinct absolute hrefs of the links matching $selector, in page order. */
+    protected function readLinks(string $selector): array
+    {
+        $script = sprintf(
+            '(function(){var out=[];[].slice.call(document.querySelectorAll(%s)).forEach(function(a){'
+            . 'if(a.href&&a.href.indexOf("http")===0&&out.indexOf(a.href)<0){out.push(a.href);}});'
+            . 'return JSON.stringify(out);})()',
+            json_encode($selector)
+        );
+
+        try {
+            $decoded = json_decode((string) $this->getPage()->evaluate($script)->getReturnValue(), true);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+    }
+
     public function getTitle()
     {
         return $this->getTextContent($this->selector('pageTitle'));

@@ -10,13 +10,10 @@ class GuestCheckout extends Scenario
         // null => the suite's locale (the project's language in the app). Friendly
         // URLs and their per-language overrides are read in that language.
         'locale' => null,
-        // A canonical product path. An id would work too — PrestaShop
-        // canonicalises on the id and ignores the slug (/1-anything redirects to
-        // the real URL), and goToPage('product', $id) now substitutes the
-        // {index} placeholder for scalar params. The path is kept because it
-        // pins this exact product *and* combination (id_product 1,
-        // id_product_attribute 1), which an id alone cannot express.
-        'productUrl' => '1-1-hummingbird-printed-t-shirt.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
         'guestEmail' => 'pf-guest@example.com',
         'firstName' => 'PrestaFlow',
@@ -54,7 +51,9 @@ class GuestCheckout extends Scenario
 
         $testSuite
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();

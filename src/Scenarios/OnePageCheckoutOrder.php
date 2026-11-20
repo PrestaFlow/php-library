@@ -27,14 +27,10 @@ class OnePageCheckoutOrder extends Scenario
         // do not hardcode a password here.
         'customerEmail' => null,
         'customerPassword' => null,
-        // A canonical product path. An id would work too — PrestaShop
-        // canonicalises on the id and ignores the slug (/6-anything redirects to
-        // the real URL), and goToPage('product', $id) now substitutes the
-        // {index} placeholder for scalar params. The path is kept because this
-        // scenario pins one product deliberately: the Mug (id 6) has no
-        // combinations, so add-to-cart works without posting an
-        // id_product_attribute, unlike the demo t-shirt this used to point to.
-        'productUrl' => '6-mug-the-best-is-yet-to-come.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
         // Used only when the customer has no saved address yet.
         'firstName' => 'PrestaFlow',
@@ -104,7 +100,9 @@ class OnePageCheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();

@@ -16,13 +16,10 @@ class CheckoutOrder extends Scenario
         // Set these params only to use another account for one suite.
         'customerEmail' => null,
         'customerPassword' => null,
-        // A canonical product path. An id would work too — PrestaShop
-        // canonicalises on the id and ignores the slug (/1-anything redirects to
-        // the real URL), and goToPage('product', $id) now substitutes the
-        // {index} placeholder for scalar params. The path is kept because it
-        // pins this exact product *and* combination (id_product 1,
-        // id_product_attribute 1), which an id alone cannot express.
-        'productUrl' => '1-1-hummingbird-printed-t-shirt.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
@@ -64,7 +61,9 @@ class CheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();

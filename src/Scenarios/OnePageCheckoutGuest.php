@@ -27,10 +27,10 @@ class OnePageCheckoutGuest extends Scenario
         'addressPostcode' => '75002',
         'addressCountry' => 'France',
         'addressPhone' => '0102030405',
-        // Canonical product path — friendly URLs can't be rebuilt from an id.
-        // Mug (id 6): no combinations, so add-to-cart works without posting an
-        // id_product_attribute, unlike the demo t-shirt this used to point to.
-        'productUrl' => '6-mug-the-best-is-yet-to-come.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
@@ -93,7 +93,9 @@ class OnePageCheckoutGuest extends Scenario
             Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            if (!$frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'))) {
+                $this->skipTest(Scenario::NO_PURCHASABLE_PRODUCT, skipRemaining: true);
+            }
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();

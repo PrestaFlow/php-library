@@ -43,8 +43,37 @@ class Page extends BasePage
      */
     public function goToProductPath(string $path)
     {
+        if (preg_match('#^https?://#i', $path)) {
+            $this->goToUrl($path);
+
+            return;
+        }
+
         $base = rtrim($this->getGlobal('FO_URL'), '/') . '/';
         $this->goToUrl($base . ltrim($path, '/'));
+    }
+
+    /**
+     * Open $productUrl (a path or an absolute URL) when given, otherwise the
+     * first product of the shop that can be added to the cart (findPurchasable()).
+     * False when nothing was given and nothing qualifies.
+     */
+    public function goToPurchasableProduct(?string $productUrl = null): bool
+    {
+        if ($productUrl !== null && $productUrl !== '') {
+            $this->goToProductPath($productUrl);
+
+            return true;
+        }
+
+        $found = $this->findPurchasable();
+        if ($found === null) {
+            return false;
+        }
+
+        $this->goToUrl($found);
+
+        return true;
     }
 
     public function getPrice()
@@ -107,6 +136,76 @@ class Page extends BasePage
         $grouping = $decimal === '.' ? ',' : '.';
 
         return (float) str_replace($decimal, '.', str_replace($grouping, '', $number));
+    }
+
+    /**
+     * Whether this product page lets a buyer add the product as it is: an
+     * add-to-cart button, enabled (PrestaShop disables it when the product is
+     * out of stock, not available for order, or waits for a required
+     * customization), and no required customization field.
+     */
+    public function isAddableToCart(): bool
+    {
+        $script = sprintf(
+            '(function(sel){var b=document.querySelector(\'[data-button-action="add-to-cart"]\')||document.querySelector(sel);'
+            . 'if(!b)return false;'
+            . 'if(b.disabled||b.hasAttribute("disabled")||b.classList.contains("disabled"))return false;'
+            . 'if(document.querySelector(".product-customization [required]"))return false;'
+            . 'return true;})(%s)',
+            json_encode($this->getSelector('addToCartButton'))
+        );
+
+        try {
+            return $this->getPage()->evaluate($script)->getReturnValue() === true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * URL of the first product of the shop a buyer can add to the cart as it
+     * is, so scenarios do not depend on the demo catalogue. Browses the
+     * listings discoverListingUrls() finds (or $listingUrls), opening at most
+     * $maxProducts product pages. Null when none qualifies. Leaves the browser
+     * on the product found.
+     */
+    public function findPurchasable(int $maxProducts = 10, array $listingUrls = []): ?string
+    {
+        if ($listingUrls === []) {
+            $listingUrls = $this->discoverListingUrls();
+        }
+
+        $seen = [];
+        foreach ($listingUrls as $listingUrl) {
+            try {
+                $this->goToUrlInPlace($listingUrl);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            foreach ($this->readProductMiniatures('#js-product-list') as $miniature) {
+                $url = $miniature['url'] ?? null;
+                if (!is_string($url) || isset($seen[$url])) {
+                    continue;
+                }
+                if (count($seen) >= $maxProducts) {
+                    return null;
+                }
+                $seen[$url] = true;
+
+                try {
+                    $this->goToUrlInPlace($url);
+                } catch (\Throwable) {
+                    continue;
+                }
+
+                if ($this->isAddableToCart()) {
+                    return $url;
+                }
+            }
+        }
+
+        return null;
     }
 
     public function addToCart(int $quantity = 1)
