@@ -97,6 +97,18 @@ class Page extends BasePage
         return $clicked;
     }
 
+    /** Whether the wishlist module (blockwishlist) shows its buttons on this listing. */
+    public function hasWishlistButtons(): bool
+    {
+        try {
+            return $this->getPage()->evaluate(
+                '!!document.querySelector(".wishlist-button-add, .wishlist-button, [class*=\\"wishlist\\"]")'
+            )->getReturnValue() === true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function addToWishList($index)
     {
         if (!$this->isAddedToWishlist($index)) {

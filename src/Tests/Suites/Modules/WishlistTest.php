@@ -63,11 +63,7 @@ class WishlistTest extends TestsSuite
             Expect::that($frontOfficeListingPage->getMetaTitle())->contains($title);
         })
         ->it('the wishlist module is on the product listing', function () use ($frontOfficeListingPage) {
-            $present = $frontOfficeListingPage->getPage()->evaluate(
-                '!!document.querySelector(".wishlist-button-add, .wishlist-button, [class*=\\"wishlist\\"]")'
-            )->getReturnValue();
-
-            if ($present !== true) {
+            if (!$frontOfficeListingPage->hasWishlistButtons()) {
                 $this->skipTest('The wishlist module (blockwishlist) is not installed, or not shown on product listings.');
             }
         });
