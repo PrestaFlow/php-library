@@ -241,5 +241,23 @@ namespace PrestaFlow\Tests\Browser {
                 $this->assertTrue($e->skipRemaining);
             }
         }
+
+        public function test_health_signals_of_a_page(): void
+        {
+            $this->load('<div id="content" class="page-home">Home</div>');
+            $checkout = new Checkout();
+            $checkout->selectors['maintenanceBlock'] = '#content.page-maintenance';
+
+            $this->assertFalse($checkout->isInMaintenance());
+            // A data: document reports no HTTP status: rendered without error = 200.
+            $this->assertSame(200, $checkout->getDocumentStatus());
+            $this->assertFalse($checkout->isOrderPage());
+
+            self::$page->evaluate('document.body.id = "checkout"');
+            $this->assertTrue($checkout->isOrderPage());
+
+            $this->load('<div id="content" class="page-maintenance">Back soon</div>');
+            $this->assertTrue($checkout->isInMaintenance());
+        }
     }
 }
