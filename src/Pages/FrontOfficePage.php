@@ -9,6 +9,7 @@ use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\CommonPage;
 use PrestaFlow\Library\Resolvers\Translations;
+use PrestaFlow\Library\Support\FailedRequests;
 use PrestaFlow\Library\Resolvers\Urls;
 use PrestaFlow\Library\Tests\TestsSuite;
 use PrestaFlow\Library\Traits\Locale;
@@ -828,6 +829,70 @@ class FrontOfficePage extends CommonPage
         }
 
         return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+    }
+
+    /**
+     * Whether the page open now is the order page (body#checkout), whichever
+     * checkout it renders: the four-step tunnel or the One Page Checkout.
+     */
+    public function isOrderPage(): bool
+    {
+        return $this->waitForJsCondition('!!document.body && document.body.id === "checkout"', 5000);
+    }
+
+    /** Whether the page open now is the shop's maintenance page. */
+    public function isInMaintenance(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('maintenanceBlock'), 1000);
+    }
+
+    /**
+     * HTTP status of the document open now: the browser's own record of the
+     * navigation, else the failed request recorded for it, else 200 (a
+     * document the browser rendered without reporting an error).
+     */
+    public function getDocumentStatus(): int
+    {
+        try {
+            $state = $this->getPage()->evaluate(
+                '(function(){var n=performance.getEntriesByType("navigation")[0];'
+                . 'return JSON.stringify({status:n&&n.responseStatus?n.responseStatus:0,url:location.href});})()'
+            )->getReturnValue();
+        } catch (\Throwable) {
+            return 200;
+        }
+
+        $state = is_string($state) ? (json_decode($state, true) ?: []) : [];
+        if ((int) ($state['status'] ?? 0) > 0) {
+            return (int) $state['status'];
+        }
+
+        foreach (FailedRequests::instance()->requests() as $request) {
+            if (($request['type'] ?? null) === 'Document' && $request['url'] === ($state['url'] ?? null) && $request['status'] !== null) {
+                return (int) $request['status'];
+            }
+        }
+
+        return 200;
+    }
+
+    /**
+     * Requests of the running test that the server answered with a 5xx, as
+     * failedRequests() words them. A 404 on an image or a tracker is a shop's
+     * own business; a 5xx is a server error.
+     *
+     * @return list<string>
+     */
+    public function failedServerRequests(): array
+    {
+        $errors = [];
+        foreach (FailedRequests::instance()->requests() as $request) {
+            if (($request['status'] ?? 0) >= 500) {
+                $errors[] = $request['method'] . ' ' . $request['url'] . ' → ' . $request['status'];
+            }
+        }
+
+        return $errors;
     }
 
     public function getTitle()
