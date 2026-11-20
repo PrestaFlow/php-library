@@ -67,6 +67,33 @@ class Page extends BasePage
         $this->waitForPageReload();
     }
 
+    /**
+     * Set the status by its id_order_state, whatever the employee's language,
+     * and answer the label of that status as the list shows it (to check the
+     * result against).
+     */
+    public function updateStatusById(int $stateId): string
+    {
+        $label = $this->getStatusLabel($stateId);
+
+        $this->selectOptionByValue($this->getSelector('statusSelect'), $stateId);
+        $this->click($this->getSelector('updateStatusButton'));
+        $this->waitForPageReload();
+
+        return $label;
+    }
+
+    /** Label of a status in the status list, '' when the list has no such id. */
+    public function getStatusLabel(int $stateId): string
+    {
+        return trim((string) $this->getPage()->evaluate(sprintf(
+            '(function(){var s=document.querySelector(%s);if(!s)return "";'
+            . 'var o=[].slice.call(s.options).find(function(x){return x.value===%s;});return o?o.text:"";})()',
+            json_encode($this->getSelector('statusSelect')),
+            json_encode((string) $stateId)
+        ))->getReturnValue());
+    }
+
     public function hasStatusInHistory(string $status): bool
     {
         // After an update the new status becomes the current one; comparing the

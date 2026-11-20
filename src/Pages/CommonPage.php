@@ -1224,6 +1224,25 @@ class CommonPage
         }
     }
 
+    /**
+     * selectOption() by the option's value instead of its label: an id does
+     * not depend on the language of the person or shop reading the list.
+     */
+    public function selectOptionByValue($selector, string|int $value): void
+    {
+        $found = $this->getPage()->evaluate(sprintf(
+            '(function(){var s=document.querySelector(%s);if(!s)return false;'
+            . 'var o=[].slice.call(s.options).find(function(x){return x.value===%s;});'
+            . 'if(!o)return false;s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));return true;})()',
+            json_encode($selector),
+            json_encode((string) $value)
+        ))->getReturnValue();
+
+        if ($found !== true) {
+            Expect::that($found)->equals(true, 'Option of value "' . $value . '" not found for selector "' . $selector . '"');
+        }
+    }
+
     public function selectValue($selector, $value)
     {
         $this->selectOption($selector, $value);

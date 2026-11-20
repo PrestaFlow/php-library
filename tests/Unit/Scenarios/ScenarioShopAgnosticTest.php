@@ -85,4 +85,13 @@ final class ScenarioShopAgnosticTest extends TestCase
             $this->assertNull($this->defaults($name)['productName'], $name);
         }
     }
+
+    public function test_manage_order_picks_the_status_by_id(): void
+    {
+        $params = $this->defaults('ManageOrder');
+
+        // PS_OS_PAYMENT on a fresh install, in every language.
+        $this->assertSame(2, $params['orderStatusId']);
+        $this->assertNull($params['orderStatus']);
+    }
 }

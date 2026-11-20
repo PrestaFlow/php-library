@@ -10,9 +10,12 @@ class ManageOrder extends Scenario
         // null => the suite's locale (the project's language in the app). Friendly
         // URLs and their per-language overrides are read in that language.
         'locale' => null,
-        // Status label as shown in the BackOffice dropdown — the admin employee's
-        // language is English on this shop (only the FrontOffice is French).
-        'orderStatus' => 'Payment accepted',
+        // id_order_state to move the order to. 2 is PS_OS_PAYMENT ("Payment
+        // accepted") on every install, whatever the employee's language.
+        'orderStatusId' => 2,
+        // Optional: a status label as the BackOffice list shows it, in the
+        // employee's language. When set, it is used instead of orderStatusId.
+        'orderStatus' => null,
         'internalNote' => 'PrestaFlow internal note',
         'trackingNumber' => 'PF-TRACK-0001',
         // Optional: order reference to manage; defaults to the one stored by a
@@ -46,9 +49,16 @@ class ManageOrder extends Scenario
             Expect::that($backOfficeOrderViewPage->getOrderReference())->contains((string) $reference);
         })
         ->it('change the order status', function () use ($backOfficeOrderViewPage) {
-            $backOfficeOrderViewPage->updateStatus($this->getParam('orderStatus'));
+            $label = $this->getParam('orderStatus');
+            if (is_string($label) && $label !== '') {
+                $backOfficeOrderViewPage->updateStatus($label);
+            } else {
+                $label = $backOfficeOrderViewPage->updateStatusById((int) $this->getParam('orderStatusId'));
 
-            Expect::that($backOfficeOrderViewPage->hasStatusInHistory($this->getParam('orderStatus')))->equals(true);
+                Expect::that($label)->isNotEmpty();
+            }
+
+            Expect::that($backOfficeOrderViewPage->hasStatusInHistory($label))->equals(true);
         })
         ->it('add an internal note', function () use ($backOfficeOrderViewPage) {
             $backOfficeOrderViewPage->setInternalNote($this->getParam('internalNote'));
