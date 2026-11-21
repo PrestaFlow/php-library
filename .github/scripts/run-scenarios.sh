@@ -17,7 +17,7 @@ mkdir -p "$out"
 # - The One Page Checkout scenarios last: they switch the shop to the one page
 #   layout and leave it so; every four-page scenario switches it back, but
 #   only on its own run.
-suites="EnsureTestAccount FrontOfficeHealth AddProductToCart CartQuantities CheckoutOrder GuestCheckout OrderLifecycle CustomerOrderHistory ContactForm OutOfStockProduct OnePageCheckoutGuest OnePageCheckoutOrder"
+suites="EnsureTestAccount FrontOfficeHealth AddProductToCart CartQuantities CheckoutOrder GuestCheckout OrderLifecycle CustomerOrderHistory ContactForm OutOfStockProduct CartVoucher OnePageCheckoutGuest OnePageCheckoutOrder"
 
 reports=""
 for suite in $suites; do
