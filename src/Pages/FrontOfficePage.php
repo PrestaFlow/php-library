@@ -589,9 +589,10 @@ class FrontOfficePage extends CommonPage
      * first one that can be added to the cart: answers its miniature
      * (['name' => ..., 'url' => ...]) and leaves the browser on it. Null when
      * none qualifies within $maxProducts product pages ($seen counts and
-     * skips the ones already tried, across listings).
+     * skips the ones already tried, across listings). $accept, when given,
+     * must also answer true on the product page for it to qualify.
      */
-    protected function pfOpenFirstPurchasable(int $maxProducts, array &$seen, string $buttonSelector): ?array
+    protected function pfOpenFirstPurchasable(int $maxProducts, array &$seen, string $buttonSelector, ?callable $accept = null): ?array
     {
         foreach ($this->readProductMiniatures('#js-product-list') as $miniature) {
             $url = $miniature['url'] ?? null;
@@ -609,7 +610,7 @@ class FrontOfficePage extends CommonPage
                 continue;
             }
 
-            if ($this->pfIsAddableToCartHere($buttonSelector)) {
+            if ($this->pfIsAddableToCartHere($buttonSelector) && ($accept === null || $accept())) {
                 return ['name' => (string) ($miniature['name'] ?? ''), 'url' => $url];
             }
         }
