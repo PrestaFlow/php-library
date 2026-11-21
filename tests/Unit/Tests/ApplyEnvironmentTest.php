@@ -326,9 +326,31 @@ echo "ok";
         // getBrowser() valide son cache par getConnection()->isConnected() à chaque appel :
         // ces lectures du navigateur partagé ne sont pas comparées, seuls les effets le sont.
         $effects = static fn (\ArrayObject $j) => array_values(array_filter($j->getArrayCopy(), static fn (string $line) => $line !== 'browser getConnection'));
+
+        // before() adds one step of its own after the environment's headers:
+        // Accept-Language = the run's language (presetAcceptLanguage()), set on
+        // the connection and the page like the other headers, before the cookies.
+        $applied = $effects($expected);
+        $headers = [];
+        foreach ($applied as $line) {
+            if (str_starts_with($line, 'connection ')) {
+                $headers = json_decode(substr($line, strlen('connection ')), true);
+            }
+        }
+        $headers['Accept-Language'] = 'en';
+        $json = json_encode($headers);
+        $cookieAt = count($applied);
+        foreach ($applied as $i => $line) {
+            if (str_starts_with($line, 'cookie ')) {
+                $cookieAt = $i;
+                break;
+            }
+        }
+        array_splice($applied, $cookieAt, 0, ['connection '.$json, 'session Network.enable', 'page '.$json]);
+
         $this->assertSame(
             // La page est d'abord mise au premier plan (bringPageToFront) : un état de la page, pas de l'environnement.
-            array_merge(['session Page.bringToFront', 'session Network.clearBrowserCookies'], $effects($expected)),
+            array_merge(['session Page.bringToFront', 'session Network.clearBrowserCookies'], $applied),
             $effects($journal)
         );
     }
