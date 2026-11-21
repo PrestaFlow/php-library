@@ -14,3 +14,4 @@ datas/.broswer
 .env.flashlight
 visual-baseline/
 visual-output/
+scenario-output/
