@@ -7,13 +7,19 @@ on:
 
 jobs:
   phpunit:
-    name: PHPUnit (PHP ${{ matrix.php }})
+    name: PHPUnit (PHP ${{ matrix.php }}, ${{ matrix.deps }})
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
         php: ['8.1', '8.2', '8.3', '8.4', '8.5']
+        deps: ['locked']
+        # Le lock est calé sur PHP 8.1 (Symfony 6.4) : ce job installe les
+        # versions les plus récentes autorisées (Symfony 8 sur PHP 8.4+).
+        include:
+          - php: '8.5'
+            deps: 'highest'
 
     steps:
       - uses: actions/checkout@v4
@@ -33,11 +39,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: composer-${{ matrix.php }}-${{ hashFiles('composer.json') }}
-          restore-keys: composer-${{ matrix.php }}-
+          key: composer-${{ matrix.php }}-${{ matrix.deps }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ matrix.php }}-${{ matrix.deps }}-
 
       - name: Install dependencies
+        if: matrix.deps == 'locked'
         run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Install highest dependencies
+        if: matrix.deps == 'highest'
+        run: |
+          composer config platform.php ${{ matrix.php }}
+          composer update --no-interaction --no-progress --prefer-dist --with-all-dependencies
+
+      - name: Show Symfony Console version
+        run: composer show symfony/console | grep -E '^versions'
 
       - name: Run unit tests
         run: vendor/bin/phpunit --testsuite Unit
