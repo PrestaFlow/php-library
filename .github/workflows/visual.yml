@@ -70,46 +70,49 @@ name: Visual
 # uploaded on every run, one artifact per row, together with the references
 # that were compared against.
 
+# Matrix scope. Full matrix on push to main, on workflow_dispatch, on pull
+# requests into main (the dev -> main release PRs, whose checks are the
+# required ones on main) and on any pull request labelled `ci:full` (use it
+# when a change touches a 1.7 / 8 page object or a Classic-only selector).
+# Every other pull request (the day-to-day ones into dev) runs only what is
+# listed as "PR" below, to save Actions minutes.
+#
+# PR: 9.2.0 hummingbird only (front office; the back-office suite runs on the
+# Classic rows, so it is left to the release run). The references are only
+# saved on push to main, which always runs the full matrix.
+# Full: the four rows below.
+
 on:
   push:
     branches: [main]
+  # `labeled` lets the `ci:full` label start a full-matrix run on an open pull
+  # request; any other label is ignored by the job-level `if` below (a skipped
+  # job costs no minute).
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 jobs:
   visual:
     name: Visual (PrestaShop ${{ matrix.ps }}, ${{ matrix.theme }})
+    if: github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - ps: '1.7.8.11'
-            service: ps17
-            port: 8017
-            theme: classic
-            suite: FrontOfficeClassic
-            backoffice: true
-          - ps: '8.2.8'
-            service: ps82
-            port: 8082
-            theme: classic
-            suite: FrontOfficeClassic
-            backoffice: true
-          - ps: '9.2.0'
-            service: ps92
-            port: 8092
-            theme: hummingbird
-            suite: FrontOfficeHummingbird
-            backoffice: false
-          # Shop 2 of the same container, on its own port and its own theme.
-          - ps: '9.2.0'
-            service: ps92
-            port: 8093
-            theme: classic
-            suite: FrontOfficeClassic
-            backoffice: true
+        # The 9.2.0 hummingbird row always runs; the three others only in the
+        # full matrix (same `fromJSON` construction as live-smoke.yml). The
+        # last one is shop 2 of the ps92 container, on its own port and theme.
+        include: >-
+          ${{ fromJSON(format('[{0}{1}]',
+          '{"ps": "9.2.0", "service": "ps92", "port": 8092, "theme": "hummingbird", "suite": "FrontOfficeHummingbird", "backoffice": false}',
+          (github.event_name != 'pull_request' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+          && ', {"ps": "1.7.8.11", "service": "ps17", "port": 8017, "theme": "classic", "suite": "FrontOfficeClassic", "backoffice": true}
+          , {"ps": "8.2.8", "service": "ps82", "port": 8082, "theme": "classic", "suite": "FrontOfficeClassic", "backoffice": true}
+          , {"ps": "9.2.0", "service": "ps92", "port": 8093, "theme": "classic", "suite": "FrontOfficeClassic", "backoffice": true}'
+          || ''
+          )) }}
 
     steps:
       - uses: actions/checkout@v4

@@ -1,25 +1,45 @@
 name: Unit tests
 
+# Matrix scope. Full matrix on push to main, on workflow_dispatch, on pull
+# requests into main (the dev -> main release PRs, whose checks are the
+# required ones on main) and on any pull request labelled `ci:full` (use it
+# when a change touches a 1.7 / 8 page object or a Classic-only selector).
+# Every other pull request (the day-to-day ones into dev) runs only what is
+# listed as PR below, to save Actions minutes.
+#
+# PR: PHP 8.1 (the floor declared in composer.json, the version the lock is
+# built on) and PHP 8.5 (the newest), both `locked`; the browser suite runs on
+# 8.5. The two ends bracket the range: a break specific to 8.2, 8.3 or 8.4
+# alone is rare, and `highest` (Symfony 8) mostly moves with upstream
+# releases rather than with a pull request, so both are left to the release
+# run (and to `ci:full`).
+# Full: 8.1 -> 8.5 `locked` + 8.5 `highest`; the browser suite runs on 8.3.
+
 on:
   push:
     branches: [main]
+  # `labeled` lets the `ci:full` label start a full-matrix run on an open pull
+  # request; any other label is ignored by the job-level `if` below (a skipped
+  # job costs no minute).
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
 
 jobs:
   phpunit:
     name: PHPUnit (PHP ${{ matrix.php }}, ${{ matrix.deps }})
+    if: github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
+        php: ${{ fromJSON((github.event_name != 'pull_request' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '["8.1", "8.2", "8.3", "8.4", "8.5"]' || '["8.1", "8.5"]') }}
         deps: ['locked']
         # Le lock est calé sur PHP 8.1 (Symfony 6.4) : ce job installe les
         # versions les plus récentes autorisées (Symfony 8 sur PHP 8.4+).
-        include:
-          - php: '8.5'
-            deps: 'highest'
+        # Full matrix only (see the top of the file).
+        include: ${{ fromJSON((github.event_name != 'pull_request' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"php":"8.5","deps":"highest"}]' || '[]') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -59,5 +79,6 @@ jobs:
         run: vendor/bin/phpunit --testsuite Unit
 
       - name: Run browser tests (real Chrome)
-        if: matrix.php == '8.3'
+        # 8.3 in the full matrix, 8.5 on a light pull request run (no 8.3 there).
+        if: matrix.deps == 'locked' && matrix.php == ((github.event_name != 'pull_request' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8.3' || '8.5')
         run: vendor/bin/phpunit --testsuite Browser

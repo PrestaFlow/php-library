@@ -34,48 +34,56 @@ name: Live smoke
 #                      2 full-matrix reruns, 1 run on the next commit).
 #   9.2.0 classic, 8.2.8 classic, 1.7.8.11 classic  4/4 green each.
 
+# Matrix scope. Full matrix on push to main, on workflow_dispatch, on pull
+# requests into main (the dev -> main release PRs, whose checks are the
+# required ones on main) and on any pull request labelled `ci:full` (use it
+# when a change touches a 1.7 / 8 page object or a Classic-only selector).
+# Every other pull request (the day-to-day ones into dev) runs only what is
+# listed as "PR" below, to save Actions minutes.
+#
+# PR: 9.2.0 hummingbird only, the theme closest to what testers run.
+# Full: the four rows below.
+
 on:
   push:
     branches: [main]
+  # `labeled` lets the `ci:full` label start a full-matrix run on an open pull
+  # request; any other label is ignored by the job-level `if` below (a skipped
+  # job costs no minute).
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   # Runs the smoke AND the scenario suites on demand, whatever changed.
   workflow_dispatch:
 
 jobs:
   smoke:
     name: Smoke (PrestaShop ${{ matrix.ps }}, ${{ matrix.theme }})
+    if: github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - ps: '1.7.8.11'
-            service: ps17
-            port: 8017
-            theme: classic
-            shop_id: 1
-          - ps: '8.2.8'
-            service: ps82
-            port: 8082
-            theme: classic
-            shop_id: 1
-          - ps: '9.2.0'
-            service: ps92
-            port: 8092
-            theme: hummingbird
-            shop_id: 1
-          # Shop 2 of the same container, on its own port and its own theme.
-          # Without this row "9.2 passes" would only ever mean "hummingbird
-          # passes", and a theme-aware selector that silently matched on one
-          # theme would never be caught.
-          - ps: '9.2.0'
-            service: ps92
-            port: 8093
-            theme: classic
-            # The scenarios write back-office settings (checkout layout,
-            # theme) per shop: this row's are shop 2's.
-            shop_id: 2
+        # The 9.2.0 hummingbird row always runs; the three others only in the
+        # full matrix. A `fromJSON` expression rather than a setup job: no
+        # extra job (and no extra billed minute) on every run. An `exclude`
+        # cannot do it, `include` is applied after it and would add the rows
+        # back.
+        #   - 9.2.0 classic is shop 2 of the ps92 container, on its own port
+        #     and its own theme. Without it "9.2 passes" would only ever mean
+        #     "hummingbird passes", and a theme-aware selector that silently
+        #     matched on one theme would never be caught. The scenarios write
+        #     back-office settings (checkout layout, theme) per shop: this
+        #     row's are shop 2's.
+        include: >-
+          ${{ fromJSON(format('[{0}{1}]',
+          '{"ps": "9.2.0", "service": "ps92", "port": 8092, "theme": "hummingbird", "shop_id": 1}',
+          (github.event_name != 'pull_request' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+          && ', {"ps": "1.7.8.11", "service": "ps17", "port": 8017, "theme": "classic", "shop_id": 1}
+          , {"ps": "8.2.8", "service": "ps82", "port": 8082, "theme": "classic", "shop_id": 1}
+          , {"ps": "9.2.0", "service": "ps92", "port": 8093, "theme": "classic", "shop_id": 2}'
+          || ''
+          )) }}
 
     steps:
       - uses: actions/checkout@v4
