@@ -36,6 +36,9 @@ class Page extends BasePage
             'lineIncreaseButton' => '.bootstrap-touchspin-up, .js-increment-button',
             'lineDecreaseButton' => '.bootstrap-touchspin-down, .js-decrement-button',
             'lineRemoveLink' => '[data-link-action="delete-from-cart"]',
+            // Attribute values of a line (Classic: .product-line-info .value,
+            // hummingbird: .product-line__item--info .product-line__item-value).
+            'lineAttributeValue' => '.product-line-info > .value, .product-line__item--info > .product-line__item-value',
             'productsSubtotal' => '#cart-subtotal-products .value, #cart-subtotal-products .cart-summary__value',
         ];
     }
@@ -105,6 +108,52 @@ class Page extends BasePage
         $text = $this->getTextContent($this->getSelector('productsSubtotal'), 1, true, 5000);
 
         return is_string($text) ? $this->parsePrice($text) : 0.0;
+    }
+
+    /**
+     * The line (1-based) holding combination $combinationId of product
+     * $productId, read from the line's remove link, which carries both ids
+     * (data-id-product, data-id-product-attribute) in Classic 1.7 to 9 and in
+     * hummingbird. 0 when the cart has no such line.
+     */
+    public function findLineOfCombination(int $productId, int $combinationId): int
+    {
+        try {
+            return (int) $this->getPage()->evaluate(sprintf(
+                '(function(lines,link,p,c){var all=document.querySelectorAll(lines);'
+                . 'for(var i=0;i<all.length;i++){var a=all[i].querySelector(link);'
+                . 'if(a&&parseInt(a.getAttribute("data-id-product"),10)===p'
+                . '&&parseInt(a.getAttribute("data-id-product-attribute"),10)===c)return i+1;}return 0;})(%s,%s,%d,%d)',
+                json_encode($this->getSelector('cartLine')),
+                json_encode($this->getSelector('lineRemoveLink')),
+                $productId,
+                $combinationId
+            ))->getReturnValue();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Attribute values the $line-th line shows, sorted and joined with " / "
+     * (e.g. "Black / M"), to compare with Product::getCombinationValues().
+     * "" when none.
+     */
+    public function getLineCombinationValues(int $line = 1): string
+    {
+        $json = $this->pfLineEval(
+            $line,
+            'return JSON.stringify([].slice.call(l.querySelectorAll(%s)).map(function(v){return v.textContent.replace(/\\s+/g," ").trim();}));',
+            'lineAttributeValue'
+        );
+        $values = is_string($json) ? json_decode($json, true) : null;
+        if (!is_array($values)) {
+            return '';
+        }
+        $values = array_values(array_filter($values, fn ($v) => is_string($v) && $v !== ''));
+        sort($values);
+
+        return implode(' / ', $values);
     }
 
     /** Add one to the quantity of the $line-th line and wait for the cart to follow. */
