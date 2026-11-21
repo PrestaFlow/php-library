@@ -139,3 +139,8 @@ docker compose logs ps92 | grep -i -e 'post-script' -e '✅' -e 'error'
 reported 2026-09-24. `docker/post-scripts/20-carrier-restrictions.sh` copies
 the rows as a workaround. Without it, checkout on the second shop stops at
 "no payment method available", with nothing in the logs to explain why.
+
+**A duplicated shop finds nothing in search.** Its products are copied as
+already indexed, but it gets no search words of its own, so every search
+answers no product. `docker/post-scripts/30-search-index.sh` rebuilds the
+search index of each shop in that shop's context (`Search::indexation(true)`).
