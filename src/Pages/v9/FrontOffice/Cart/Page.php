@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Cart;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
@@ -9,6 +10,9 @@ class Page extends BasePage
     public string $pageTitle = 'Cart';
     public string $url = 'cart';
     public $shopPage = 'cart';
+
+    /** Skip reason of requireVoucherForm(). */
+    public const NO_VOUCHER_FORM = 'This shop shows no promo code field on its cart page.';
 
     public function defineSelectors()
     {
@@ -40,6 +44,20 @@ class Page extends BasePage
             // hummingbird: .product-line__item--info .product-line__item-value).
             'lineAttributeValue' => '.product-line-info > .value, .product-line__item--info > .product-line__item-value',
             'productsSubtotal' => '#cart-subtotal-products .value, #cart-subtotal-products .cart-summary__value',
+            // Grand total of the cart page: Classic's .cart-total line (1.7 to
+            // 9), the first total line of hummingbird's summary.
+            'cartTotal' => '.js-cart-detailed-totals .cart-total .value, .js-cart-detailed-totals .js-cart-summary-totals .cart-summary__value',
+            // The promo code block (cart-voucher.tpl), Classic and hummingbird
+            // alike: the form posts discount_name, the core JS sends it over
+            // AJAX and refreshes the cart.
+            'voucherForm' => '.js-cart-voucher form[data-link-action="add-voucher"]',
+            'voucherInput' => '.js-cart-voucher form[data-link-action="add-voucher"] input[name="discount_name"]',
+            'voucherSubmitButton' => '.js-cart-voucher form[data-link-action="add-voucher"] button[type="submit"]',
+            // What opens the collapsed form: Classic's "Have a promo code?"
+            // link, hummingbird's accordion button.
+            'voucherToggle' => '.js-cart-voucher a.collapse-button[href="#promo-code"], .js-cart-voucher [data-bs-target="#promo-code"]',
+            'voucherRemoveLink' => '.js-cart-voucher [data-link-action="remove-voucher"]',
+            'voucherErrorText' => '.js-cart-voucher .js-error-text',
         ];
     }
 
@@ -181,6 +199,147 @@ class Page extends BasePage
             $before
         ), 10000);
         $this->waitForStable(3000);
+    }
+
+    /** Whether the cart page shows the promo code form. */
+    public function hasVoucherForm(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('voucherForm'), 5000);
+    }
+
+    /**
+     * Skip the test when the cart page has no promo code form: the theme
+     * does not show it, or the shop has no active cart rule at all (the
+     * block is only rendered then).
+     */
+    public function requireVoucherForm(): void
+    {
+        if (!$this->hasVoucherForm()) {
+            throw new SkipTestException(self::NO_VOUCHER_FORM, skipRemaining: false);
+        }
+    }
+
+    /** Grand total of the cart, as a number. */
+    public function getCartTotal(): float
+    {
+        $text = $this->getTextContent($this->getSelector('cartTotal'), 1, true, 5000);
+
+        return is_string($text) ? $this->parsePrice($text) : 0.0;
+    }
+
+    /** Number of vouchers applied to the cart (the lines that can be removed). */
+    public function countVouchers(): int
+    {
+        return (int) $this->getPage()->evaluate(sprintf(
+            'document.querySelectorAll(%s).length',
+            json_encode($this->getSelector('voucherRemoveLink'))
+        ))->getReturnValue();
+    }
+
+    /** The error the shop answered the last promo code with, '' when there is none. */
+    public function getVoucherError(): string
+    {
+        $text = $this->getPage()->evaluate(sprintf(
+            '(function(){var e=document.querySelector(%s);return e?e.textContent:"";})()',
+            json_encode($this->getSelector('voucherErrorText'))
+        ))->getReturnValue();
+
+        return trim((string) $text);
+    }
+
+    /**
+     * Type $code in the promo code field and send it, then wait for the cart
+     * to show the voucher, or for the shop's error.
+     */
+    public function applyVoucher(string $code): void
+    {
+        $vouchers = $this->countVouchers();
+        $total = $this->pfCartTotalText();
+
+        // The form sits in a collapsed block: open it like a customer would.
+        if (!$this->pfIsShown('voucherInput')) {
+            $this->click($this->getSelector('voucherToggle'));
+            $this->waitForJsCondition($this->pfShownJs('voucherInput'), 3000);
+        }
+
+        if ($this->pfIsShown('voucherInput')) {
+            $this->setValue($this->getSelector('voucherInput'), $code);
+            $this->click($this->getSelector('voucherSubmitButton'));
+        } else {
+            // Still collapsed (a theme animation that never ended): send the
+            // very same form, through its submit event so the AJAX handler runs.
+            $this->setValueByJs($this->getSelector('voucherInput'), $code);
+            $this->getPage()->evaluate(sprintf(
+                '(function(){var f=document.querySelector(%s);if(f){f.requestSubmit();}})()',
+                json_encode($this->getSelector('voucherForm'))
+            ));
+        }
+
+        // Done when the voucher line is there and the total was refreshed, or
+        // when the shop refused the code.
+        $this->waitForJsCondition(sprintf(
+            '(function(){var e=document.querySelector(%s);if(e&&e.textContent.trim()!=="")return true;'
+            . 'var t=document.querySelector(%s);'
+            . 'return document.querySelectorAll(%s).length>%d&&!!t&&t.textContent!==%s;})()',
+            json_encode($this->getSelector('voucherErrorText')),
+            json_encode($this->getSelector('cartTotal')),
+            json_encode($this->getSelector('voucherRemoveLink')),
+            $vouchers,
+            json_encode($total)
+        ), 10000);
+        $this->waitForStable(3000);
+    }
+
+    /** Remove the $nth applied voucher (1-based) and wait for the cart to follow. */
+    public function removeVoucher(int $nth = 1): void
+    {
+        $vouchers = $this->countVouchers();
+        $total = $this->pfCartTotalText();
+
+        $this->getPage()->evaluate(sprintf(
+            '(function(){[].slice.call(document.querySelectorAll("[data-pf-cart-target]")).forEach(function(e){e.removeAttribute("data-pf-cart-target");});'
+            . 'var e=document.querySelectorAll(%s)[%d];if(e){e.setAttribute("data-pf-cart-target","voucher");}})()',
+            json_encode($this->getSelector('voucherRemoveLink')),
+            $nth - 1
+        ));
+        $this->click('[data-pf-cart-target="voucher"]');
+
+        $this->waitForJsCondition(sprintf(
+            '(function(){var t=document.querySelector(%s);'
+            . 'return document.querySelectorAll(%s).length<%d&&!!t&&t.textContent!==%s;})()',
+            json_encode($this->getSelector('cartTotal')),
+            json_encode($this->getSelector('voucherRemoveLink')),
+            $vouchers,
+            json_encode($total)
+        ), 10000);
+        $this->waitForStable(3000);
+    }
+
+    private function pfCartTotalText(): string
+    {
+        return (string) $this->getPage()->evaluate(sprintf(
+            '(function(){var t=document.querySelector(%s);return t?t.textContent:"";})()',
+            json_encode($this->getSelector('cartTotal'))
+        ))->getReturnValue();
+    }
+
+    /**
+     * JS expression: whether the element $key is rendered, not collapsed away
+     * and not in the middle of a collapse animation (.collapsing), where a
+     * click would land on a moving target.
+     */
+    private function pfShownJs(string $key): string
+    {
+        return sprintf(
+            '(function(){var e=document.querySelector(%s);return !!e&&e.offsetParent!==null'
+            . '&&e.getBoundingClientRect().height>0&&!e.closest(".collapsing");})()',
+            json_encode($this->getSelector($key))
+        );
+    }
+
+    private function pfIsShown(string $key): bool
+    {
+        return $this->getPage()->evaluate($this->pfShownJs($key))->getReturnValue() === true;
     }
 
     private function pfChangeLineQuantity(int $line, string $buttonKey, int $change): void
