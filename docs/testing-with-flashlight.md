@@ -139,3 +139,9 @@ docker compose logs ps92 | grep -i -e 'post-script' -e '✅' -e 'error'
 reported 2026-09-24. `docker/post-scripts/20-carrier-restrictions.sh` copies
 the rows as a workaround. Without it, checkout on the second shop stops at
 "no payment method available", with nothing in the logs to explain why.
+
+**The containers cannot send e-mails.** There is no mail relay behind their
+`sendmail`, so `Mail::Send()` fails and the forgotten-password page answers
+"An error occurred while sending the email.".
+`docker/post-scripts/30-no-mail.sh` sets `PS_MAIL_METHOD=3` ("Never send
+emails") on every shop, which makes `Mail::Send()` return true without sending.
