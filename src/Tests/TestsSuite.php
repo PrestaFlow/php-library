@@ -748,6 +748,9 @@ class TestsSuite implements OutputStates
         // Posés APRÈS Basic Auth pour pouvoir les surcharger si besoin.
         $this->presetExtraHeadersFromEnv();
 
+        // 2c) Accept-Language = the run's language, without a region.
+        $this->presetAcceptLanguage();
+
         // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
         // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
         // consentement (RGPD) sur un environnement protégé/preprod.
@@ -853,6 +856,53 @@ class TestsSuite implements OutputStates
             static fn () => TestsSuite::getBrowser(force: false),
             static fn () => TestsSuite::getPage(),
         );
+    }
+
+    /**
+     * The Accept-Language header the browser sends: the run's language alone
+     * (PRESTAFLOW_LOCALE, "en"), never a region, unless PRESTAFLOW_EXTRA_HEADERS
+     * sets one.
+     *
+     * With PS_DETECT_COUNTRY (on by default), PrestaShop picks the visitor's
+     * country from the region of this header, and the address forms preselect
+     * it. Chrome otherwise sends the locale of the machine it runs on: fr-FR on
+     * a French laptop (France preselected), en-US on a CI runner (United States
+     * preselected). On a shop whose payment modules are restricted to some
+     * countries, the same checkout then passes on one machine and finds "no
+     * payment method available" on the other. Without a region, PrestaShop
+     * keeps its default country wherever the run happens.
+     */
+    protected function presetAcceptLanguage(): void
+    {
+        // Only PRESTAFLOW_EXTRA_HEADERS wins: a value left in the static array by
+        // an earlier suite of the process (another locale) is replaced.
+        $fromEnv = json_decode((string) Env::get('PRESTAFLOW_EXTRA_HEADERS', ''), true);
+        foreach (array_keys(is_array($fromEnv) ? $fromEnv : []) as $name) {
+            if (strcasecmp((string) $name, 'Accept-Language') === 0) {
+                return;
+            }
+        }
+
+        $language = self::acceptLanguageFor((string) ($this->globals['LOCALE'] ?? Env::get('PRESTAFLOW_LOCALE', 'en')));
+        TestsSuite::$extraHttpHeaders['Accept-Language'] = $language;
+
+        $browser = TestsSuite::getBrowser(force: false);
+        if ($browser) {
+            try {
+                $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
+        self::pushExtraHttpHeaders(TestsSuite::getPage());
+    }
+
+    /** "en", "fr-FR", "pt_BR" => "en", "fr", "pt"; anything unusable => "en". */
+    public static function acceptLanguageFor(string $locale): string
+    {
+        $language = strtolower((string) preg_replace('/[-_].*$/', '', trim($locale)));
+
+        return preg_match('/^[a-z]{2,3}$/', $language) ? $language : 'en';
     }
 
     /**
