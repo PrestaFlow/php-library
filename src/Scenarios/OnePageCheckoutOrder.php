@@ -89,6 +89,12 @@ class OnePageCheckoutOrder extends Scenario
         // returns false on a missing selector instead of raising — so a failed
         // back-office login would go unnoticed and every later step would
         // "pass" while doing nothing at all.
+        ->it('the theme supports the one page checkout', function () use ($frontOfficeOnePageCheckoutPage) {
+            // Skips the suite on the Classic theme, before the layout is switched.
+            $frontOfficeOnePageCheckoutPage->requireCompatibleTheme();
+
+            Expect::that($frontOfficeOnePageCheckoutPage->getShopThemeName())->notEquals('classic');
+        })
         ->it('log in on the BackOffice', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->goToPage('login');
             $backOfficeLoginPage->login();

@@ -4,6 +4,7 @@ namespace PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout;
 
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 
 /**
  * One Page Checkout, shipped as the ps_onepagecheckout module since PrestaShop 9.2.
@@ -49,6 +50,37 @@ class Page extends BasePage
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
             'payButton' => '#opc-pay-button',
         ];
+    }
+
+    public const CLASSIC_THEME = 'The One Page Checkout does not support the Classic theme';
+
+    /**
+     * The folder of the theme the front office is rendered with ("classic",
+     * "hummingbird"…), read from its own stylesheets on the home page. Empty
+     * when no stylesheet points into themes/.
+     */
+    public function getShopThemeName(): string
+    {
+        $this->goToUrl($this->pfBaseUrl());
+
+        return (string) $this->getPage()->evaluate(
+            '(function(){var l=[].slice.call(document.querySelectorAll("link[rel=stylesheet][href]"));'
+            . 'for(var i=0;i<l.length;i++){var m=l[i].href.match(/\/themes\/([^\/]+)\/assets\//);if(m){return m[1];}}'
+            . 'return "";})()'
+        )->getReturnValue();
+    }
+
+    /**
+     * Skip the rest of the suite when the shop runs the Classic theme. The
+     * module's own back office warns that the layout "will break your
+     * storefront" there (it needs a Bootstrap 5 theme): on Classic the order
+     * page renders empty, so switching to it would only break the shop.
+     */
+    public function requireCompatibleTheme(): void
+    {
+        if ($this->getShopThemeName() === 'classic') {
+            throw new SkipTestException(self::CLASSIC_THEME, skipRemaining: true);
+        }
     }
 
     /**

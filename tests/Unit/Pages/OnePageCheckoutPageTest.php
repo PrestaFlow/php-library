@@ -37,6 +37,16 @@ final class OnePageCheckoutPageTest extends TestCase
         }
     }
 
+    public function testSkipsTheClassicTheme(): void
+    {
+        $this->assertTrue(method_exists(self::PAGE_CLASS, 'requireCompatibleTheme'));
+        $this->assertTrue(method_exists(self::PAGE_CLASS, 'getShopThemeName'));
+        $this->assertSame(
+            'The One Page Checkout does not support the Classic theme',
+            constant(self::PAGE_CLASS . '::CLASSIC_THEME')
+        );
+    }
+
     public function testSelectPaymentChecksTheChoiceSurvivesARefresh(): void
     {
         $method = new \ReflectionMethod(self::PAGE_CLASS, 'selectPayment');
