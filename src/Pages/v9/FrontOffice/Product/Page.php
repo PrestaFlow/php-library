@@ -187,6 +187,12 @@ class Page extends BasePage
 
         $this->click($this->getSelector('addToCartButton'));
 
-        return ltrim($this->getTextContent($this->getSelector('modalTitle')));
+        // The confirmation modal opens once the add-to-cart request answered.
+        // 3 s (getTextContent()'s default) was too short on a busy shop: the
+        // caller then navigated to the cart while the request was still in
+        // flight, and the cart came up empty (seen once in a CI-like run).
+        $title = $this->getTextContent($this->getSelector('modalTitle'), 1, true, 10000);
+
+        return ltrim(is_string($title) ? $title : '');
     }
 }

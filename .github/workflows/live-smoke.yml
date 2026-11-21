@@ -38,6 +38,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Runs the smoke AND the scenario suites on demand, whatever changed.
+  workflow_dispatch:
 
 jobs:
   smoke:
@@ -52,14 +54,17 @@ jobs:
             service: ps17
             port: 8017
             theme: classic
+            shop_id: 1
           - ps: '8.2.8'
             service: ps82
             port: 8082
             theme: classic
+            shop_id: 1
           - ps: '9.2.0'
             service: ps92
             port: 8092
             theme: hummingbird
+            shop_id: 1
           # Shop 2 of the same container, on its own port and its own theme.
           # Without this row "9.2 passes" would only ever mean "hummingbird
           # passes", and a theme-aware selector that silently matched on one
@@ -68,9 +73,15 @@ jobs:
             service: ps92
             port: 8093
             theme: classic
+            # The scenarios write back-office settings (checkout layout,
+            # theme) per shop: this row's are shop 2's.
+            shop_id: 2
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The scenario step compares the PR with its base branch.
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -142,6 +153,47 @@ jobs:
           done
           exit $status
 
+      # The scenario suites (src/Tests/Suites/Scenarios) on the shop this job
+      # already started: no extra job, no extra shop boot. They cost several
+      # minutes per row, so a pull request only runs them when it touches what
+      # they exercise; pushes to main and manual runs always do. Measured
+      # durations: see the PR that added this step.
+      - name: Decide whether the scenarios run
+        id: scenarios
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(src/(Scenarios|Pages|Expects|Tests/TestsSuite\.php|Tests/Suites/Scenarios|Support|Urls|Themes|Resolvers)|docker|docker-compose\.yml|composer\.lock|\.github/(workflows/live-smoke\.yml|scripts/|scenario-expected-skips\.json))'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No change the scenarios exercise: skipped on this pull request."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Every scenario runs even when one is red. A failure, and a skip not
+      # listed for this row in .github/scenario-expected-skips.json, fail the
+      # step: on the demo data "no product can be added to the cart" or "no
+      # offline payment method" means the discovery broke, not the shop.
+      - name: Run the scenario suites
+        if: ${{ !cancelled() && steps.scenarios.outputs.run == 'true' }}
+        env:
+          PRESTAFLOW_FO_URL: http://localhost:${{ matrix.port }}/
+          PRESTAFLOW_BO_URL: http://localhost:${{ matrix.port }}/admin-dev/
+          PRESTAFLOW_BO_EMAIL: admin@prestashop.com
+          PRESTAFLOW_BO_PASSWD: prestashop
+          # Created by EnsureTestAccount, the first scenario of the run.
+          PRESTAFLOW_FO_EMAIL: pf-ci@example.com
+          PRESTAFLOW_FO_PASSWD: 'PrestaFlow2026!'
+          PRESTAFLOW_PS_VERSION: ${{ matrix.ps }}
+          PRESTAFLOW_THEME: ${{ matrix.theme }}
+          PRESTAFLOW_SHOP_ID: ${{ matrix.shop_id }}
+          PRESTAFLOW_LOCALE: en
+        run: .github/scripts/run-scenarios.sh "${{ matrix.ps }}-${{ matrix.theme }}"
+
       # Says what is on disk before the upload decides there is nothing to
       # take, so an empty artifact can be told apart from a capture that
       # never happened.
@@ -150,12 +202,15 @@ jobs:
         run: |
           echo "cwd: $(pwd)"
           ls -laR smoke-output/ 2>&1 || echo "smoke-output/ does not exist"
+          ls -laR scenario-output/ 2>&1 || echo "scenario-output/ does not exist"
 
       - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ matrix.ps }}-${{ matrix.theme }}
-          path: smoke-output/
+          path: |
+            smoke-output/
+            scenario-output/
           # `warn`, not `ignore`: an upload that finds nothing has to say so.
           if-no-files-found: warn

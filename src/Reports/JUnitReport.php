@@ -96,7 +96,19 @@ final class JUnitReport
                 $caseEl->appendChild($sysOut);
             }
         } elseif (in_array($state, ['skip', 'skipped', 'todo'], true)) {
-            $caseEl->appendChild($doc->createElement('skipped'));
+            $skippedEl = $doc->createElement('skipped');
+            // The reason a test skipped itself with (skipWithReason(), a page
+            // that lacks what it needs), or why it was not run: CI tells an
+            // expected skip from one that hides a regression by it.
+            $reasons = $test['expect']['skip'] ?? [];
+            $reason = is_array($reasons) ? implode("\n", array_filter($reasons, 'is_string')) : (string) $reasons;
+            if ($reason === '' && $state === 'skipped') {
+                $reason = 'Not run: an earlier test of the suite failed.';
+            }
+            if ($reason !== '') {
+                $skippedEl->setAttribute('message', $reason);
+            }
+            $caseEl->appendChild($skippedEl);
         }
 
         return $caseEl;
