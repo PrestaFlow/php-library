@@ -74,6 +74,14 @@ curl -s http://localhost:8092/ | grep -o 'themes/[a-z]*/' | head -1   # hummingb
 curl -s http://localhost:8093/ | grep -o 'themes/[a-z]*/' | head -1   # classic
 ```
 
+Every shop also mounts `docker/nginx/fastcgi_params`, which raises nginx's
+FastCGI buffers. Flashlight ships them at nginx's defaults, and the One Page
+Checkout's submit (9.2) answers with headers too big for them: nginx returns a
+502 ("upstream sent too big header" in `docker compose logs`), no order is
+placed and the checkout only says "Unable to submit checkout.". A container
+started before this mount existed needs `docker compose up -d --force-recreate
+<service>` to pick it up.
+
 ## Configure
 
 ```bash
