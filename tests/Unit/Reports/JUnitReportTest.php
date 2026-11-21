@@ -56,6 +56,23 @@ final class JUnitReportTest extends TestCase
         $this->assertTrue(isset($cases[2]->skipped));
     }
 
+    public function testSkipCarriesItsReason(): void
+    {
+        $report = new JUnitReport();
+        $report->addSuite($this->sampleSuite([
+            'tests' => [
+                ['title' => 'pay', 'state' => 'skip', 'time' => 0, 'expect' => ['skip' => ['No offline payment method offered by the shop']]],
+                ['title' => 'after', 'state' => 'skipped', 'time' => 0, 'expect' => []],
+                ['title' => 'static', 'state' => 'skip', 'time' => 0, 'expect' => []],
+            ],
+        ]));
+        $cases = simplexml_load_string($report->render())->testsuite[0]->testcase;
+
+        $this->assertSame('No offline payment method offered by the shop', (string) $cases[0]->skipped['message']);
+        $this->assertSame('Not run: an earlier test of the suite failed.', (string) $cases[1]->skipped['message']);
+        $this->assertFalse(isset($cases[2]->skipped['message']));
+    }
+
     public function testTodoMapsToSkipped(): void
     {
         $report = new JUnitReport();
