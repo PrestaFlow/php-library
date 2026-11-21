@@ -21,7 +21,13 @@ class Application extends BaseApplication
     {
         parent::__construct('PrestaFlow', \PrestaFlow\Library\Traits\AppVersion::APP_VERSION);
 
-        $this->add(new ExecuteSuite());
+        // addCommand() arrive en Symfony 7.4 et add() disparaît en 8 : on
+        // prend celle qui existe, pour garder Symfony 6 (et PHP 8.1) possible.
+        if (method_exists($this, 'addCommand')) {
+            $this->addCommand(new ExecuteSuite());
+        } else {
+            $this->add(new ExecuteSuite());
+        }
 
         // Most failures inside a run are \Error (resolveSuitePaths() throws one):
         // without this they would escape run() as a PHP fatal error.
