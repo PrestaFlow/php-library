@@ -133,6 +133,42 @@ class Page extends BasePage
     }
 
     /**
+     * Id of the product open now: the embedded product data, else the
+     * add-to-cart form's id_product field (1.7 to 9, Classic and
+     * hummingbird). 0 when the page shows no product.
+     */
+    public function getProductId(): int
+    {
+        $id = (int) ($this->getProductData()['id_product'] ?? 0);
+        if ($id > 0) {
+            return $id;
+        }
+
+        try {
+            return (int) $this->getPage()->evaluate(
+                '(function(){var i=document.querySelector(\'#add-to-cart-or-refresh input[name="id_product"], input[name="id_product"]\');'
+                . 'return i?i.value:"0";})()'
+            )->getReturnValue();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Name of the product open now, as the shop shows it in the current
+     * language: the embedded product data, else the page heading.
+     */
+    public function getProductName(): string
+    {
+        $name = $this->getProductData()['name'] ?? null;
+        if (is_string($name) && trim($name) !== '') {
+            return trim(html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+
+        return trim((string) $this->getTitle());
+    }
+
+    /**
      * Whether the shop lets this product be ordered without stock: the
      * product's own setting, else PS_ORDER_OUT_OF_STOCK, or no stock
      * management at all (allow_oosp in the embedded product data).
@@ -263,12 +299,6 @@ class Page extends BasePage
         }
 
         return true;
-    }
-
-    /** Id of the product open now (data-product), 0 when unknown. */
-    public function getProductId(): int
-    {
-        return (int) ($this->getProductData()['id_product'] ?? 0);
     }
 
     /**
