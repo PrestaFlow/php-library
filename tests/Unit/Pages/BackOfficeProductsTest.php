@@ -112,6 +112,29 @@ final class BackOfficeProductsTest extends TestCase
         );
     }
 
+    public function testV7UsesTheLegacyCatalogAndProductPage(): void
+    {
+        $class = 'PrestaFlow\\Library\\Pages\\v7\\BackOffice\\Products\\Page';
+        $page = new $class(locale: 'en', patchVersion: '1.7.8.11', globals: [
+            'PS_VERSION' => '1.7.8.11',
+            'LOCALE' => 'en',
+            'PREFIX_LOCALE' => false,
+            'BO' => ['URL' => 'http://localhost/admin/', 'EMAIL' => 'a@b.c', 'PASSWD' => 'x'],
+            'FO' => ['URL' => 'http://localhost/', 'EMAIL' => 'a@b.c', 'PASSWD' => 'x'],
+            'DEBUG' => false,
+            'VERBOSE' => false,
+        ], customs: []);
+        $selectors = $page->selectors;
+
+        $this->assertSame('input[name="filter_column_name"]', $selectors['filterNameInput']);
+        $this->assertSame('#form_step1_price_shortcut', $selectors['formPriceInput']);
+        $this->assertSame('#form_step1_qty_0_shortcut', $selectors['formQuantityInput']);
+        $this->assertSame('#catalog_deletion_modal button[value="confirm"]', $selectors['deleteConfirmButton']);
+        // Keys the v9 methods still read are kept.
+        $this->assertArrayHasKey('newProductButton', $selectors);
+        $this->assertArrayHasKey('successAlert', $selectors);
+    }
+
     public function testHasEditActions(): void
     {
         $page = $this->make();
