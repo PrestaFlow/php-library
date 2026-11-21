@@ -36,4 +36,14 @@ final class OnePageCheckoutPageTest extends TestCase
             $this->assertTrue(method_exists(self::PAGE_CLASS, $method), $method);
         }
     }
+
+    public function testSelectPaymentChecksTheChoiceSurvivesARefresh(): void
+    {
+        $method = new \ReflectionMethod(self::PAGE_CLASS, 'selectPayment');
+        $lines = file($method->getFileName());
+        $body = implode('', array_slice($lines, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+
+        $this->assertStringContainsString(':checked', $body);
+        $this->assertStringContainsString('for ($attempt', $body);
+    }
 }

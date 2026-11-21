@@ -264,7 +264,24 @@ class Page extends BasePage
      */
     public function selectPayment(mixed $modules = self::OFFLINE_PAYMENT_MODULES): ?string
     {
-        return $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
+        // The payment section is re-rendered over AJAX after the address and
+        // the carrier settle, and a refresh still in flight wipes the choice
+        // ("Please select a payment method." on submit). Check that the option
+        // stays selected, and pick it again when a refresh replaced it.
+        $checked = json_encode($this->getSelector('paymentOption') . ':checked');
+        $module = null;
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            $module = $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
+            $lost = $this->waitForJsCondition('!document.querySelector(' . $checked . ')', 1500);
+            if (!$lost) {
+                break;
+            }
+            $this->waitForJsCondition(
+                '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
+            );
+        }
+
+        return $module;
     }
 
     /**
