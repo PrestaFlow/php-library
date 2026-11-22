@@ -28,6 +28,7 @@ class Page extends BasePage
             'personalFirstNameInput' => '#checkout-personal-information-step input[name="firstname"]',
             'personalLastNameInput' => '#checkout-personal-information-step input[name="lastname"]',
             'personalContinueButton' => '#checkout-personal-information-step button[type="submit"]',
+            'personalInformationStep' => '#checkout-personal-information-step',
             // Guest new-address step.
             'addressStreetInput' => '#checkout-addresses-step input[name="address1"]',
             'addressCityInput' => '#checkout-addresses-step input[name="city"]',
@@ -64,23 +65,57 @@ class Page extends BasePage
         return $this->elementIsVisible($this->getSelector('paymentOption'), 5000);
     }
 
+    /**
+     * Étape « Informations personnelles » en invité : remplit le formulaire,
+     * coche les consentements obligatoires, vérifie le tout, puis le valide et
+     * attend l'étape des adresses.
+     *
+     * Le remplissage n'est plus fait à l'aveugle : sur un Chrome Linux en
+     * conteneur ou distant, il arrivait avant que la page de commande soit en
+     * place (clic du panier lent à naviguer), et le formulaire partait vide —
+     * titre, prénom, nom, e-mail vides, cases décochées — pour échouer 40 s plus
+     * tard sur l'étape de livraison. On attend donc le formulaire, on relit les
+     * valeurs saisies (ressaisie en JS si besoin, pfFillInputsVerified()) et un
+     * formulaire toujours incomplet échoue ici, avec le nom des champs.
+     */
     public function checkoutAsGuest(string $email, string $firstName, string $lastName): void
     {
+        $emailInput = json_encode($this->getSelector('personalEmailInput'));
+        Expect::that($this->waitForJsCondition(
+            '!!document.querySelector(' . $emailInput . ')',
+            20000
+        ))->equals(true, 'The checkout personal information form did not show up');
+
         // If a guest/sign-in toggle is present, switch to the guest form.
         $this->click($this->getSelector('guestToggle'));
+        // Le champ doit être affiché (onglet invité actif) avant d'y taper.
+        $this->waitForJsCondition(
+            '(function(e){return !!e && e.getClientRects().length > 0;})(document.querySelector(' . $emailInput . '))',
+            5000
+        );
+        $this->waitForStable(3000);
 
-        $this->setValue($this->getSelector('personalFirstNameInput'), $firstName);
-        $this->setValue($this->getSelector('personalLastNameInput'), $lastName);
-        $this->setValue($this->getSelector('personalEmailInput'), $email);
+        $unfilled = $this->pfFillInputsVerified([
+            $this->getSelector('personalFirstNameInput') => $firstName,
+            $this->getSelector('personalLastNameInput') => $lastName,
+            $this->getSelector('personalEmailInput') => $email,
+        ]);
+        Expect::that($unfilled === [])->equals(true, 'Guest form fields still not filled: ' . implode(', ', $unfilled));
 
         // Tick every required consent checkbox (GDPR terms + data privacy) — the
         // step refuses to advance otherwise.
-        $this->getPage()->evaluate(
-            '(function(){[].slice.call(document.querySelectorAll("#checkout-personal-information-step input[type=checkbox]")).forEach(function(c){if(c.required&&!c.checked){c.click();}});})()'
-        );
+        $unticked = $this->pfTickRequiredCheckboxes($this->getSelector('personalInformationStep'));
+        Expect::that($unticked === 0)->equals(true, 'Required consent checkboxes of the guest form are still unticked');
 
         $this->click($this->getSelector('personalContinueButton'));
         $this->waitForPageReload();
+
+        // L'étape suivante : le formulaire d'adresse (invité) ou ses cartes.
+        $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')'
+            . ' || !!document.querySelector(' . json_encode($this->getSelector('addressesContinueButton')) . ')',
+            15000
+        );
     }
 
     /**
@@ -118,6 +153,13 @@ class Page extends BasePage
      */
     public function fillNewAddress(array $address): void
     {
+        // Le formulaire doit être là avant toute saisie (page encore en
+        // chargement après l'étape précédente).
+        $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')',
+            15000
+        );
+
         // Country first: changing it re-renders the form for that country's
         // address format (postcode, state).
         //
@@ -154,11 +196,16 @@ class Page extends BasePage
             $this->getSelector('addressPostcodeInput')
         );
 
-        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
-        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
-        $this->setValue($this->getSelector('addressPostcodeInput'), $postcode);
+        // Même précaution que checkoutAsGuest() : saisie relue, ressaisie si
+        // le texte n'a pas tenu (focus perdu, re-rendu du formulaire).
+        $unfilled = $this->pfFillInputsVerified([
+            $this->getSelector('addressStreetInput') => (string) ($address['street'] ?? ''),
+            $this->getSelector('addressCityInput') => (string) ($address['city'] ?? ''),
+            $this->getSelector('addressPostcodeInput') => $postcode,
+            $this->getSelector('addressPhoneInput') => (string) ($address['phone'] ?? ''),
+        ]);
+        Expect::that($unfilled === [])->equals(true, 'Address form fields still not filled: ' . implode(', ', $unfilled));
         $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
-        $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
 
         $this->click($this->getSelector('addressesContinueButton'));
         $this->waitForPageReload();
