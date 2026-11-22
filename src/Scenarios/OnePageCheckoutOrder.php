@@ -101,12 +101,6 @@ class OnePageCheckoutOrder extends Scenario
 
             Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
         })
-        ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
-            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
-            $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
-
-            Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
-        })
         ->it('log in on the FrontOffice', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->goToPage('login');
             $frontOfficeLoginPage->login(
@@ -117,6 +111,9 @@ class OnePageCheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
+            // Avant la bascule du tunnel : un saut ici (aucun produit commandable)
+            // ne doit pas laisser la boutique sur une mise en page jamais vérifiée.
+            // Le panier ne dépend pas de la mise en page du tunnel.
             // Skips the suite when no product of the shop can be added to the cart.
             $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
@@ -124,8 +121,24 @@ class OnePageCheckoutOrder extends Scenario
             $frontOfficeCartPage->goToCart();
             Expect::that($frontOfficeCartPage->hasItems())->equals(true);
         })
-        ->it('reach the one page checkout', function () use ($frontOfficeCartPage, $frontOfficeOnePageCheckoutPage) {
+        ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
+            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
+            $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
+
+            Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
+        })
+        ->it('reach the one page checkout', function () use ($frontOfficeCartPage, $frontOfficeOnePageCheckoutPage, $backOfficeCheckoutLayoutPage) {
+            $frontOfficeCartPage->goToCart();
             $frontOfficeCartPage->proceedToCheckout();
+
+            // Le front doit afficher la commande en une page ; sinon (thème sans
+            // gabarit pour le module) la boutique est remise en quatre étapes
+            // sur-le-champ et la suite est sautée : jamais de tunnel cassé.
+            self::pfRequireOnePageCheckoutRendered(
+                $frontOfficeOnePageCheckoutPage,
+                $backOfficeCheckoutLayoutPage,
+                (int) $this->getParam('shopId')
+            );
 
             Expect::that($frontOfficeOnePageCheckoutPage->isOnePageCheckoutActive())->equals(true);
         })
