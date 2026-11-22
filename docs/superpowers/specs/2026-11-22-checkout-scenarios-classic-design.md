@@ -24,7 +24,7 @@ enfant de Classic, ni un thème dont les feuilles ne pointent pas dans
 `themes/<nom>/assets/`.
 
 Changement, en plus de la garde :
-- `Scenario::pfRequireOnePageCheckoutRendered()` juge sur ce que voit le
+- `OnePageCheckout\Page::requireRenderedOrRestore()` juge sur ce que voit le
   client : à l'étape « reach the one page checkout », si `#opc-form` n'est pas
   affiché, la boutique est remise en quatre étapes aussitôt (et cela est
   vérifié), puis la suite est sautée avec `ONE_PAGE_CHECKOUT_UNAVAILABLE`. Si la

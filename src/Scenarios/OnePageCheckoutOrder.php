@@ -134,11 +134,7 @@ class OnePageCheckoutOrder extends Scenario
             // Le front doit afficher la commande en une page ; sinon (thème sans
             // gabarit pour le module) la boutique est remise en quatre étapes
             // sur-le-champ et la suite est sautée : jamais de tunnel cassé.
-            Scenario::pfRequireOnePageCheckoutRendered(
-                $frontOfficeOnePageCheckoutPage,
-                $backOfficeCheckoutLayoutPage,
-                (int) $this->getParam('shopId')
-            );
+            $frontOfficeOnePageCheckoutPage->requireRenderedOrRestore($backOfficeCheckoutLayoutPage, (int) $this->getParam('shopId'));
 
             Expect::that($frontOfficeOnePageCheckoutPage->isOnePageCheckoutActive())->equals(true);
         })

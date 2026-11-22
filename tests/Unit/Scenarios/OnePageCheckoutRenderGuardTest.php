@@ -4,6 +4,7 @@ namespace PrestaFlow\Tests\Unit\Scenarios;
 
 use PHPUnit\Framework\TestCase;
 use PrestaFlow\Library\Exceptions\SkipTestException;
+use PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout\Page as OnePageCheckoutPage;
 use PrestaFlow\Library\Scenarios\Scenario;
 
 /**
@@ -14,18 +15,15 @@ use PrestaFlow\Library\Scenarios\Scenario;
  */
 final class OnePageCheckoutRenderGuardTest extends TestCase
 {
-    private function front(bool $rendered): object
+    private function front(bool $rendered): OnePageCheckoutPage
     {
-        return new class ($rendered) {
-            public function __construct(private bool $rendered)
-            {
-            }
+        $page = $this->getMockBuilder(OnePageCheckoutPage::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isOnePageCheckoutActive'])
+            ->getMock();
+        $page->method('isOnePageCheckoutActive')->willReturn($rendered);
 
-            public function isOnePageCheckoutActive(): bool
-            {
-                return $this->rendered;
-            }
-        };
+        return $page;
     }
 
     private function back(bool $switchWorks): object
@@ -60,7 +58,7 @@ final class OnePageCheckoutRenderGuardTest extends TestCase
     {
         $back = $this->back(true);
 
-        Scenario::pfRequireOnePageCheckoutRendered($this->front(true), $back, 1);
+        $this->front(true)->requireRenderedOrRestore($back, 1);
 
         $this->assertSame([], $back->calls);
     }
@@ -70,7 +68,7 @@ final class OnePageCheckoutRenderGuardTest extends TestCase
         $back = $this->back(true);
 
         try {
-            Scenario::pfRequireOnePageCheckoutRendered($this->front(false), $back, 2);
+            $this->front(false)->requireRenderedOrRestore($back, 2);
             $this->fail('the suite must be skipped');
         } catch (SkipTestException $e) {
             $this->assertTrue($e->skipRemaining);
@@ -83,7 +81,7 @@ final class OnePageCheckoutRenderGuardTest extends TestCase
     public function testFailsLoudlyWhenTheShopCannotBeRestored(): void
     {
         try {
-            Scenario::pfRequireOnePageCheckoutRendered($this->front(false), $this->back(false), 1);
+            $this->front(false)->requireRenderedOrRestore($this->back(false), 1);
             $this->fail('a shop left with a broken checkout must fail the step');
         } catch (SkipTestException $e) {
             $this->fail('a shop left with a broken checkout must not be reported as skipped');
@@ -110,10 +108,10 @@ final class OnePageCheckoutRenderGuardTest extends TestCase
     {
         $source = file_get_contents(__DIR__ . '/../../../src/Scenarios/' . $name . '.php');
 
-        // Les étapes sont exécutées avec $this et self liés à la suite de tests
-        // (Closure::call) : le helper doit être appelé par le nom de sa classe.
-        $this->assertStringContainsString('Scenario::pfRequireOnePageCheckoutRendered(', $source);
-        $this->assertStringNotContainsString('self::pfRequireOnePageCheckoutRendered(', $source);
+        // Les étapes s'exécutent liées à la suite de tests (Closure::call) : ni
+        // self:: ni Scenario:: n'y désignent le scénario. La vérification passe
+        // donc par la page objet.
+        $this->assertStringContainsString('->requireRenderedOrRestore(', $source);
 
         // Un saut « aucun produit commandable » doit arriver avant la bascule,
         // jamais entre la bascule et la vérification du front.

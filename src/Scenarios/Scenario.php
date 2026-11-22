@@ -155,50 +155,7 @@ class Scenario
     }
 
     /** Raison du saut quand la commande en une page ne s'affiche pas sur le front. */
-    public const ONE_PAGE_CHECKOUT_UNAVAILABLE = 'The One Page Checkout is not available with this shop\'s theme'
-        . ' (the order page does not render it): the shop was switched back to the four-page checkout.';
-
-    /**
-     * Vérifie, une fois la boutique basculée sur la commande en une page, que le
-     * front l'affiche vraiment ; sinon remet aussitôt le tunnel en quatre étapes
-     * et saute la suite.
-     *
-     * Le module ps_onepagecheckout n'a de gabarit que pour les thèmes Bootstrap 5
-     * (Hummingbird). Sur Classic, ou sur un thème enfant de Classic que la garde
-     * sur le nom du thème ne reconnaît pas, la page de commande ne rend plus que
-     * le squelette du module (« Hello world! This is HTML5 Boilerplate. ») : le
-     * tunnel est cassé pour les vrais clients. La garde sur le thème évite la
-     * bascule dans le cas connu ; cette vérification couvre tous les autres, car
-     * elle juge sur ce que voit le client et non sur un nom de dossier.
-     *
-     * Si la remise en quatre étapes échoue elle-même, c'est un échec franc : la
-     * boutique est cassée et il faut que cela se voie.
-     *
-     * @param object $frontOfficeOnePageCheckoutPage FrontOffice\OnePageCheckout, sur la page de commande
-     * @param object $backOfficeCheckoutLayoutPage   BackOffice\CheckoutLayout, session BO ouverte
-     */
-    public static function pfRequireOnePageCheckoutRendered(
-        object $frontOfficeOnePageCheckoutPage,
-        object $backOfficeCheckoutLayoutPage,
-        int $shopId
-    ): void {
-        if ($frontOfficeOnePageCheckoutPage->isOnePageCheckoutActive()) {
-            return;
-        }
-
-        $backOfficeCheckoutLayoutPage->goTo($shopId);
-        if (!$backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected()) {
-            $backOfficeCheckoutLayoutPage->switchToFourPageCheckout();
-        }
-
-        Expect::that($backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected())->equals(
-            true,
-            'The One Page Checkout does not render on the order page and the shop could not be switched'
-                . ' back to the four-page checkout: its checkout is broken until it is.'
-        );
-
-        throw new SkipTestException(self::ONE_PAGE_CHECKOUT_UNAVAILABLE, skipRemaining: true);
-    }
+    public const ONE_PAGE_CHECKOUT_UNAVAILABLE = \PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout\Page::RENDER_UNAVAILABLE;
 
     public function it(string $description, $steps)
     {

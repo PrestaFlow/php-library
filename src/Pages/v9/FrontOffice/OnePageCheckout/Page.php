@@ -54,6 +54,10 @@ class Page extends BasePage
 
     public const CLASSIC_THEME = 'The One Page Checkout does not support the Classic theme';
 
+    /** Raison du saut quand la commande en une page ne s'affiche pas sur le front. */
+    public const RENDER_UNAVAILABLE = 'The One Page Checkout is not available with this shop\'s theme'
+        . ' (the order page does not render it): the shop was switched back to the four-page checkout.';
+
     /**
      * The folder of the theme the front office is rendered with ("classic",
      * "hummingbird"…), read from its own stylesheets on the home page. Empty
@@ -81,6 +85,43 @@ class Page extends BasePage
         if ($this->getShopThemeName() === 'classic') {
             throw new SkipTestException(self::CLASSIC_THEME, skipRemaining: true);
         }
+    }
+
+    /**
+     * Vérifie, une fois la boutique basculée sur la commande en une page, que le
+     * front l'affiche vraiment ; sinon remet aussitôt le tunnel en quatre étapes
+     * et saute la suite.
+     *
+     * Le module ps_onepagecheckout n'a de gabarit que pour les thèmes Bootstrap 5
+     * (Hummingbird). Sur Classic, ou sur un thème enfant de Classic que
+     * requireCompatibleTheme() ne reconnaît pas, la page de commande ne rend plus
+     * que le squelette du module (« Hello world! This is HTML5 Boilerplate. ») :
+     * le tunnel est cassé pour les vrais clients. Cette vérification juge sur ce
+     * que voit le client et non sur un nom de dossier.
+     *
+     * Si la remise en quatre étapes échoue elle-même, c'est un échec franc : la
+     * boutique est cassée et il faut que cela se voie.
+     *
+     * @param object $backOfficeCheckoutLayoutPage BackOffice\CheckoutLayout, session BO ouverte
+     */
+    public function requireRenderedOrRestore(object $backOfficeCheckoutLayoutPage, int $shopId): void
+    {
+        if ($this->isOnePageCheckoutActive()) {
+            return;
+        }
+
+        $backOfficeCheckoutLayoutPage->goTo($shopId);
+        if (!$backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected()) {
+            $backOfficeCheckoutLayoutPage->switchToFourPageCheckout();
+        }
+
+        Expect::that($backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected())->equals(
+            true,
+            'The One Page Checkout does not render on the order page and the shop could not be switched'
+                . ' back to the four-page checkout: its checkout is broken until it is.'
+        );
+
+        throw new SkipTestException(self::RENDER_UNAVAILABLE, skipRemaining: true);
     }
 
     /**
