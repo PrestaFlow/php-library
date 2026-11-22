@@ -110,7 +110,10 @@ final class OnePageCheckoutRenderGuardTest extends TestCase
     {
         $source = file_get_contents(__DIR__ . '/../../../src/Scenarios/' . $name . '.php');
 
-        $this->assertStringContainsString('pfRequireOnePageCheckoutRendered(', $source);
+        // Les étapes sont exécutées avec $this et self liés à la suite de tests
+        // (Closure::call) : le helper doit être appelé par le nom de sa classe.
+        $this->assertStringContainsString('Scenario::pfRequireOnePageCheckoutRendered(', $source);
+        $this->assertStringNotContainsString('self::pfRequireOnePageCheckoutRendered(', $source);
 
         // Un saut « aucun produit commandable » doit arriver avant la bascule,
         // jamais entre la bascule et la vérification du front.
