@@ -3,6 +3,7 @@
 namespace PrestaFlow\Tests\Unit\Pages;
 
 use PHPUnit\Framework\TestCase;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\FrontOfficePage;
 use PrestaFlow\Library\Pages\v9\FrontOffice\Checkout\Page as CheckoutPage;
 
@@ -95,6 +96,31 @@ final class CheckoutRobustnessTest extends TestCase
             ['#street' => '16 Main street', '#phone' => '0102030405'],
             ['#street' => '16 Main street', '#phone' => null]
         ));
+    }
+
+    public function testPaymentStepWithoutAnyPaymentOptionCountsAsReached(): void
+    {
+        $page = $this->checkoutPage([true]);
+
+        $this->assertTrue($page->hasReachedPaymentStep());
+        $this->assertStringContainsString('#checkout-payment-step', $page->receivedJs[0]);
+    }
+
+    public function testNoPaymentOptionSkipsTheSuiteWithTheScenarioReason(): void
+    {
+        // Aucune option de paiement : le script de sélection renvoie null.
+        $page = $this->checkoutPage([null]);
+
+        try {
+            $page->choosePayment(null);
+            $this->fail('choosePayment() must skip when the shop offers no payment option');
+        } catch (SkipTestException $e) {
+            $this->assertTrue($e->skipRemaining);
+            $this->assertSame(
+                FrontOfficePage::pfNoPaymentMethodReason(FrontOfficePage::OFFLINE_PAYMENT_MODULES),
+                $e->getMessage()
+            );
+        }
     }
 
     public function testGuestCheckoutVerifiesWhatWasTyped(): void

@@ -20,6 +20,10 @@ class Page extends BasePage
             'shippingOptionById' => '#checkout-delivery-step input[name^="delivery_option"][id="delivery_option_${carrierId}"]',
             'shippingContinueButton' => '#checkout-delivery-step button[name="confirmDeliveryOption"]',
             'paymentOption' => 'input[name="payment-option"]',
+            // L'étape de paiement affichée, qu'elle propose des moyens de
+            // paiement ou seulement « aucun moyen de paiement n'est disponible ».
+            // js-current-step : Classic et Hummingbird ; -current : Classic.
+            'paymentStepCurrent' => '#checkout-payment-step.js-current-step, #checkout-payment-step.-current',
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
             'placeOrderButton' => '#payment-confirmation button',
             // Guest personal-information step — best-effort PS 9, corrected live.
@@ -62,7 +66,15 @@ class Page extends BasePage
      */
     public function hasReachedPaymentStep(): bool
     {
-        return $this->elementIsVisible($this->getSelector('paymentOption'), 5000);
+        // L'étape est atteinte même quand elle ne propose aucun moyen de
+        // paiement (« Malheureusement, aucun moyen de paiement n'est
+        // disponible. ») : c'est à choosePayment() de sauter la suite avec sa
+        // raison, pas à cette vérification d'échouer.
+        return $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
+            . ' || !!document.querySelector(' . json_encode($this->getSelector('paymentStepCurrent')) . ')',
+            5000
+        );
     }
 
     /**
