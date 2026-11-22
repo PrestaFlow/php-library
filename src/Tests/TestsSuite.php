@@ -17,6 +17,7 @@ use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\FailedRequests;
+use PrestaFlow\Library\Support\RemoteBrowser;
 use PrestaFlow\Library\Support\ScreenRecorder;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
@@ -249,6 +250,21 @@ class TestsSuite implements OutputStates
      */
     public static function resetBrowser(): void
     {
+        // Navigateur distant : on ferme la session de ce process, sans toucher aux
+        // fichiers .browser (jamais écrits dans ce mode) ; le prochain getBrowser()
+        // ouvre une nouvelle session distante.
+        if (self::remoteBrowserConfig() !== null) {
+            try {
+                self::$browserInstance?->close();
+            } catch (\Throwable) {
+                // session déjà terminée / injoignable
+            }
+            self::$browserInstance = null;
+            self::$browserInstanceSocket = null;
+
+            return;
+        }
+
         $socketFile = self::getFilePath('.browser');
 
         try {
@@ -566,8 +582,77 @@ class TestsSuite implements OutputStates
         return self::getFilePath('.browser');
     }
 
+    /**
+     * Navigateur distant demandé par l'environnement, null sinon :
+     *  - PRESTAFLOW_BROWSER_WS : adresse ws:// ou wss:// du navigateur
+     *    (Cloudflare Browser Run, Chrome en conteneur derrière un proxy…) ;
+     *  - PRESTAFLOW_BROWSER_WS_TOKEN : jeton facultatif, envoyé dans l'en-tête
+     *    `Authorization: Bearer …` de la poignée de main.
+     *
+     * Le jeton ne sort jamais de cet en-tête : ni fichier .browser, ni message
+     * d'erreur (RemoteBrowser::redact()).
+     *
+     * @return array{uri: string, headers: array<string,string>}|null
+     */
+    public static function remoteBrowserConfig(): ?array
+    {
+        $uri = trim((string) Env::get('PRESTAFLOW_BROWSER_WS', ''));
+        if ($uri === '') {
+            return null;
+        }
+
+        $headers = [];
+        $token = trim((string) Env::get('PRESTAFLOW_BROWSER_WS_TOKEN', ''));
+        if ($token !== '') {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        return ['uri' => $uri, 'headers' => $headers];
+    }
+
+    /**
+     * getBrowser() en mode navigateur distant : une session par process, gardée
+     * en mémoire seulement (rien dans .browser, que d'autres process liraient).
+     * Jamais de Chrome local de repli : si la session ne s'ouvre pas, l'exception
+     * remonte. Taille et user agent courants (browserOptions()) posés sur chaque page.
+     *
+     * @param array{uri: string, headers: array<string,string>} $remote
+     */
+    private static function getRemoteBrowser(array $remote, bool $force): ?RemoteBrowser
+    {
+        if (self::$browserInstance instanceof RemoteBrowser
+            && self::$browserInstance->getConnection()->isConnected()) {
+            return self::$browserInstance;
+        }
+
+        self::$browserInstance = null;
+        self::$browserInstanceSocket = null;
+
+        if (!$force) {
+            return null;
+        }
+
+        $opts = self::browserOptions();
+        $browser = RemoteBrowser::connect(
+            $remote['uri'],
+            $remote['headers'],
+            self::cdpTimeout(),
+            $opts['windowSize'],
+            $opts['userAgent'],
+        );
+
+        self::$browserInstance = $browser;
+
+        return $browser;
+    }
+
     public static function getBrowser(bool $headless = true, bool $force = true)
     {
+        $remote = self::remoteBrowserConfig();
+        if ($remote !== null) {
+            return self::getRemoteBrowser($remote, $force);
+        }
+
         $browser = null;
 
         $socketFile = TestsSuite::getFilePath('.browser');
