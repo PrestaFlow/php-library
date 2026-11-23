@@ -47,7 +47,10 @@ final class PageFactorizationTest extends TestCase
     public function testPricesDropDeltaPreserved(): void
     {
         // Phase 1: v7/v8 pages are gone until Phase 2/3 reimplements them.
+        // The alias the app writes URL overrides under; the shop's own URL is
+        // read from prestashop.urls.pages through shopPage.
         $this->assertSame('promotions', $this->make('v9', 'FrontOffice\\PricesDrop')->url);
+        $this->assertSame('prices-drop', $this->make('v9', 'FrontOffice\\PricesDrop')->shopPage);
         $this->assertSame('Promotions', $this->make('v9', 'FrontOffice\\PricesDrop')->pageTitle);
     }
 

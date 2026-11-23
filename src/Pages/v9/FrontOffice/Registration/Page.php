@@ -22,6 +22,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Registration';
     public string $url = 'registration';
+    public $shopPage = 'registration';
 
     public function defineSelectors()
     {
@@ -71,6 +72,31 @@ class Page extends BasePage
      *
      * @param array{firstName?:string,lastName?:string,email:string,password:string,birthday?:string} $customer
      */
+    /**
+     * Create the account unless a customer session is already open (the
+     * credentials just tried worked). A null e-mail or password falls back
+     * to the project's account (FO_EMAIL / FO_PASSWD), as login() does.
+     */
+    public function registerUnlessLoggedIn(array $customer): void
+    {
+        $loggedIn = false;
+        try {
+            $loggedIn = $this->getPage()->evaluate(
+                '!!(window.prestashop&&prestashop.customer&&prestashop.customer.is_logged)'
+            )->getReturnValue() === true;
+        } catch (\Throwable) {
+        }
+        if ($loggedIn) {
+            return;
+        }
+
+        $customer['email'] = ($customer['email'] ?? null) ?? $this->getGlobal('FO_EMAIL');
+        $customer['password'] = ($customer['password'] ?? null) ?? $this->getGlobal('FO_PASSWD');
+
+        $this->goToRegistration();
+        $this->register($customer);
+    }
+
     public function register(array $customer): void
     {
         $this->setValueByJs($this->getSelector('firstNameInput'), $customer['firstName'] ?? 'PrestaFlow');

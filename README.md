@@ -51,6 +51,36 @@ PRESTAFLOW_SUITES=BackOffice,FrontOffice/Checkout ./vendor/bin/prestaflow run te
 - `--group` and `--draft` still apply, on the suites of the selected folders.
 - Unset or empty: every suite under `<path>` runs, as before.
 
+## Run on a remote browser
+
+By default each run launches a local Chrome. To drive a remote one instead
+(Cloudflare Browser Run, a Chrome container behind a proxy…), set:
+
+| Variable | Effect |
+|---|---|
+| `PRESTAFLOW_BROWSER_WS` | `ws://` or `wss://` address of the remote browser's DevTools endpoint. When set, the suites connect to it and never launch a local Chrome, not even as a fallback: if the connection fails, the run fails. |
+| `PRESTAFLOW_BROWSER_WS_TOKEN` | Optional. Sent as `Authorization: Bearer <token>` in the WebSocket handshake. It never appears in error messages, logs, the `.browser` file or the results. |
+
+```bash
+PRESTAFLOW_BROWSER_WS="wss://api.cloudflare.com/client/v4/accounts/<account>/browser-run/devtools/browser?keep_alive=60000" \
+PRESTAFLOW_BROWSER_WS_TOKEN="<api token>" \
+./vendor/bin/prestaflow run tests
+```
+
+- A remote browser ignores launch options: the window size and user agent
+  (`PRESTAFLOW_WINDOW_SIZE_WIDTH` / `_HEIGHT`, `PRESTAFLOW_USER_AGENT`, device
+  presets) are applied to every page instead, as the viewport size.
+- Each process opens its own session, kept in memory only. Changing the device
+  (`resetBrowser()`) closes the session; the next page opens a new one.
+- `PRESTAFLOW_CDP_TIMEOUT` applies as with a local Chrome.
+- Unset or empty `PRESTAFLOW_BROWSER_WS`: nothing changes, a local Chrome is
+  launched as before.
+
+For code that connects by itself, `PrestaFlow\Library\Support\RemoteBrowser::connect($uri, $headers, $timeoutMs, $windowSize, $userAgent)`
+is the same entry point. It reads `wss://` without blocking
+(`NonBlockingReadSocket`): with Wrench's default socket, one CDP command in two
+or three waited the 5 s socket timeout over TLS.
+
 ## Visual regression runs
 
 `VisualTestsSuite` reads these variables:

@@ -12,6 +12,13 @@ class BackOfficePage extends CommonPage
     use Locale;
     use Urls;
 
+    // Redeclared here, not only through the trait: before PHP 8.3 a trait's
+    // static property used again in a child class stays shared with the
+    // parent (CommonPage), so the back office and the front office would
+    // overwrite each other's language (BO_LOCALE).
+    protected static $localeInit = null;
+    protected static string $locale = 'en';
+
     public string $menuSelector = '';
     public string $parentMenuSelector = '';
 
@@ -58,14 +65,15 @@ class BackOfficePage extends CommonPage
         }
 
         if (is_string($page)) {
-            $pageUrl = $this->url($page);
-            if ($pageUrl !== '' && $pageUrl !== null && !in_array($pageUrl, ['login', 'index'])) {
-                $url .= $pageUrl;
-            } else {
-                $url .= match ($page) {
-                    'login', 'index' => '',
-                    default => ''
-                };
+            // Login and dashboard sit at the admin folder root. Decide on the
+            // key, before url(): that catalog is the front office's, and it
+            // translates "login" ("connexion" in French), which once turned the
+            // back-office login into /admin-dev/connexion, a 404.
+            if (!in_array($page, ['login', 'index'], true)) {
+                $pageUrl = $this->url($page);
+                if ($pageUrl !== '' && $pageUrl !== null) {
+                    $url .= $pageUrl;
+                }
             }
         } else if (is_object($page)) {
             $pageUrl = $this->url($page->url);

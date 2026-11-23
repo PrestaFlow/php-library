@@ -1,0 +1,287 @@
+<?php
+
+namespace PrestaFlow\Tests\Browser\ShopAgnosticFixtures {
+
+    use PrestaFlow\Library\Pages\v9\FrontOffice\Category\Page as CategoryPage;
+    use PrestaFlow\Library\Pages\v9\FrontOffice\Checkout\Page as CheckoutPage;
+    use PrestaFlow\Library\Pages\v9\FrontOffice\Listing\Page as ListingPage;
+    use PrestaFlow\Library\Pages\v9\FrontOffice\Product\Page as ProductPage;
+
+    /** Drives a chrome-php page handed in by the test, without a suite. */
+    trait OnGivenPage
+    {
+        public static $chromePage = null;
+
+        public function __construct()
+        {
+            $this->selectors = $this->defineSelectors();
+        }
+
+        public function getPage()
+        {
+            return self::$chromePage;
+        }
+
+        public function state(string $selector, ?string $label = null): void
+        {
+            $this->pfFillState($selector, $label);
+        }
+
+        public function countryIso(string $selector): ?string
+        {
+            return $this->pfSelectedCountryIso($selector);
+        }
+
+        public function postcode(?string $given): string
+        {
+            return $this->pfPostcodeForForm($given, '#c', '#z');
+        }
+    }
+
+    class Checkout extends CheckoutPage
+    {
+        use OnGivenPage;
+    }
+
+    class Product extends ProductPage
+    {
+        use OnGivenPage;
+    }
+
+    class Listing extends ListingPage
+    {
+        use OnGivenPage;
+    }
+
+    class Category extends CategoryPage
+    {
+        use OnGivenPage;
+    }
+}
+
+namespace PrestaFlow\Tests\Browser {
+
+    use HeadlessChromium\BrowserFactory;
+    use PHPUnit\Framework\TestCase;
+    use PrestaFlow\Library\Exceptions\SkipTestException;
+    use PrestaFlow\Library\Pages\FrontOfficePage;
+    use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Category;
+    use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Checkout;
+    use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Listing;
+    use PrestaFlow\Tests\Browser\ShopAgnosticFixtures\Product;
+
+    /** The DOM helpers scenarios use to stay independent of the demo shop, on simulated markup. */
+    final class ShopAgnosticHelpersBrowserTest extends TestCase
+    {
+        private static $browser = null;
+
+        private static $page = null;
+
+        public static function tearDownAfterClass(): void
+        {
+            self::$browser?->close();
+            self::$browser = null;
+        }
+
+        private function load(string $body): void
+        {
+            if (self::$browser === null) {
+                try {
+                    self::$browser = (new BrowserFactory())->createBrowser(['headless' => true, 'windowSize' => [800, 600], 'noSandbox' => true]);
+                    self::$page = self::$browser->createPage();
+                } catch (\Throwable $e) {
+                    if (getenv('CI') === false || getenv('CI') === '') {
+                        $this->markTestSkipped('Chrome indisponible : '.$e->getMessage());
+                    }
+                    $this->fail('Chrome indisponible en CI : '.$e->getMessage());
+                }
+            }
+
+            self::$page->navigate('data:text/html,'.rawurlencode('<meta charset="utf-8"><body>'.$body.'</body>'))->waitForNavigation();
+            Checkout::$chromePage = Product::$chromePage = Listing::$chromePage = Category::$chromePage = self::$page;
+        }
+
+        private const PAYMENTS = '<div id="checkout-payment-step">'
+            .'<input type="radio" name="payment-option" id="payment-option-1" data-module-name="stripe_official">'
+            .'<input type="radio" name="payment-option" id="payment-option-2" data-module-name="ps_checkpayment">'
+            .'<input type="radio" name="payment-option" id="payment-option-3" data-module-name="ps_wirepayment">'
+            .'</div>';
+
+        public function test_payment_is_the_first_offline_option_in_page_order(): void
+        {
+            $this->load(self::PAYMENTS);
+            $checkout = new Checkout();
+
+            $this->assertSame('ps_checkpayment', $checkout->choosePayment());
+            $this->assertTrue(self::$page->evaluate('document.getElementById("payment-option-2").checked')->getReturnValue());
+            $this->assertFalse(self::$page->evaluate('document.getElementById("payment-option-1").checked')->getReturnValue());
+        }
+
+        public function test_payment_honours_the_given_modules(): void
+        {
+            $this->load(self::PAYMENTS);
+
+            $this->assertSame('ps_wirepayment', (new Checkout())->choosePayment(['ps_wirepayment']));
+        }
+
+        public function test_no_offline_payment_skips_the_suite_and_clicks_nothing(): void
+        {
+            $this->load('<input type="radio" name="payment-option" id="p" data-module-name="paypal">');
+
+            $skip = $this->skipOf(fn () => (new Checkout())->choosePayment());
+            $this->assertSame(FrontOfficePage::pfNoPaymentMethodReason(FrontOfficePage::OFFLINE_PAYMENT_MODULES), $skip->getMessage());
+            $this->assertTrue($skip->skipRemaining);
+            $this->assertFalse(self::$page->evaluate('document.getElementById("p").checked')->getReturnValue());
+        }
+
+        public function test_payment_modules_as_a_suite_passes_them(): void
+        {
+            $this->load(self::PAYMENTS);
+            $this->assertSame('ps_wirepayment', (new Checkout())->choosePayment('ps_wirepayment'));
+
+            $this->load(self::PAYMENTS);
+            $this->assertSame('ps_checkpayment', (new Checkout())->choosePayment(null));
+        }
+
+        public function test_listing_skips_carry_the_exact_reasons(): void
+        {
+            $this->load('<div id="js-product-list"><div class="products"></div></div>');
+
+            $this->assertSame('No product of this listing can be added to the cart as it is.', $this->skipOf(fn () => (new Listing())->openPurchasableProduct())->getMessage());
+            $this->assertSame('No product of this category can be added to the cart as it is.', $this->skipOf(fn () => (new Category())->openPurchasableProduct())->getMessage());
+            $this->assertSame(FrontOfficePage::NO_PURCHASABLE_PRODUCT, $this->skipOf(fn () => (new Category())->openProductToBuy(null))->getMessage());
+            $this->assertNull((new Listing())->findPurchasableProduct());
+
+            $wishlist = $this->skipOf(fn () => (new Listing())->requireWishlistButtons());
+            $this->assertSame('The wishlist module (blockwishlist) is not installed, or not shown on product listings.', $wishlist->getMessage());
+            $this->assertFalse($wishlist->skipRemaining);
+        }
+
+        private function skipOf(callable $call): SkipTestException
+        {
+            try {
+                $call();
+            } catch (SkipTestException $e) {
+                return $e;
+            }
+            $this->fail('Expected a SkipTestException');
+        }
+
+        public function test_add_to_cart_button_state(): void
+        {
+            $this->load('<button class="add-to-cart" data-button-action="add-to-cart">Add</button>');
+            $this->assertTrue((new Product())->isAddableToCart());
+
+            $this->load('<button class="add-to-cart" data-button-action="add-to-cart" disabled>Add</button>');
+            $this->assertFalse((new Product())->isAddableToCart());
+
+            $this->load('<div class="product-customization"><textarea required></textarea></div>'
+                .'<button class="add-to-cart" data-button-action="add-to-cart">Add</button>');
+            $this->assertFalse((new Product())->isAddableToCart());
+
+            $this->load('<p>Catalog mode: no button</p>');
+            $this->assertFalse((new Product())->isAddableToCart());
+        }
+
+        public function test_listing_reads_miniatures(): void
+        {
+            $this->load('<div id="js-product-list"><div class="products">'
+                .'<article class="product-miniature js-product-miniature"><a class="thumbnail" href="https://shop.test/1-a.html"></a>'
+                .'<h3 class="product-title"><a href="https://shop.test/1-a.html">  Mug   blue </a></h3></article>'
+                .'<article class="product-miniature js-product-miniature"><a class="product-miniature__title" href="https://shop.test/2-b.html">Poster</a></article>'
+                .'</div></div>');
+            $listing = new Listing();
+
+            $this->assertSame(2, $listing->countProducts());
+            $this->assertSame('Mug blue', $listing->getProductName(1));
+            $this->assertSame('https://shop.test/2-b.html', $listing->getProductUrl(2));
+            $this->assertNull($listing->getProductUrl(3));
+        }
+
+        public function test_category_links(): void
+        {
+            $this->load('<ul id="top-menu"><li id="category-3"><a href="https://shop.test/3-clothes">Clothes</a>'
+                .'<ul><li id="category-4"><a href="https://shop.test/4-men">Men</a></li></ul></li>'
+                .'<li id="cms-1"><a href="https://shop.test/content/1-delivery">Delivery</a></li></ul>');
+
+            $this->assertSame(['https://shop.test/3-clothes', 'https://shop.test/4-men'], (new Listing())->readCategoryLinks());
+        }
+
+        public function test_required_state_and_preselected_country(): void
+        {
+            $this->load('<select name="id_country" id="c"><option value="8">France</option><option value="21" selected>United States</option></select>'
+                .'<select name="id_state" id="s"><option value="">-</option><option value="0">--</option><option value="12">Alabama</option><option value="13">Alaska</option></select>');
+            $checkout = new Checkout();
+
+            $this->assertSame('US', $checkout->countryIso('#c'));
+
+            $checkout->state('#s');
+            $this->assertSame('12', self::$page->evaluate('document.getElementById("s").value')->getReturnValue());
+
+            $checkout->state('#s', 'Alaska');
+            $this->assertSame('13', self::$page->evaluate('document.getElementById("s").value')->getReturnValue());
+        }
+
+        public function test_postcode_follows_the_preselected_country(): void
+        {
+            $this->load('<select id="c"><option value="8" selected>France</option></select><input id="z" required>');
+            $this->assertSame('75002', (new Checkout())->postcode(null));
+            $this->assertSame('99999', (new Checkout())->postcode('99999'));
+
+            // 244: a country added after the install, format unknown.
+            $this->load('<select id="c"><option value="244" selected>Elsewhere</option></select><input id="z">');
+            $this->assertSame('', (new Checkout())->postcode(null));
+
+            $this->load('<select id="c"><option value="244" selected>Elsewhere</option></select><input id="z" required>');
+            try {
+                (new Checkout())->postcode(null);
+                $this->fail('A required postcode of an unknown format must skip');
+            } catch (SkipTestException $e) {
+                $this->assertStringContainsString('addressPostcode', $e->getMessage());
+                $this->assertTrue($e->skipRemaining);
+            }
+        }
+
+        public function test_health_signals_of_a_page(): void
+        {
+            $this->load('<div id="content" class="page-home">Home</div>');
+            $checkout = new Checkout();
+            $checkout->selectors['maintenanceBlock'] = '#content.page-maintenance';
+
+            $this->assertFalse($checkout->isInMaintenance());
+            // A data: document reports no HTTP status: rendered without error = 200.
+            $this->assertSame(200, $checkout->getDocumentStatus());
+            $this->assertFalse($checkout->isOrderPage());
+
+            self::$page->evaluate('document.body.id = "checkout"');
+            $this->assertTrue($checkout->isOrderPage());
+
+            $this->load('<div id="content" class="page-maintenance">Back soon</div>');
+            $this->assertTrue($checkout->isInMaintenance());
+        }
+
+        public function test_out_of_stock_orders_read_from_the_embedded_product(): void
+        {
+            // hummingbird
+            $this->load('<div class="js-product-details" data-product="' . htmlspecialchars(json_encode(['allow_oosp' => 1, 'quantity' => 0])) . '"></div>');
+            $this->assertTrue((new Product())->acceptsOutOfStockOrders());
+            $skip = $this->skipOf(fn () => (new Product())->requireOutOfStockRefused());
+            $this->assertSame(
+                'This shop accepts orders for out-of-stock products (PS_ORDER_OUT_OF_STOCK, or stock management is disabled): an out-of-stock product stays orderable.',
+                $skip->getMessage()
+            );
+            $this->assertFalse($skip->skipRemaining);
+
+            // Classic
+            $this->load('<div id="product-details" data-product="' . htmlspecialchars(json_encode(['allow_oosp' => 0, 'availability' => 'unavailable'])) . '"></div>');
+            $this->assertFalse((new Product())->acceptsOutOfStockOrders());
+            $this->assertSame('unavailable', (new Product())->getProductData()['availability']);
+            (new Product())->requireOutOfStockRefused();
+
+            // No embedded data: nothing to skip on.
+            $this->load('<p>Custom theme</p>');
+            $this->assertSame([], (new Product())->getProductData());
+            $this->assertFalse((new Product())->acceptsOutOfStockOrders());
+        }
+    }
+}

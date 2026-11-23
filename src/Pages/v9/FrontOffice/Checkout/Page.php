@@ -2,12 +2,14 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\Checkout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 
 class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -15,8 +17,13 @@ class Page extends BasePage
             // Best-effort PS 9 checkout tunnel (order controller) — corrected live.
             'addressesContinueButton' => '#checkout-addresses-step button[name="confirm-addresses"]',
             'shippingOption' => '#checkout-delivery-step input[name^="delivery_option"]',
+            'shippingOptionById' => '#checkout-delivery-step input[name^="delivery_option"][id="delivery_option_${carrierId}"]',
             'shippingContinueButton' => '#checkout-delivery-step button[name="confirmDeliveryOption"]',
             'paymentOption' => 'input[name="payment-option"]',
+            // L'étape de paiement affichée, qu'elle propose des moyens de
+            // paiement ou seulement « aucun moyen de paiement n'est disponible ».
+            // js-current-step : Classic et Hummingbird ; -current : Classic.
+            'paymentStepCurrent' => '#checkout-payment-step.js-current-step, #checkout-payment-step.-current',
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
             'placeOrderButton' => '#payment-confirmation button',
             // Guest personal-information step — best-effort PS 9, corrected live.
@@ -25,11 +32,13 @@ class Page extends BasePage
             'personalFirstNameInput' => '#checkout-personal-information-step input[name="firstname"]',
             'personalLastNameInput' => '#checkout-personal-information-step input[name="lastname"]',
             'personalContinueButton' => '#checkout-personal-information-step button[type="submit"]',
+            'personalInformationStep' => '#checkout-personal-information-step',
             // Guest new-address step.
             'addressStreetInput' => '#checkout-addresses-step input[name="address1"]',
             'addressCityInput' => '#checkout-addresses-step input[name="city"]',
             'addressPostcodeInput' => '#checkout-addresses-step input[name="postcode"]',
             'addressCountrySelect' => '#checkout-addresses-step select[name="id_country"]',
+            'addressStateSelect' => '#checkout-addresses-step select[name="id_state"]',
             'addressPhoneInput' => '#checkout-addresses-step input[name="phone"]',
         ];
     }
@@ -57,33 +66,139 @@ class Page extends BasePage
      */
     public function hasReachedPaymentStep(): bool
     {
-        return $this->elementIsVisible($this->getSelector('paymentOption'), 5000);
+        // L'étape est atteinte même quand elle ne propose aucun moyen de
+        // paiement (« Malheureusement, aucun moyen de paiement n'est
+        // disponible. ») : c'est à choosePayment() de sauter la suite avec sa
+        // raison, pas à cette vérification d'échouer.
+        return $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
+            . ' || !!document.querySelector(' . json_encode($this->getSelector('paymentStepCurrent')) . ')',
+            5000
+        );
     }
 
+    /**
+     * Étape « Informations personnelles » en invité : remplit le formulaire,
+     * coche les consentements obligatoires, vérifie le tout, puis le valide et
+     * attend l'étape des adresses.
+     *
+     * Le remplissage n'est plus fait à l'aveugle : sur un Chrome Linux en
+     * conteneur ou distant, il arrivait avant que la page de commande soit en
+     * place (clic du panier lent à naviguer), et le formulaire partait vide —
+     * titre, prénom, nom, e-mail vides, cases décochées — pour échouer 40 s plus
+     * tard sur l'étape de livraison. On attend donc le formulaire, on relit les
+     * valeurs saisies (ressaisie en JS si besoin, pfFillInputsVerified()) et un
+     * formulaire toujours incomplet échoue ici, avec le nom des champs.
+     */
     public function checkoutAsGuest(string $email, string $firstName, string $lastName): void
     {
+        $emailInput = json_encode($this->getSelector('personalEmailInput'));
+        Expect::that($this->waitForJsCondition(
+            '!!document.querySelector(' . $emailInput . ')',
+            20000
+        ))->equals(true, 'The checkout personal information form did not show up');
+
         // If a guest/sign-in toggle is present, switch to the guest form.
         $this->click($this->getSelector('guestToggle'));
+        // Le champ doit être affiché (onglet invité actif) avant d'y taper.
+        $this->waitForJsCondition(
+            '(function(e){return !!e && e.getClientRects().length > 0;})(document.querySelector(' . $emailInput . '))',
+            5000
+        );
+        $this->waitForStable(3000);
 
-        $this->setValue($this->getSelector('personalFirstNameInput'), $firstName);
-        $this->setValue($this->getSelector('personalLastNameInput'), $lastName);
-        $this->setValue($this->getSelector('personalEmailInput'), $email);
+        $unfilled = $this->pfFillInputsVerified([
+            $this->getSelector('personalFirstNameInput') => $firstName,
+            $this->getSelector('personalLastNameInput') => $lastName,
+            $this->getSelector('personalEmailInput') => $email,
+        ]);
+        Expect::that($unfilled === [])->equals(true, 'Guest form fields still not filled: ' . implode(', ', $unfilled));
 
         // Tick every required consent checkbox (GDPR terms + data privacy) — the
         // step refuses to advance otherwise.
-        $this->getPage()->evaluate(
-            '(function(){[].slice.call(document.querySelectorAll("#checkout-personal-information-step input[type=checkbox]")).forEach(function(c){if(c.required&&!c.checked){c.click();}});})()'
-        );
+        $unticked = $this->pfTickRequiredCheckboxes($this->getSelector('personalInformationStep'));
+        Expect::that($unticked === 0)->equals(true, 'Required consent checkboxes of the guest form are still unticked');
 
         $this->click($this->getSelector('personalContinueButton'));
         $this->waitForPageReload();
+
+        $this->requireAddressStep();
     }
 
+    /**
+     * Échoue tout de suite si le tunnel n'est pas passé à l'étape des adresses.
+     *
+     * Sans ce contrôle, un formulaire invité refusé sans message laissait le
+     * scénario continuer : fillNewAddress() ne trouvait aucun champ à remplir,
+     * et le run échouait environ 55 s plus tard sur hasReachedShippingStep(),
+     * avec un simple « false doit être égal à 1 ».
+     */
+    public function requireAddressStep(int $timeout = 15000): void
+    {
+        // L'étape suivante : le formulaire d'adresse (invité) ou ses cartes.
+        $reached = $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')'
+            . ' || !!document.querySelector(' . json_encode($this->getSelector('addressesContinueButton')) . ')',
+            $timeout
+        );
+        if ($reached) {
+            return;
+        }
+
+        $stillOnPersonalInformation = $this->getPage()->evaluate(
+            '!!document.querySelector(' . json_encode($this->getSelector('personalInformationStep') . '.-current') . ')'
+        )->getReturnValue();
+
+        Expect::that(false)->equals(true, $stillOnPersonalInformation
+            ? 'The checkout stayed on the personal information step after the guest form was sent'
+            : 'The checkout address step did not show up after the guest form was sent');
+    }
+
+    /**
+     * Whether the addresses step shows the address form, i.e. the customer
+     * has no address yet (a guest, or an account that never ordered).
+     */
+    public function hasAddressForm(): bool
+    {
+        return $this->elementIsVisible($this->getSelector('addressStreetInput'), 3000);
+    }
+
+    /**
+     * The addresses step whatever the account: confirm its saved address, or
+     * fill and submit $address (see fillNewAddress()) when it has none yet.
+     */
+    public function confirmOrFillAddress(array $address): void
+    {
+        if ($this->hasAddressForm()) {
+            $this->fillNewAddress($address);
+
+            return;
+        }
+
+        $this->confirmAddresses();
+    }
+
+    /**
+     * Fill and submit the addresses step's form.
+     *
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{street?:string,city?:string,postcode?:?string,country?:?string,state?:?string,phone?:string} $address
+     */
     public function fillNewAddress(array $address): void
     {
-        $this->setValue($this->getSelector('addressStreetInput'), $address['street'] ?? '');
-        $this->setValue($this->getSelector('addressCityInput'), $address['city'] ?? '');
-        $this->setValue($this->getSelector('addressPostcodeInput'), $address['postcode'] ?? '');
+        // Le formulaire doit être là avant toute saisie (page encore en
+        // chargement après l'étape précédente).
+        $this->waitForJsCondition(
+            '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')',
+            15000
+        );
+
+        // Country first: changing it re-renders the form for that country's
+        // address format (postcode, state).
+        //
         // Only touch the country <select> when it doesn't already show the
         // requested country: a "change" here makes the checkout re-render the
         // address form through an AJAX call, and re-rendering costs a round
@@ -108,8 +223,25 @@ class Page extends BasePage
         // its own, not because it works around a defect.
         if (!empty($address['country']) && !$this->countryAlreadySelected($address['country'])) {
             $this->selectValue($this->getSelector('addressCountrySelect'), $address['country']);
+            $this->waitForStable(3000);
         }
-        $this->setValue($this->getSelector('addressPhoneInput'), $address['phone'] ?? '');
+
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
+
+        // Même précaution que checkoutAsGuest() : saisie relue, ressaisie si
+        // le texte n'a pas tenu (focus perdu, re-rendu du formulaire).
+        $unfilled = $this->pfFillInputsVerified([
+            $this->getSelector('addressStreetInput') => (string) ($address['street'] ?? ''),
+            $this->getSelector('addressCityInput') => (string) ($address['city'] ?? ''),
+            $this->getSelector('addressPostcodeInput') => $postcode,
+            $this->getSelector('addressPhoneInput') => (string) ($address['phone'] ?? ''),
+        ]);
+        Expect::that($unfilled === [])->equals(true, 'Address form fields still not filled: ' . implode(', ', $unfilled));
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
 
         $this->click($this->getSelector('addressesContinueButton'));
         $this->waitForPageReload();
@@ -127,13 +259,59 @@ class Page extends BasePage
         ))->getReturnValue() === true;
     }
 
+    /** Pick the first carrier and confirm the delivery step. */
     public function chooseShipping(): void
     {
-        $this->click($this->getSelector('shippingOption'));
+        $this->chooseCarrier();
+    }
+
+    /**
+     * Pick a carrier and confirm the delivery step: $carrierId when given
+     * (fails when the shop does not offer it here), else the first one.
+     * A new method rather than a parameter on chooseShipping(): a project
+     * page overriding chooseShipping() keeps a compatible signature.
+     * $carrierId is taken as a suite passes it: null, '', an int or a
+     * numeric string.
+     */
+    public function chooseCarrier(mixed $carrierId = null): void
+    {
+        $carrierId = self::pfCarrierId($carrierId);
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('shippingOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('shippingOption'));
+        }
         $this->click($this->getSelector('shippingContinueButton'));
         $this->waitForPageReload();
     }
 
+    /**
+     * Select the first payment option whose module is in $modules (a list, a
+     * module name, or null for the offline ones) and answer that module. When
+     * the shop offers none of them, skips the test and the rest of the suite
+     * rather than pay for real.
+     */
+    public function choosePayment(mixed $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        return $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
+    }
+
+    /** Accept the terms and place the order, once a payment option is selected. */
+    public function acceptTermsAndPlaceOrder(): void
+    {
+        $this->click($this->getSelector('termsCheckbox'));
+        $this->click($this->getSelector('placeOrderButton'));
+        $this->waitForPageReload();
+    }
+
+    /**
+     * Select the FIRST payment option, whatever it is, and place the order.
+     * Prefer choosePayment() + acceptTermsAndPlaceOrder(): the first option may be a
+     * real payment provider.
+     */
     public function choosePaymentAndConfirm(): void
     {
         $this->click($this->getSelector('paymentOption'));

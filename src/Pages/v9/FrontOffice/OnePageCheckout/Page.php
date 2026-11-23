@@ -2,7 +2,9 @@
 
 namespace PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout;
 
+use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 
 /**
  * One Page Checkout, shipped as the ps_onepagecheckout module since PrestaShop 9.2.
@@ -18,6 +20,7 @@ class Page extends BasePage
 {
     public string $pageTitle = 'Checkout';
     public string $url = 'order';
+    public $shopPage = 'order';
 
     public function defineSelectors()
     {
@@ -31,6 +34,7 @@ class Page extends BasePage
             'addressRadioById' => '#opc-address-delivery-${idAddress}',
             'addressFields' => '#opc-delivery-address-fields',
             'addressCountrySelect' => '#opc-delivery-address-fields select[name="id_country"]',
+            'addressStateSelect' => '#opc-delivery-address-fields select[name="id_state"]',
             'addressFirstNameInput' => '#opc-delivery-address-fields input[name="firstname"]',
             'addressLastNameInput' => '#opc-delivery-address-fields input[name="lastname"]',
             'addressStreetInput' => '#opc-delivery-address-fields input[name="address1"]',
@@ -39,12 +43,85 @@ class Page extends BasePage
             'addressPhoneInput' => '#opc-delivery-address-fields input[name="phone"]',
             // Delivery
             'carrierOption' => '#opc-delivery-methods input[name="delivery_option"]',
+            'carrierOptionById' => '#opc-delivery-methods input[name="delivery_option"][id="opc_delivery_option_${carrierId}"]',
             // Payment
             'paymentOption' => '#opc-payment-methods input[name="payment-option"]',
             // Footer
             'termsCheckbox' => '#conditions-to-approve input[type="checkbox"]',
             'payButton' => '#opc-pay-button',
         ];
+    }
+
+    public const CLASSIC_THEME = 'The One Page Checkout does not support the Classic theme';
+
+    /** Raison du saut quand la commande en une page ne s'affiche pas sur le front. */
+    public const RENDER_UNAVAILABLE = 'The One Page Checkout is not available with this shop\'s theme'
+        . ' (the order page does not render it): the shop was switched back to the four-page checkout.';
+
+    /**
+     * The folder of the theme the front office is rendered with ("classic",
+     * "hummingbird"…), read from its own stylesheets on the home page. Empty
+     * when no stylesheet points into themes/.
+     */
+    public function getShopThemeName(): string
+    {
+        $this->goToUrl($this->pfBaseUrl());
+
+        return (string) $this->getPage()->evaluate(
+            '(function(){var l=[].slice.call(document.querySelectorAll("link[rel=stylesheet][href]"));'
+            . 'for(var i=0;i<l.length;i++){var m=l[i].href.match(/\/themes\/([^\/]+)\/assets\//);if(m){return m[1];}}'
+            . 'return "";})()'
+        )->getReturnValue();
+    }
+
+    /**
+     * Skip the rest of the suite when the shop runs the Classic theme. The
+     * module's own back office warns that the layout "will break your
+     * storefront" there (it needs a Bootstrap 5 theme): on Classic the order
+     * page renders empty, so switching to it would only break the shop.
+     */
+    public function requireCompatibleTheme(): void
+    {
+        if ($this->getShopThemeName() === 'classic') {
+            throw new SkipTestException(self::CLASSIC_THEME, skipRemaining: true);
+        }
+    }
+
+    /**
+     * Vérifie, une fois la boutique basculée sur la commande en une page, que le
+     * front l'affiche vraiment ; sinon remet aussitôt le tunnel en quatre étapes
+     * et saute la suite.
+     *
+     * Le module ps_onepagecheckout n'a de gabarit que pour les thèmes Bootstrap 5
+     * (Hummingbird). Sur Classic, ou sur un thème enfant de Classic que
+     * requireCompatibleTheme() ne reconnaît pas, la page de commande ne rend plus
+     * que le squelette du module (« Hello world! This is HTML5 Boilerplate. ») :
+     * le tunnel est cassé pour les vrais clients. Cette vérification juge sur ce
+     * que voit le client et non sur un nom de dossier.
+     *
+     * Si la remise en quatre étapes échoue elle-même, c'est un échec franc : la
+     * boutique est cassée et il faut que cela se voie.
+     *
+     * @param object $backOfficeCheckoutLayoutPage BackOffice\CheckoutLayout, session BO ouverte
+     */
+    public function requireRenderedOrRestore(object $backOfficeCheckoutLayoutPage, int $shopId): void
+    {
+        if ($this->isOnePageCheckoutActive()) {
+            return;
+        }
+
+        $backOfficeCheckoutLayoutPage->goTo($shopId);
+        if (!$backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected()) {
+            $backOfficeCheckoutLayoutPage->switchToFourPageCheckout();
+        }
+
+        Expect::that($backOfficeCheckoutLayoutPage->isFourPageCheckoutSelected())->equals(
+            true,
+            'The One Page Checkout does not render on the order page and the shop could not be switched'
+                . ' back to the four-page checkout: its checkout is broken until it is.'
+        );
+
+        throw new SkipTestException(self::RENDER_UNAVAILABLE, skipRemaining: true);
     }
 
     /**
@@ -118,7 +195,11 @@ class Page extends BasePage
      * there is no save button to click — the carrier list appearing is the signal
      * that the address was persisted.
      *
-     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:string,city?:string,country?:string,phone?:string} $address
+     * 'country' (a label) is only selected when given: the shop's preselected
+     * country stays otherwise. A missing 'postcode' becomes one valid for the
+     * country shown; a required state takes 'state' (a label) or the first one.
+     *
+     * @param array{firstName?:string,lastName?:string,street?:string,postcode?:?string,city?:string,country?:?string,state?:?string,phone?:string} $address
      */
     public function fillNewAddress(array $address): void
     {
@@ -131,11 +212,19 @@ class Page extends BasePage
             );
         }
 
+        $postcode = $this->pfPostcodeForForm(
+            $address['postcode'] ?? null,
+            $this->getSelector('addressCountrySelect'),
+            $this->getSelector('addressPostcodeInput')
+        );
+
+        $this->pfFillState($this->getSelector('addressStateSelect'), $address['state'] ?? null);
+
         foreach ([
             'addressFirstNameInput' => $address['firstName'] ?? '',
             'addressLastNameInput' => $address['lastName'] ?? '',
             'addressStreetInput' => $address['street'] ?? '',
-            'addressPostcodeInput' => $address['postcode'] ?? '',
+            'addressPostcodeInput' => $postcode,
             'addressCityInput' => $address['city'] ?? '',
             'addressPhoneInput' => $address['phone'] ?? '',
         ] as $selectorKey => $value) {
@@ -155,12 +244,46 @@ class Page extends BasePage
      */
     public function selectFirstCarrier(): void
     {
+        $this->selectCarrier();
+    }
+
+    /**
+     * Select $carrierId (fails when it is not offered), else the first
+     * carrier, then wait for the payment options the module fetches.
+     */
+    public function selectCarrier(mixed $carrierId = null): void
+    {
+        // As a suite passes it: null, '', an int or a numeric string.
+        $carrierId = self::pfCarrierId($carrierId);
         $this->waitForCarriers();
-        $this->click($this->getSelector('carrierOption'));
+        if ($carrierId !== null) {
+            $selector = $this->getSelector('carrierOptionById', ['carrierId' => $carrierId]);
+            Expect::that($this->elementIsVisible($selector, 5000))
+                ->equals(true, 'Carrier ' . $carrierId . ' is not offered for this cart and address');
+            $this->click($selector);
+        } else {
+            $this->click($this->getSelector('carrierOption'));
+        }
 
         $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
         );
+    }
+
+    /**
+     * Use the customer's first saved address, or fill $address (see
+     * fillNewAddress()) when there is none: a customer who never ordered
+     * gets the inline form instead of the address cards.
+     */
+    public function selectSavedAddressOrFill(array $address): void
+    {
+        if ($this->hasSavedAddresses()) {
+            $this->selectAddress();
+
+            return;
+        }
+
+        $this->fillNewAddress($address);
     }
 
     /**
@@ -207,7 +330,36 @@ class Page extends BasePage
     }
 
     /**
-     * Select the first payment option.
+     * Select the first payment option whose module is in $modules (a list, a
+     * module name, or null for the offline ones) and answer that module. When
+     * the shop offers none of them, skips the test and the rest of the suite
+     * rather than pay for real.
+     */
+    public function selectPayment(mixed $modules = self::OFFLINE_PAYMENT_MODULES): ?string
+    {
+        // The payment section is re-rendered over AJAX after the address and
+        // the carrier settle, and a refresh still in flight wipes the choice
+        // ("Please select a payment method." on submit). Check that the option
+        // stays selected, and pick it again when a refresh replaced it.
+        $checked = json_encode($this->getSelector('paymentOption') . ':checked');
+        $module = null;
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            $module = $this->pfPayWithOrSkip($this->getSelector('paymentOption'), $modules);
+            $lost = $this->waitForJsCondition('!document.querySelector(' . $checked . ')', 1500);
+            if (!$lost) {
+                break;
+            }
+            $this->waitForJsCondition(
+                '!!document.querySelector(' . json_encode($this->getSelector('paymentOption')) . ')'
+            );
+        }
+
+        return $module;
+    }
+
+    /**
+     * Select the first payment option, whatever it is. Prefer selectPayment():
+     * the first option may be a real payment provider.
      */
     public function selectFirstPayment(): void
     {

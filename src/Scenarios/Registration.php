@@ -18,7 +18,9 @@ use PrestaFlow\Library\Expects\Expect;
 class Registration extends Scenario
 {
     public $params = [
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // null => a unique address is generated for this run.
         'email' => null,
         'password' => 'PrestaFlow2026!',
@@ -28,7 +30,9 @@ class Registration extends Scenario
 
     public function steps($testSuite)
     {
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('FrontOffice\Registration');
         $testSuite->importPage('FrontOffice\Login');
@@ -39,7 +43,7 @@ class Registration extends Scenario
         // and is only reachable from inside an ->it() closure, which is rebound
         // to the suite at execution time. $this->params already carries the
         // constructor overrides.
-        $email = ($this->params['email'] ?? null) ?: $this->uniqueEmail();
+        $email = ($this->params['email'] ?? null) ?: self::pfUniqueEmail('pf-register');
 
         $testSuite
         ->it('open the account creation form', function () use ($frontOfficeRegistrationPage) {
@@ -64,14 +68,5 @@ class Registration extends Scenario
         });
 
         return $testSuite;
-    }
-
-    /**
-     * A per-run address. The shop rejects a duplicate e-mail, so reusing one
-     * would turn the second run into a false failure.
-     */
-    private function uniqueEmail(): string
-    {
-        return sprintf('pf-register-%s@example.com', date('Ymd-His'));
     }
 }

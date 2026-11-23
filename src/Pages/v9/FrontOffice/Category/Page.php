@@ -8,6 +8,8 @@ class Page extends BasePage
 {
     public string $url = '{index}-category';
 
+    public const NO_PURCHASABLE_ON_LISTING = 'No product of this category can be added to the cart as it is.';
+
     // No selector overrides: Category used to re-declare `pageTitle` as
     // `#js-product-list-header h1` because Listing pointed at the surrounding
     // container. Listing now declares the heading itself, so repeating it here

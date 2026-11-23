@@ -47,4 +47,25 @@ final class OnlyTestFilterTest extends TestCase
         $this->expectExceptionMessage('disparu');
         ($kept[0]['steps'])();
     }
+
+    public function test_several_titles_one_per_line_keep_the_suite_order(): void
+    {
+        $_ENV['PRESTAFLOW_ONLY_TEST'] = "ajoute au panier\n ouvre la fiche \n";
+
+        $kept = TestsSuite::onlyTest($this->tests());
+
+        $this->assertSame(['ouvre la fiche', 'ajoute au panier'], array_column($kept, 'title'));
+    }
+
+    public function test_each_unknown_title_among_several_gives_its_failing_test(): void
+    {
+        $_ENV['PRESTAFLOW_ONLY_TEST'] = "ajoute au panier\ndisparu\nenvolé";
+
+        $kept = TestsSuite::onlyTest($this->tests());
+
+        $this->assertSame(['ajoute au panier', 'disparu', 'envolé'], array_column($kept, 'title'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('envolé');
+        ($kept[2]['steps'])();
+    }
 }

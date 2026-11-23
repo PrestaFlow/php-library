@@ -34,6 +34,8 @@ services:
       POST_SCRIPTS_DIR: /tmp/post-scripts
     volumes:
       - ./docker/post-scripts:/tmp/post-scripts:ro
+      # Larger FastCGI buffers: see docker/nginx/fastcgi_params.
+      - ./docker/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
     ports:
       - "8017:80"
       - "8018:80"   # the second shop
@@ -64,6 +66,8 @@ services:
       POST_SCRIPTS_DIR: /tmp/post-scripts
     volumes:
       - ./docker/post-scripts:/tmp/post-scripts:ro
+      # Larger FastCGI buffers: see docker/nginx/fastcgi_params.
+      - ./docker/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
     ports:
       - "8082:80"
       - "8083:80"   # the second shop
@@ -94,6 +98,8 @@ services:
       POST_SCRIPTS_DIR: /tmp/post-scripts
     volumes:
       - ./docker/post-scripts:/tmp/post-scripts:ro
+      # Larger FastCGI buffers: see docker/nginx/fastcgi_params.
+      - ./docker/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
     ports:
       - "8092:80"
       - "8093:80"   # the second shop, on its own port rather than a virtual URI

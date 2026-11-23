@@ -23,7 +23,9 @@ use PrestaFlow\Library\Expects\Expect;
 class SwitchTheme extends Scenario
 {
     public $params = [
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // Directory name of the theme, as it appears under themes/.
         // null => the theme the suite is already configured for, i.e.
         // PRESTAFLOW_THEME. That is almost always what you want: the point of
@@ -33,12 +35,15 @@ class SwitchTheme extends Scenario
         'theme' => null,
         // Which shop to act on: the "Use this theme" button is rendered
         // disabled outside a single-shop context.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)
     {
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         // Read from $this->params rather than getParam(): the latter lives on
         // TestsSuite and is only reachable from inside an ->it() closure.

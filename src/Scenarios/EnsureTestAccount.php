@@ -21,7 +21,9 @@ use PrestaFlow\Library\Expects\Expect;
 class EnsureTestAccount extends Scenario
 {
     public $params = [
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // null => fall back to the FO_EMAIL / FO_PASSWD globals.
         'email' => null,
         'password' => null,
@@ -31,7 +33,9 @@ class EnsureTestAccount extends Scenario
 
     public function steps($testSuite)
     {
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('FrontOffice\Login');
         $testSuite->importPage('FrontOffice\Registration');
@@ -49,17 +53,13 @@ class EnsureTestAccount extends Scenario
             $frontOfficeLoginPage->goToPage('login');
             $frontOfficeLoginPage->login($email, $password);
 
-            if (!$frontOfficeLoginPage->isLoggedIn()) {
-                $frontOfficeRegistrationPage->goToRegistration();
-                $frontOfficeRegistrationPage->register([
-                    'firstName' => $this->getParam('firstName'),
-                    'lastName' => $this->getParam('lastName'),
-                    // login() resolved null to the globals; register() needs the
-                    // values themselves, so read them the same way it did.
-                    'email' => $email ?? $frontOfficeLoginPage->getGlobal('FO_EMAIL'),
-                    'password' => $password ?? $frontOfficeLoginPage->getGlobal('FO_PASSWD'),
-                ]);
-            }
+            // Registers only when that login did not open a session.
+            $frontOfficeRegistrationPage->registerUnlessLoggedIn([
+                'firstName' => $this->getParam('firstName'),
+                'lastName' => $this->getParam('lastName'),
+                'email' => $email,
+                'password' => $password,
+            ]);
 
             // Asserted whichever branch ran: the account exists AND its
             // credentials open a session.

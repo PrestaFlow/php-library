@@ -13,9 +13,11 @@ use HeadlessChromium\Cookies\CookiesCollection;
 use HeadlessChromium\Exception\BrowserConnectionFailed;
 use HeadlessChromium\Exception\OperationTimedOut;
 use HeadlessChromium\Exception\TargetDestroyed;
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Support\ConsoleErrors;
 use PrestaFlow\Library\Support\FailedRequests;
+use PrestaFlow\Library\Support\RemoteBrowser;
 use PrestaFlow\Library\Support\ScreenRecorder;
 use PrestaFlow\Library\Traits\ImportPage;
 use PrestaFlow\Library\Traits\Locale;
@@ -86,6 +88,9 @@ class TestsSuite implements OutputStates
     protected $datasets = [];
 
     protected array $store = [];
+
+    /** Set by a SkipTestException thrown with $skipRemaining: the later tests are skipped with it. */
+    protected $skipRemainingReason = null;
 
     protected $scenarioName = '';
     protected $scenarioParams = [];
@@ -245,6 +250,21 @@ class TestsSuite implements OutputStates
      */
     public static function resetBrowser(): void
     {
+        // Navigateur distant : on ferme la session de ce process, sans toucher aux
+        // fichiers .browser (jamais écrits dans ce mode) ; le prochain getBrowser()
+        // ouvre une nouvelle session distante.
+        if (self::remoteBrowserConfig() !== null) {
+            try {
+                self::$browserInstance?->close();
+            } catch (\Throwable) {
+                // session déjà terminée / injoignable
+            }
+            self::$browserInstance = null;
+            self::$browserInstanceSocket = null;
+
+            return;
+        }
+
         $socketFile = self::getFilePath('.browser');
 
         try {
@@ -364,6 +384,15 @@ class TestsSuite implements OutputStates
         ];
 
         return $this;
+    }
+
+    /**
+     * Skip the running test with a reason, from inside an it() closure.
+     * $skipRemaining skips the rest of the suite with the same reason.
+     */
+    public function skipWithReason(string $reason, bool $skipRemaining = false): never
+    {
+        throw new SkipTestException($reason, $skipRemaining);
     }
 
     public function skip(string $description, Closure $steps)
@@ -553,8 +582,77 @@ class TestsSuite implements OutputStates
         return self::getFilePath('.browser');
     }
 
+    /**
+     * Navigateur distant demandé par l'environnement, null sinon :
+     *  - PRESTAFLOW_BROWSER_WS : adresse ws:// ou wss:// du navigateur
+     *    (Cloudflare Browser Run, Chrome en conteneur derrière un proxy…) ;
+     *  - PRESTAFLOW_BROWSER_WS_TOKEN : jeton facultatif, envoyé dans l'en-tête
+     *    `Authorization: Bearer …` de la poignée de main.
+     *
+     * Le jeton ne sort jamais de cet en-tête : ni fichier .browser, ni message
+     * d'erreur (RemoteBrowser::redact()).
+     *
+     * @return array{uri: string, headers: array<string,string>}|null
+     */
+    public static function remoteBrowserConfig(): ?array
+    {
+        $uri = trim((string) Env::get('PRESTAFLOW_BROWSER_WS', ''));
+        if ($uri === '') {
+            return null;
+        }
+
+        $headers = [];
+        $token = trim((string) Env::get('PRESTAFLOW_BROWSER_WS_TOKEN', ''));
+        if ($token !== '') {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        return ['uri' => $uri, 'headers' => $headers];
+    }
+
+    /**
+     * getBrowser() en mode navigateur distant : une session par process, gardée
+     * en mémoire seulement (rien dans .browser, que d'autres process liraient).
+     * Jamais de Chrome local de repli : si la session ne s'ouvre pas, l'exception
+     * remonte. Taille et user agent courants (browserOptions()) posés sur chaque page.
+     *
+     * @param array{uri: string, headers: array<string,string>} $remote
+     */
+    private static function getRemoteBrowser(array $remote, bool $force): ?RemoteBrowser
+    {
+        if (self::$browserInstance instanceof RemoteBrowser
+            && self::$browserInstance->getConnection()->isConnected()) {
+            return self::$browserInstance;
+        }
+
+        self::$browserInstance = null;
+        self::$browserInstanceSocket = null;
+
+        if (!$force) {
+            return null;
+        }
+
+        $opts = self::browserOptions();
+        $browser = RemoteBrowser::connect(
+            $remote['uri'],
+            $remote['headers'],
+            self::cdpTimeout(),
+            $opts['windowSize'],
+            $opts['userAgent'],
+        );
+
+        self::$browserInstance = $browser;
+
+        return $browser;
+    }
+
     public static function getBrowser(bool $headless = true, bool $force = true)
     {
+        $remote = self::remoteBrowserConfig();
+        if ($remote !== null) {
+            return self::getRemoteBrowser($remote, $force);
+        }
+
         $browser = null;
 
         $socketFile = TestsSuite::getFilePath('.browser');
@@ -639,6 +737,16 @@ class TestsSuite implements OutputStates
         return $browser;
     }
 
+    /**
+     * Whether this process already holds a browser. Lets a page decide to read
+     * something from the shop only when a run is actually driving one (never
+     * from a unit test, never by launching Chrome as a side effect).
+     */
+    public static function pfHasBrowser(): bool
+    {
+        return self::$browserInstance !== null;
+    }
+
     public static function getPage()
     {
         // L'énumération des targets (getPages) peut floter au démarrage à froid,
@@ -678,6 +786,10 @@ class TestsSuite implements OutputStates
     {
         $this->suite = get_class($this);
         $this->start_time = hrtime(true);
+
+        // Each suite reads the shop's URLs afresh: the app runs many suites,
+        // possibly against several shops, in one process.
+        \PrestaFlow\Library\Pages\FrontOfficePage::pfClearShopUrls();
 
         if (!$this->isVersionSupported()) {
             throw new Error('This version of PrestaShop is not supported by PrestaFlow.');
@@ -720,6 +832,9 @@ class TestsSuite implements OutputStates
         // `X-CI-Bypass: <secret>`), du request tracing (`X-Request-Id`), etc.
         // Posés APRÈS Basic Auth pour pouvoir les surcharger si besoin.
         $this->presetExtraHeadersFromEnv();
+
+        // 2c) Accept-Language = the run's language, without a region.
+        $this->presetAcceptLanguage();
 
         // 3) Pré-réglage de cookies fournis via l'environnement (PRESTAFLOW_COOKIES,
         // JSON), avant toute navigation. Pratique pour neutraliser un bandeau de
@@ -826,6 +941,53 @@ class TestsSuite implements OutputStates
             static fn () => TestsSuite::getBrowser(force: false),
             static fn () => TestsSuite::getPage(),
         );
+    }
+
+    /**
+     * The Accept-Language header the browser sends: the run's language alone
+     * (PRESTAFLOW_LOCALE, "en"), never a region, unless PRESTAFLOW_EXTRA_HEADERS
+     * sets one.
+     *
+     * With PS_DETECT_COUNTRY (on by default), PrestaShop picks the visitor's
+     * country from the region of this header, and the address forms preselect
+     * it. Chrome otherwise sends the locale of the machine it runs on: fr-FR on
+     * a French laptop (France preselected), en-US on a CI runner (United States
+     * preselected). On a shop whose payment modules are restricted to some
+     * countries, the same checkout then passes on one machine and finds "no
+     * payment method available" on the other. Without a region, PrestaShop
+     * keeps its default country wherever the run happens.
+     */
+    protected function presetAcceptLanguage(): void
+    {
+        // Only PRESTAFLOW_EXTRA_HEADERS wins: a value left in the static array by
+        // an earlier suite of the process (another locale) is replaced.
+        $fromEnv = json_decode((string) Env::get('PRESTAFLOW_EXTRA_HEADERS', ''), true);
+        foreach (array_keys(is_array($fromEnv) ? $fromEnv : []) as $name) {
+            if (strcasecmp((string) $name, 'Accept-Language') === 0) {
+                return;
+            }
+        }
+
+        $language = self::acceptLanguageFor((string) ($this->globals['LOCALE'] ?? Env::get('PRESTAFLOW_LOCALE', 'en')));
+        TestsSuite::$extraHttpHeaders['Accept-Language'] = $language;
+
+        $browser = TestsSuite::getBrowser(force: false);
+        if ($browser) {
+            try {
+                $browser->getConnection()->setConnectionHttpHeaders(TestsSuite::$extraHttpHeaders);
+            } catch (Throwable $e) {
+                // best-effort
+            }
+        }
+        self::pushExtraHttpHeaders(TestsSuite::getPage());
+    }
+
+    /** "en", "fr-FR", "pt_BR" => "en", "fr", "pt"; anything unusable => "en". */
+    public static function acceptLanguageFor(string $locale): string
+    {
+        $language = strtolower((string) preg_replace('/[-_].*$/', '', trim($locale)));
+
+        return preg_match('/^[a-z]{2,3}$/', $language) ? $language : 'en';
     }
 
     /**
@@ -966,33 +1128,39 @@ class TestsSuite implements OutputStates
     }
 
     /**
-     * PRESTAFLOW_ONLY_TEST="<titre>" : ne garde que ce test (rejeu d'un test en échec). Un titre
-     * introuvable donne un test en échec, jamais une suite vide qui passerait pour verte.
+     * PRESTAFLOW_ONLY_TEST="<titre>" : ne garde que ce test (rejeu d'un test en échec). Plusieurs titres,
+     * un par ligne, gardent ces tests dans l'ordre de la suite (rejeu des tests en échec d'un run). Un
+     * titre introuvable donne un test en échec, jamais une suite vide qui passerait pour verte.
      *
      * @param  list<array<string, mixed>>  $tests
      * @return list<array<string, mixed>>
      */
     public static function onlyTest(array $tests): array
     {
-        $only = trim((string) Env::get('PRESTAFLOW_ONLY_TEST', ''));
-        if ($only === '') {
+        $only = array_values(array_unique(array_filter(
+            array_map('trim', explode("\n", str_replace("\r", '', (string) Env::get('PRESTAFLOW_ONLY_TEST', '')))),
+            fn (string $title) => $title !== '',
+        )));
+        if ($only === []) {
             return $tests;
         }
-        $kept = array_values(array_filter($tests, fn (array $t) => trim((string) ($t['title'] ?? '')) === $only));
-        if ($kept !== []) {
-            return $kept;
+
+        $kept = array_values(array_filter($tests, fn (array $t) => in_array(trim((string) ($t['title'] ?? '')), $only, true)));
+        $found = array_map(fn (array $t) => trim((string) ($t['title'] ?? '')), $kept);
+        foreach (array_diff($only, $found) as $missing) {
+            $kept[] = [
+                'title' => $missing,
+                'steps' => static function () use ($missing): void {
+                    throw new \RuntimeException(sprintf('Test introuvable dans la suite : « %s ».', $missing));
+                },
+                'datasets' => [],
+                'dataset' => 1,
+                'file' => __FILE__,
+                'line' => __LINE__,
+            ];
         }
 
-        return [[
-            'title' => $only,
-            'steps' => static function () use ($only): void {
-                throw new \RuntimeException(sprintf('Test introuvable dans la suite : « %s ».', $only));
-            },
-            'datasets' => [],
-            'dataset' => 1,
-            'file' => __FILE__,
-            'line' => __LINE__,
-        ]];
+        return $kept;
     }
 
     /**
@@ -1269,6 +1437,8 @@ class TestsSuite implements OutputStates
         $this->globals = [
             'PS_VERSION' => Env::get('PRESTAFLOW_PS_VERSION', '8.1.0'),
             'LOCALE' => Env::get('PRESTAFLOW_LOCALE', 'en'),
+            // Langue du back-office (celle de l'employé) ; vide = LOCALE.
+            'BO_LOCALE' => (string) Env::get('PRESTAFLOW_BO_LOCALE', ''),
             // Selector variants are merged per theme. Classic is the default
             // because it is the library's historical baseline — see
             // CommonPage::getSelectors().
@@ -1276,14 +1446,20 @@ class TestsSuite implements OutputStates
             'PREFIX_LOCALE' => (bool) Env::get('PRESTAFLOW_PREFIX_LOCALE', false),
             'BO' => [
                 'URL' => $backOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_BO_EMAIL', 'demo@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_BO_PASSWD', 'Correct Horse Battery Staple'),
+                // No default account: a run against the user's shop must not
+                // silently try PrestaShop's demo credentials. Login pages skip
+                // with a clear reason when these are empty.
+                'EMAIL' => (string) Env::get('PRESTAFLOW_BO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_BO_PASSWD', ''),
             ],
             'FO' => [
                 'URL' => $frontOfficeUrl,
-                'EMAIL' => Env::get('PRESTAFLOW_FO_EMAIL', 'pub@prestashop.com'),
-                'PASSWD' => Env::get('PRESTAFLOW_FO_PASSWD', '123456789'),
+                'EMAIL' => (string) Env::get('PRESTAFLOW_FO_EMAIL', ''),
+                'PASSWD' => (string) Env::get('PRESTAFLOW_FO_PASSWD', ''),
             ],
+            // Shop the back-office settings of the scenarios are written for
+            // (multistore). 1 is the shop every install starts with.
+            'SHOP_ID' => max(1, (int) Env::get('PRESTAFLOW_SHOP_ID', 1)),
             'DEBUG' => (bool) Env::get('PRESTAFLOW_DEBUG', false),
             'VERBOSE' => (bool) Env::get('PRESTAFLOW_VERBOSE', true),
             'BROWSER' => [
@@ -1369,6 +1545,7 @@ class TestsSuite implements OutputStates
                 }
             }
             $this->tests = self::onlyTest($tests);
+            $this->skipRemainingReason = null;
             $recorder = ScreenRecorder::current();
 
             foreach ($this->tests as $testIndex => &$test) {
@@ -1381,7 +1558,11 @@ class TestsSuite implements OutputStates
 
                     $this->getInstructions($test);
 
-                    if ($this->isSkippable($test) === true) {
+                    if ($this->skipRemainingReason !== null) {
+                        $test['state'] = 'skip';
+                        $this->stats['skips']++;
+                        Expect::$expectMessage['skip'][] = $this->skipRemainingReason;
+                    } else if ($this->isSkippable($test) === true) {
                         $test['state'] = 'skip';
                         $this->stats['skips']++;
                     } else if ($this->isSkippableCauseFailed($test) === true) {
@@ -1410,6 +1591,16 @@ class TestsSuite implements OutputStates
 
                         $test['state'] = 'pass';
                         $this->stats['passes']++;
+                    }
+                } catch (SkipTestException $e) {
+                    // The shop lacks what the test needs: a skip with its reason,
+                    // not a failure, and never a reason to skip as if it failed.
+                    $test['state'] = 'skip';
+                    $this->stats['skips']++;
+                    $this->stats['assertions'] += Expect::getNbAssertions();
+                    Expect::$expectMessage['skip'][] = $e->getMessage();
+                    if ($e->skipRemaining) {
+                        $this->skipRemainingReason = $e->getMessage();
                     }
                 } catch (OperationTimedOut | UnexpectedValueException | TargetDestroyed | FatalError | Throwable | Exception $e) {
                     $test['state'] = 'fail';

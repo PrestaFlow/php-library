@@ -1,0 +1,20 @@
+{
+  "1.7.8.11-classic": [
+    {
+      "suite": "One Page Checkout",
+      "test": "One Page Checkout requires PrestaShop 9.2+"
+    }
+  ],
+  "8.2.8-classic": [
+    {
+      "suite": "One Page Checkout",
+      "test": "One Page Checkout requires PrestaShop 9.2+"
+    }
+  ],
+  "9.2.0-classic": [
+    {
+      "suite": "One Page Checkout",
+      "reason": "The One Page Checkout does not support the Classic theme"
+    }
+  ]
+}

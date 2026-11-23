@@ -43,19 +43,24 @@ class WishlistTest extends TestsSuite
         ->it('should go to login page', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->goToPage('login');
 
-            Expect::that($frontOfficeLoginPage->getPageTitle())->contains($frontOfficeLoginPage->pageTitle());
+            // The form, not the page title: the title is the shop's wording,
+            // in the shop's language ("Login", "Sign in", "Connexion"...).
+            Expect::that($frontOfficeLoginPage->elementIsVisible($frontOfficeLoginPage->getSelector('emailInput'), 5000))->equals(true);
         })
         ->it('should sign in with default customer', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->login();
-
-            var_dump($frontOfficeLoginPage->selector('logoutLink'));
 
             Expect::that()->customerIsLogged($frontOfficeLoginPage->selector('logoutLink'), 1000);
         })
         ->it('should go to all products page', function () use ($frontOfficeHomePage, $frontOfficeListingPage) {
             $frontOfficeHomePage->goToAllProducts();
 
-            Expect::that($frontOfficeListingPage->getListingTitle())->contains('Accueil');
+            // Locale-agnostic, as in FrontOfficeSmoke.
+            Expect::that($frontOfficeListingPage->getListingTitle())->isNotEmpty();
+        })
+        ->it('the wishlist module is on the product listing', function () use ($frontOfficeListingPage) {
+            // Skips this test when the module is not on the listing.
+            $frontOfficeListingPage->requireWishlistButtons();
         });
 
         for ($i = 1; $i <= 3; $i++) {

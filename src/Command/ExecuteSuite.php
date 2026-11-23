@@ -3,6 +3,7 @@
 namespace PrestaFlow\Library\Command;
 
 use Error;
+use Throwable;
 use PrestaFlow\Library\Utils\Env;
 use PrestaFlow\Library\Utils\Output;
 use PrestaFlow\Library\Utils\OutputStates;
@@ -42,6 +43,14 @@ class ExecuteSuite extends Command implements OutputStates
     protected $file = 'prestaflow/results.json';
 
     protected array $aggregatedSuites = [];
+
+    /** Run en JSON avec --file : results.json doit être écrit, même si le processus meurt. */
+    protected bool $writesResultsFile = false;
+
+    protected bool $resultsFileWritten = false;
+
+    /** Classe de la suite en cours d'exécution, null entre deux suites. */
+    protected ?string $runningSuite = null;
 
     use Output;
 
@@ -136,6 +145,14 @@ class ExecuteSuite extends Command implements OutputStates
         $summary = new TestRunSummary();
         $report = new JUnitReport();
 
+        $this->writesResultsFile = (bool) $input->getOption('file') && self::OUTPUT_JSON === $this->getOutputMode();
+        if ($this->writesResultsFile) {
+            // Une suite qui appelle exit ou provoque une erreur fatale tue le
+            // processus avant la fin de la boucle : on écrit quand même les
+            // résultats obtenus, avec la suite interrompue marquée en échec.
+            register_shutdown_function([$this, 'writeResultsOnShutdown']);
+        }
+
         $junitOption = $input->getOption('junit');
         $junitPath = ($junitOption === false) ? null : ($junitOption ?: 'prestaflow/junit.xml');
 
@@ -168,13 +185,7 @@ class ExecuteSuite extends Command implements OutputStates
                 continue;
             }
 
-            $testFile = file_get_contents($suitePath);
-            $namespace = str_replace('namespace ', '', str_replace(';', '', preg_grep('/namespace\s+(.+?);$/sm', explode("\n", $testFile))));
-            if (is_array($namespace)) {
-                $namespace = array_values($namespace)[0];
-            } else {
-                $namespace = '';
-            }
+            $namespace = $this->namespaceOf((string) file_get_contents($suitePath));
 
             $pathSplits = explode('/', $suitePath);
 
@@ -194,6 +205,9 @@ class ExecuteSuite extends Command implements OutputStates
             try {
                 if ($this->isExecutable($suite)) {
                     $nbSuites++;
+                    // Suite en cours : si le processus meurt (exit, erreur fatale),
+                    // l'arrêt écrit quand même les résultats déjà obtenus.
+                    $this->runningSuite = $className;
                     // Create a new section
                     $sectionId = ($this->cli ? 'cli-' : '') . sha1(str_replace('\\', '-', $className));
                     if (!array_key_exists($sectionId, $this->outputSections)) {
@@ -240,24 +254,37 @@ class ExecuteSuite extends Command implements OutputStates
                             $this->output->writeLn(json_encode($suite->results(false), JSON_PRETTY_PRINT));
                         }
                     }
-                } else {
-                    if ($this->isDebugMode()) {
-                        // $this->debug('Not executable', section: $sectionId);
+                }
+            } catch (Throwable $e) {
+                // Une suite qui plante (init(), classe absente, exception hors
+                // test) échoue seule : les autres suites tournent et leurs
+                // résultats sont écrits.
+                if ($this->runningSuite === null) {
+                    // Plantée avant d'être comptée (isExecutable()) : elle compte,
+                    // sinon un run fait seulement de suites plantées passerait pour vide.
+                    $nbSuites++;
+                }
+                $errored = $this->erroredSuiteResult($className, $e);
+                $summary->add($errored['stats']);
+                $report->addSuite($errored);
+                if (self::OUTPUT_JSON === $this->getOutputMode()) {
+                    if ($input->getOption('file')) {
+                        $this->aggregatedSuites[] = $errored;
+                    } else {
+                        $this->output->writeLn(json_encode($errored, JSON_PRETTY_PRINT));
                     }
                 }
-            } catch (Error $e) {
-                throw $e;
+                $this->reportSuiteError($className, $e);
+            } finally {
+                $this->runningSuite = null;
             }
         }
 
         $this->sections['progressIndicator']->finish('Finished');
         $this->sections['progressBar']->clear();
 
-        if ($input->getOption('file') && self::OUTPUT_JSON === $this->getOutputMode()) {
-            $this->filePutContents(
-                $this->file,
-                json_encode(['suites' => $this->aggregatedSuites], JSON_PRETTY_PRINT)
-            );
+        if ($this->writesResultsFile) {
+            $this->writeResultsFile();
             $this->success('Results saved to ' . $this->file, newLine: true, force: true);
         }
 
@@ -306,6 +333,100 @@ class ExecuteSuite extends Command implements OutputStates
         $this->releaseBrowser();
 
         return $summary->hasFailures() ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Namespace déclaré dans le source d'un fichier PHP, '' s'il n'en a pas
+     * (index.php de protection, script sans namespace) : jamais d'avertissement.
+     */
+    public function namespaceOf(string $source): string
+    {
+        if (preg_match('/^\s*namespace\s+([^;\s{]+)\s*[;{]/m', $source, $matches) !== 1) {
+            return '';
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * Résultat d'une suite qui n'a pas pu tourner : même forme que
+     * TestsSuite::results(false), un test en échec qui porte le message.
+     */
+    public function erroredSuiteResult(string $className, Throwable|string $error): array
+    {
+        $message = $error instanceof Throwable
+            ? sprintf('%s: %s', get_class($error), $error->getMessage())
+            : $error;
+
+        return [
+            'suite' => $className,
+            'title' => $className,
+            'stats' => [
+                'passes' => 0,
+                'failures' => 1,
+                'skips' => 0,
+                'skippeds' => 0,
+                'todos' => 0,
+                'assertions' => 0,
+                'time' => 0,
+            ],
+            'tests' => [[
+                'title' => 'Suite could not run',
+                'state' => 'fail',
+                'time' => 0,
+                'expect' => ['fail' => [$message]],
+            ]],
+            'warnings' => [],
+            'screens' => [],
+        ];
+    }
+
+    protected function reportSuiteError(string $className, Throwable $error): void
+    {
+        $message = sprintf('%s could not run: %s: %s', $className, get_class($error), $error->getMessage());
+
+        if (self::OUTPUT_JSON === $this->getOutputMode()) {
+            // La sortie standard porte le JSON : l'erreur va sur la sortie d'erreur.
+            if ($this->output instanceof \Symfony\Component\Console\Output\ConsoleOutputInterface) {
+                $this->output->getErrorOutput()->writeln('ERROR ' . $message);
+            }
+
+            return;
+        }
+
+        $this->cli(baseLine: '', bold: true, titleColor: 'red', title: 'ERROR', secondaryColor: 'white', message: $message, newLine: true, section: 'errors');
+    }
+
+    protected function writeResultsFile(): void
+    {
+        $this->filePutContents(
+            $this->file,
+            json_encode(['suites' => $this->aggregatedSuites], JSON_PRETTY_PRINT)
+        );
+        $this->resultsFileWritten = true;
+    }
+
+    /**
+     * Arrêt du processus pendant une suite (exit, erreur fatale) : écrit les
+     * résultats obtenus, la suite interrompue en échec, et sort en erreur.
+     */
+    public function writeResultsOnShutdown(): void
+    {
+        if (!$this->writesResultsFile || $this->resultsFileWritten || $this->runningSuite === null) {
+            return;
+        }
+
+        $fatal = error_get_last();
+        $reason = ($fatal !== null && in_array($fatal['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true))
+            ? sprintf('Fatal error: %s in %s:%d', $fatal['message'], $fatal['file'], $fatal['line'])
+            : 'The process stopped during this suite (exit called, or a fatal error).';
+
+        $this->aggregatedSuites[] = $this->erroredSuiteResult($this->runningSuite, $reason);
+        $this->writeResultsFile();
+        fwrite(STDERR, sprintf("ERROR %s could not run: %s\n", $this->runningSuite, $reason));
+
+        // Un exit() sans code dans une suite sortirait en succès : le run a échoué.
+        exit(1);
     }
 
     /**

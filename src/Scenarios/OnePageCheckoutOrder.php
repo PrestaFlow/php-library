@@ -16,8 +16,9 @@ use PrestaFlow\Library\Expects\Expect;
 class OnePageCheckoutOrder extends Scenario
 {
     public $params = [
-        // The reference shop (ps92rc1 container) runs in English.
-        'locale' => 'en',
+        // null => the suite's locale (the project's language in the app). Friendly
+        // URLs and their per-language overrides are read in that language.
+        'locale' => null,
         // Left null on purpose: FrontOffice\Login::login() then falls back to the
         // FO_EMAIL / FO_PASSWD globals, fed by PRESTAFLOW_FO_EMAIL and
         // PRESTAFLOW_FO_PASSWD — the same route the back-office step already
@@ -25,26 +26,34 @@ class OnePageCheckoutOrder extends Scenario
         // do not hardcode a password here.
         'customerEmail' => null,
         'customerPassword' => null,
-        // A canonical product path. An id would work too — PrestaShop
-        // canonicalises on the id and ignores the slug (/6-anything redirects to
-        // the real URL), and goToPage('product', $id) now substitutes the
-        // {index} placeholder for scalar params. The path is kept because this
-        // scenario pins one product deliberately: the Mug (id 6) has no
-        // combinations, so add-to-cart works without posting an
-        // id_product_attribute, unlike the demo t-shirt this used to point to.
-        'productUrl' => '6-mug-the-best-is-yet-to-come.html',
+        // null => the first product of the shop that can be added to the cart
+        // as it is (Product::findPurchasable()). Set a product path or URL to
+        // pin one product.
+        'productUrl' => null,
         'cartQuantity' => 1,
+        // null => the first carrier offered; an id_carrier picks that one.
+        'carrierId' => null,
+        // The first payment option of these modules is used. Offline ones by
+        // default: no redirection to a payment provider, nothing charged. When
+        // the shop offers none of them the order steps are skipped.
+        'paymentModules' => \PrestaFlow\Library\Pages\FrontOfficePage::OFFLINE_PAYMENT_MODULES,
         // Used only when the customer has no saved address yet.
         'firstName' => 'PrestaFlow',
         'lastName' => 'Fixture',
         'addressStreet' => '16 Main street',
         'addressCity' => 'Paris',
-        'addressPostcode' => '75002',
-        'addressCountry' => 'France',
+        // null => a postcode valid for the country the form shows.
+        'addressPostcode' => null,
+        // null => keep the country the shop preselects; a label (as listed in
+        // the form, in the shop's language) selects that one.
+        'addressCountry' => null,
+        // null => the first state when the country requires one; or a label.
+        'addressState' => null,
         'addressPhone' => '0102030405',
         // Which shop the back-office settings are written for. The checkout
         // layout is stored per shop, so a multistore run must say which one.
-        'shopId' => 1,
+        // null => the project's shop (PRESTAFLOW_SHOP_ID, default 1).
+        'shopId' => null,
     ];
 
     public function steps($testSuite)
@@ -60,7 +69,9 @@ class OnePageCheckoutOrder extends Scenario
 
         // importPage() resolves friendly URLs from the SUITE's locale, so propagate
         // this scenario's locale before importing pages.
-        $testSuite->params['locale'] = $this->params['locale'] ?? 'en';
+        if (is_string($this->params['locale'] ?? null) && $this->params['locale'] !== '') {
+            $testSuite->params['locale'] = $this->params['locale'];
+        }
 
         $testSuite->importPage('BackOffice\Login');
         $testSuite->importPage('BackOffice\CheckoutLayout');
@@ -78,17 +89,17 @@ class OnePageCheckoutOrder extends Scenario
         // returns false on a missing selector instead of raising — so a failed
         // back-office login would go unnoticed and every later step would
         // "pass" while doing nothing at all.
+        ->it('the theme supports the one page checkout', function () use ($frontOfficeOnePageCheckoutPage) {
+            // Skips the suite on the Classic theme, before the layout is switched.
+            $frontOfficeOnePageCheckoutPage->requireCompatibleTheme();
+
+            Expect::that($frontOfficeOnePageCheckoutPage->getShopThemeName())->notEquals('classic');
+        })
         ->it('log in on the BackOffice', function () use ($backOfficeLoginPage) {
             $backOfficeLoginPage->goToPage('login');
             $backOfficeLoginPage->login();
 
             Expect::that($backOfficeLoginPage->isLoggedIn())->equals(true);
-        })
-        ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
-            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
-            $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
-
-            Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
         })
         ->it('log in on the FrontOffice', function () use ($frontOfficeLoginPage) {
             $frontOfficeLoginPage->goToPage('login');
@@ -100,14 +111,30 @@ class OnePageCheckoutOrder extends Scenario
             Expect::that($frontOfficeLoginPage->isLoggedIn())->equals(true);
         })
         ->it('add a product to the cart', function () use ($frontOfficeProductPage, $frontOfficeCartPage) {
-            $frontOfficeProductPage->goToProductPath($this->getParam('productUrl'));
+            // Avant la bascule du tunnel : un saut ici (aucun produit commandable)
+            // ne doit pas laisser la boutique sur une mise en page jamais vérifiée.
+            // Le panier ne dépend pas de la mise en page du tunnel.
+            // Skips the suite when no product of the shop can be added to the cart.
+            $frontOfficeProductPage->goToPurchasableProduct($this->getParam('productUrl'));
             $frontOfficeProductPage->addToCart((int) $this->getParam('cartQuantity'));
 
             $frontOfficeCartPage->goToCart();
             Expect::that($frontOfficeCartPage->hasItems())->equals(true);
         })
-        ->it('reach the one page checkout', function () use ($frontOfficeCartPage, $frontOfficeOnePageCheckoutPage) {
+        ->it('switch the shop to the one page checkout', function () use ($backOfficeCheckoutLayoutPage) {
+            $backOfficeCheckoutLayoutPage->goTo((int) $this->getParam('shopId'));
+            $backOfficeCheckoutLayoutPage->switchToOnePageCheckout();
+
+            Expect::that($backOfficeCheckoutLayoutPage->isOnePageCheckoutSelected())->equals(true);
+        })
+        ->it('reach the one page checkout', function () use ($frontOfficeCartPage, $frontOfficeOnePageCheckoutPage, $backOfficeCheckoutLayoutPage) {
+            $frontOfficeCartPage->goToCart();
             $frontOfficeCartPage->proceedToCheckout();
+
+            // Le front doit afficher la commande en une page ; sinon (thème sans
+            // gabarit pour le module) la boutique est remise en quatre étapes
+            // sur-le-champ et la suite est sautée : jamais de tunnel cassé.
+            $frontOfficeOnePageCheckoutPage->requireRenderedOrRestore($backOfficeCheckoutLayoutPage, (int) $this->getParam('shopId'));
 
             Expect::that($frontOfficeOnePageCheckoutPage->isOnePageCheckoutActive())->equals(true);
         })
@@ -116,27 +143,25 @@ class OnePageCheckoutOrder extends Scenario
             // that has never ordered — a freshly provisioned fixture, say — gets
             // the inline form instead. Both are legitimate states for a
             // logged-in buyer, and the carrier assertion below gates them alike.
-            if ($frontOfficeOnePageCheckoutPage->hasSavedAddresses()) {
-                $frontOfficeOnePageCheckoutPage->selectAddress();
-            } else {
-                $frontOfficeOnePageCheckoutPage->fillNewAddress([
-                    'firstName' => $this->getParam('firstName'),
-                    'lastName' => $this->getParam('lastName'),
-                    'street' => $this->getParam('addressStreet'),
-                    'postcode' => $this->getParam('addressPostcode'),
-                    'city' => $this->getParam('addressCity'),
-                    'country' => $this->getParam('addressCountry'),
-                    'phone' => $this->getParam('addressPhone'),
-                ]);
-            }
+            $frontOfficeOnePageCheckoutPage->selectSavedAddressOrFill([
+                'firstName' => $this->getParam('firstName'),
+                'lastName' => $this->getParam('lastName'),
+                'street' => $this->getParam('addressStreet'),
+                'postcode' => $this->getParam('addressPostcode'),
+                'city' => $this->getParam('addressCity'),
+                'country' => $this->getParam('addressCountry'),
+                'state' => $this->getParam('addressState'),
+                'phone' => $this->getParam('addressPhone'),
+            ]);
 
             // Carriers only appear once an address is selected and persisted:
             // assert it here rather than letting a silent failure surface later
             // as an unexplained timeout on the payment section.
             Expect::that($frontOfficeOnePageCheckoutPage->hasCarriers())->equals(true);
 
-            $frontOfficeOnePageCheckoutPage->selectFirstCarrier();
-            $frontOfficeOnePageCheckoutPage->selectFirstPayment();
+            $frontOfficeOnePageCheckoutPage->selectCarrier($this->getParam('carrierId'));
+            // Skips the suite when the shop offers none of these payment modules.
+            $frontOfficeOnePageCheckoutPage->selectPayment($this->getParam('paymentModules'));
             $frontOfficeOnePageCheckoutPage->acceptTerms();
 
             Expect::that($frontOfficeOnePageCheckoutPage->isReadyToPlaceOrder())->equals(true);
