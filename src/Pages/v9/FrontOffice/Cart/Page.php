@@ -88,8 +88,38 @@ class Page extends BasePage
 
     public function proceedToCheckout(): void
     {
+        $href = $this->pfCheckoutHref();
         $this->click($this->getSelector('checkoutButton'));
         $this->waitForPageReload();
+
+        // waitForPageReload() rend la main au bout de 10 s sans rien dire : sur
+        // un navigateur lent (conteneur, navigateur distant) la page de commande
+        // n'était pas encore là quand l'étape suivante remplissait ses champs.
+        // On attend donc la page de commande elle-même (body#checkout, les deux
+        // tunnels) ; si le clic n'a pas navigué (bouton désactivé le temps d'un
+        // rafraîchissement du panier), on suit son lien.
+        if (!$this->waitForJsCondition('!!document.body && document.body.id === "checkout"', 10000)
+            && $href !== null
+            && $this->waitForJsCondition('!!document.body && document.body.id === "cart"', 1000)
+        ) {
+            $this->goToUrl($href);
+            $this->waitForJsCondition('!!document.body && document.body.id === "checkout"', 10000);
+        }
+    }
+
+    /** Lien du bouton « Commander » de la page panier, null quand il est absent. */
+    private function pfCheckoutHref(): ?string
+    {
+        try {
+            $href = $this->getPage()->evaluate(sprintf(
+                '(function(){var a=document.querySelector(%s);return a&&a.href?a.href:null;})()',
+                json_encode($this->getSelector('cartPageCheckoutButton'))
+            ))->getReturnValue();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_string($href) && $href !== '' ? $href : null;
     }
 
     /** Number of product lines in the cart. */

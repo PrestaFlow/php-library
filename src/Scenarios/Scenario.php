@@ -2,6 +2,7 @@
 
 namespace PrestaFlow\Library\Scenarios;
 
+use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Expects\Expect;
 use PrestaFlow\Library\Pages\FrontOfficePage;
 use PrestaFlow\Library\Traits\ImportPage;
@@ -152,6 +153,9 @@ class Scenario
             }
         );
     }
+
+    /** Raison du saut quand la commande en une page ne s'affiche pas sur le front. */
+    public const ONE_PAGE_CHECKOUT_UNAVAILABLE = \PrestaFlow\Library\Pages\v9\FrontOffice\OnePageCheckout\Page::RENDER_UNAVAILABLE;
 
     public function it(string $description, $steps)
     {

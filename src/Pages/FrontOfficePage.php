@@ -778,6 +778,116 @@ class FrontOfficePage extends CommonPage
     }
 
     /**
+     * Sélecteurs dont la valeur lue ne correspond pas à la valeur voulue
+     * (espaces de bord ignorés). Un champ absent de la page (null) n'est pas
+     * compté : un thème ou une boutique peut masquer un champ facultatif (le
+     * téléphone de l'adresse, par exemple), et c'est l'attente du formulaire,
+     * pas cette comparaison, qui dit si la page est la bonne.
+     *
+     * @param array<string, string>      $wanted sélecteur => valeur voulue
+     * @param array<string, string|null> $read   sélecteur => valeur lue (null = champ absent)
+     *
+     * @return list<string>
+     */
+    public static function pfUnfilledFields(array $wanted, array $read): array
+    {
+        $unfilled = [];
+        foreach ($wanted as $selector => $value) {
+            $actual = $read[$selector] ?? null;
+            $value = trim((string) $value);
+            if ($actual !== null && trim((string) $actual) !== $value) {
+                $unfilled[] = (string) $selector;
+            }
+        }
+
+        return $unfilled;
+    }
+
+    /**
+     * Valeur courante (propriété value) de chaque champ, null quand il est absent.
+     *
+     * @param list<string> $selectors
+     *
+     * @return array<string, string|null>
+     */
+    protected function pfReadInputValues(array $selectors): array
+    {
+        try {
+            $json = $this->getPage()->evaluate(sprintf(
+                '(function(sels){var out={};sels.forEach(function(s){var e=document.querySelector(s);'
+                . 'out[s]=e?String(e.value):null;});return JSON.stringify(out);})(%s)',
+                json_encode(array_values($selectors))
+            ))->getReturnValue();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $decoded = json_decode((string) $json, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Remplit des champs puis vérifie ce qu'ils contiennent vraiment, et
+     * ressaisit ceux qui ne tiennent pas.
+     *
+     * La saisie au clavier (setValue) suppose que le clic a donné le focus au
+     * champ : sur une page encore en train de se mettre en place (chargement
+     * lent, re-rendu AJAX d'une étape, décalage de mise en page), le texte part
+     * ailleurs sans aucune erreur. Sur un Chrome Linux en conteneur, le tunnel
+     * de commande a ainsi validé un formulaire invité entièrement vide. Les
+     * tentatives suivantes posent la valeur en JS (input + change), qui ne
+     * dépend pas du focus.
+     *
+     * @param array<string, string> $fields sélecteur => valeur
+     *
+     * @return list<string> les sélecteurs encore faux après toutes les tentatives
+     */
+    protected function pfFillInputsVerified(array $fields, int $attempts = 3): array
+    {
+        $unfilled = array_keys($fields);
+        for ($attempt = 0; $attempt < $attempts && $unfilled !== []; $attempt++) {
+            if ($attempt > 0) {
+                // Laisse un re-rendu en cours se terminer avant de ressaisir.
+                $this->waitForStable(2000);
+            }
+            foreach ($unfilled as $selector) {
+                $value = (string) $fields[$selector];
+                if ($attempt === 0) {
+                    $this->setValue($selector, $value);
+                } else {
+                    $this->setValueByJs($selector, $value);
+                }
+            }
+            $unfilled = self::pfUnfilledFields($fields, $this->pfReadInputValues(array_keys($fields)));
+        }
+
+        return $unfilled;
+    }
+
+    /**
+     * Coche les cases obligatoires (required) sous $scope et renvoie le nombre
+     * de cases obligatoires encore décochées ensuite ; -1 quand $scope est absent.
+     */
+    protected function pfTickRequiredCheckboxes(string $scope): int
+    {
+        try {
+            $left = $this->getPage()->evaluate(sprintf(
+                '(function(scope){var root=document.querySelector(scope);if(!root)return -1;'
+                . 'var boxes=[].slice.call(root.querySelectorAll("input[type=checkbox]")).filter(function(c){return c.required;});'
+                . 'boxes.forEach(function(c){if(!c.checked){c.click();}});'
+                . 'boxes.forEach(function(c){if(!c.checked){c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}));}});'
+                . 'return boxes.filter(function(c){return !c.checked;}).length;})(%s)',
+                json_encode($scope)
+            ))->getReturnValue();
+        } catch (\Throwable) {
+            return -1;
+        }
+
+        return is_numeric($left) ? (int) $left : -1;
+    }
+
+    /**
      * Expect this page's title to contain $expected, ignoring case (themes
      * upper-case headings in CSS) and a trailing "..." (truncated miniature
      * names). Does nothing when $expected is null or '': an optional check a
