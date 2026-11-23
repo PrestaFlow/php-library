@@ -122,12 +122,36 @@ class Page extends BasePage
         $this->click($this->getSelector('personalContinueButton'));
         $this->waitForPageReload();
 
+        $this->requireAddressStep();
+    }
+
+    /**
+     * Échoue tout de suite si le tunnel n'est pas passé à l'étape des adresses.
+     *
+     * Sans ce contrôle, un formulaire invité refusé sans message laissait le
+     * scénario continuer : fillNewAddress() ne trouvait aucun champ à remplir,
+     * et le run échouait environ 55 s plus tard sur hasReachedShippingStep(),
+     * avec un simple « false doit être égal à 1 ».
+     */
+    public function requireAddressStep(int $timeout = 15000): void
+    {
         // L'étape suivante : le formulaire d'adresse (invité) ou ses cartes.
-        $this->waitForJsCondition(
+        $reached = $this->waitForJsCondition(
             '!!document.querySelector(' . json_encode($this->getSelector('addressStreetInput')) . ')'
             . ' || !!document.querySelector(' . json_encode($this->getSelector('addressesContinueButton')) . ')',
-            15000
+            $timeout
         );
+        if ($reached) {
+            return;
+        }
+
+        $stillOnPersonalInformation = $this->getPage()->evaluate(
+            '!!document.querySelector(' . json_encode($this->getSelector('personalInformationStep') . '.-current') . ')'
+        )->getReturnValue();
+
+        Expect::that(false)->equals(true, $stillOnPersonalInformation
+            ? 'The checkout stayed on the personal information step after the guest form was sent'
+            : 'The checkout address step did not show up after the guest form was sent');
     }
 
     /**

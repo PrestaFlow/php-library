@@ -123,6 +123,52 @@ final class CheckoutRobustnessTest extends TestCase
         }
     }
 
+    public function testAddressStepReachedPassesSilently(): void
+    {
+        $page = $this->checkoutPage([true]);
+
+        $page->requireAddressStep(1);
+
+        $this->assertCount(1, $page->receivedJs);
+        $this->assertStringContainsString('input[name=\"address1\"]', $page->receivedJs[0]);
+    }
+
+    public function testCheckoutStuckOnPersonalInformationFailsWithAClearMessage(): void
+    {
+        // Formulaire d'adresse absent, étape 1 toujours courante : le cas vu
+        // sur un Chrome partagé, qui échouait 55 s plus tard sans explication.
+        $page = $this->checkoutPage([false, true]);
+
+        try {
+            $page->requireAddressStep(1);
+            $this->fail('requireAddressStep() must fail when the address step never shows up');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('stayed on the personal information step', $e->getMessage());
+        }
+        $this->assertStringContainsString('#checkout-personal-information-step', end($page->receivedJs));
+    }
+
+    public function testMissingAddressFormElsewhereFailsWithAClearMessage(): void
+    {
+        $page = $this->checkoutPage([false, false]);
+
+        try {
+            $page->requireAddressStep(1);
+            $this->fail('requireAddressStep() must fail when the address step never shows up');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('address step did not show up', $e->getMessage());
+        }
+    }
+
+    public function testGuestCheckoutEndsOnTheAddressStepCheck(): void
+    {
+        $method = new \ReflectionMethod(CheckoutPage::class, 'checkoutAsGuest');
+        $lines = file($method->getFileName());
+        $body = implode('', array_slice($lines, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+
+        $this->assertStringContainsString('$this->requireAddressStep()', $body);
+    }
+
     public function testGuestCheckoutVerifiesWhatWasTyped(): void
     {
         $method = new \ReflectionMethod(CheckoutPage::class, 'checkoutAsGuest');
