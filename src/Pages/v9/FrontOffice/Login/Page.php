@@ -5,6 +5,7 @@ namespace PrestaFlow\Library\Pages\v9\FrontOffice\Login;
 use PrestaFlow\Library\Exceptions\SkipTestException;
 use PrestaFlow\Library\Pages\Common\FrontOffice\Page as BasePage;
 use PrestaFlow\Library\Tests\TestsSuite;
+use PrestaFlow\Library\Utils\CustomerLoginLink;
 
 class Page extends BasePage
 {
@@ -24,10 +25,22 @@ class Page extends BasePage
     }
 
     /**
-     * Enter credentials and submit login form
+     * Enter credentials and submit login form, or, on a cloud run without a
+     * customer password, open the module's login link.
      */
     public function login($email = null, $password = null, $waitForNavigation = true)
     {
+        // Cloud run on a shop linked by the module: no customer password, a
+        // single-use link that opens the session (CustomerLoginLink).
+        if ($email === null && $password === null) {
+            $link = CustomerLoginLink::take();
+            if ($link !== null) {
+                $this->goToUrl($link);
+
+                return;
+            }
+        }
+
         if ($email === null) {
             $email = $this->getGlobal('FO_EMAIL');
         }
