@@ -8,20 +8,20 @@
     "packages": [
         {
             "name": "chrome-php/chrome",
-            "version": "v1.16.1",
+            "version": "v1.16.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/chrome-php/chrome.git",
-                "reference": "2618fbcd0530e917433675b507eca25ad4c52376"
+                "reference": "3dc28d80f1660eae8cf0c983421463e3cc7bae0d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/chrome-php/chrome/zipball/2618fbcd0530e917433675b507eca25ad4c52376",
-                "reference": "2618fbcd0530e917433675b507eca25ad4c52376",
+                "url": "https://api.github.com/repos/chrome-php/chrome/zipball/3dc28d80f1660eae8cf0c983421463e3cc7bae0d",
+                "reference": "3dc28d80f1660eae8cf0c983421463e3cc7bae0d",
                 "shasum": ""
             },
             "require": {
-                "chrome-php/wrench": "^1.9",
+                "chrome-php/wrench": "^1.9.3",
                 "evenement/evenement": "^3.0.1",
                 "monolog/monolog": "^1.27.1 || ^2.8 || ^3.2",
                 "php": "^7.4.15 || ^8.0.2",
@@ -76,22 +76,22 @@
             ],
             "support": {
                 "issues": "https://github.com/chrome-php/chrome/issues",
-                "source": "https://github.com/chrome-php/chrome/tree/v1.16.1"
+                "source": "https://github.com/chrome-php/chrome/tree/v1.16.3"
             },
-            "time": "2026-07-06T19:06:52+00:00"
+            "time": "2026-11-26T00:02:52+00:00"
         },
         {
             "name": "chrome-php/wrench",
-            "version": "v1.9.2",
+            "version": "v1.9.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/chrome-php/wrench.git",
-                "reference": "c314dcfaca020e836d05e0913a63db97d7d3da05"
+                "reference": "f926988e97642891b3d1688822c79addbbb4e857"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/chrome-php/wrench/zipball/c314dcfaca020e836d05e0913a63db97d7d3da05",
-                "reference": "c314dcfaca020e836d05e0913a63db97d7d3da05",
+                "url": "https://api.github.com/repos/chrome-php/wrench/zipball/f926988e97642891b3d1688822c79addbbb4e857",
+                "reference": "f926988e97642891b3d1688822c79addbbb4e857",
                 "shasum": ""
             },
             "require": {
@@ -138,9 +138,9 @@
             ],
             "support": {
                 "issues": "https://github.com/chrome-php/wrench/issues",
-                "source": "https://github.com/chrome-php/wrench/tree/v1.9.2"
+                "source": "https://github.com/chrome-php/wrench/tree/v1.9.3"
             },
-            "time": "2026-07-06T19:07:11+00:00"
+            "time": "2026-11-25T23:56:52+00:00"
         },
         {
             "name": "evenement/evenement",
