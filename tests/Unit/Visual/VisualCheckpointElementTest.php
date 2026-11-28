@@ -38,6 +38,7 @@ final class VisualCheckpointElementTest extends TestCase
     {
         return new class ('en', '8.1.0', [], $nodeClip, $scroll) extends CommonPage {
             public array $screenshotOptions = [];
+            public array $waited = [];
             public ?int $saveTimeout = null;
 
             public function __construct($locale, $version, $options, public ?Clip $nodeClip, public array $scroll)
@@ -52,6 +53,11 @@ final class VisualCheckpointElementTest extends TestCase
                 return new class ($outer) {
                     public function __construct(private $outer)
                     {
+                    }
+
+                    public function waitUntilContainsElement($selector, int $timeout = 30000)
+                    {
+                        $this->outer->waited[] = [$selector, $timeout];
                     }
 
                     public function dom()
@@ -148,6 +154,20 @@ final class VisualCheckpointElementTest extends TestCase
 
         $this->assertSame(CommonPage::SCREENSHOT_TIMEOUT_MS, $page->saveTimeout);
         $this->assertGreaterThanOrEqual(30000, CommonPage::SCREENSHOT_TIMEOUT_MS);
+    }
+
+    /**
+     * The first navigation of a run, on a cold shop, can hand back a blank page:
+     * the element must be awaited before it is declared missing.
+     */
+    public function test_the_element_is_awaited_before_the_capture(): void
+    {
+        $page = $this->makePage(new Clip(0, 0, 300, 100), [0, 0]);
+
+        $page->visualCheckpoint('header', '#header');
+
+        $this->assertSame([['#header', CommonPage::VISUAL_ELEMENT_TIMEOUT_MS]], $page->waited);
+        $this->assertSame(10000, CommonPage::VISUAL_ELEMENT_TIMEOUT_MS);
     }
 
     public function test_element_without_a_render_box_fails_explicitly(): void
