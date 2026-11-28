@@ -34,6 +34,13 @@ class CommonPage
      */
     public const SCREENSHOT_TIMEOUT_MS = 30000;
 
+    /**
+     * Attente maximale de l'élément d'un checkpoint visuel. La 1re navigation d'un run, sur une
+     * boutique encore froide, peut rendre la main sur une page encore blanche : sans attente, le
+     * sélecteur était déclaré introuvable en 570 ms (header Desktop d'un run cloud).
+     */
+    public const VISUAL_ELEMENT_TIMEOUT_MS = 10000;
+
     protected $customs = [
         'selectors' => [],
         'messages' => [],
@@ -841,6 +848,7 @@ class CommonPage
                 $this->applyVisualInline('hide', $hide, 'display', 'none', false);
             }
             if ($selector !== null) {
+                $this->waitForVisualElement($selector);
                 $node = $page->dom()->querySelector($selector);
                 if ($node === null) {
                     throw new \RuntimeException("visualCheckpoint : sélecteur introuvable « {$selector} »");
@@ -981,6 +989,16 @@ class CommonPage
     public function getMetaTitle()
     {
         return $this->getPage()->evaluate('document.title')->getReturnValue();
+    }
+
+    /** Attend l'élément d'un checkpoint ; s'il n'apparaît pas, visualCheckpoint() le dit introuvable. */
+    protected function waitForVisualElement(string $selector): void
+    {
+        try {
+            $this->getPage()->waitUntilContainsElement($selector, self::VISUAL_ELEMENT_TIMEOUT_MS);
+        } catch (\Throwable) {
+            // Introuvable ou délai dépassé : signalé juste après, avec le sélecteur.
+        }
     }
 
     public function goToUrl(string $url)
